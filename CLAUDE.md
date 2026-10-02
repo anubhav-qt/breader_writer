@@ -21,8 +21,8 @@ the way a breader card fills with colour as you read.
 
 ## Status
 
-Nothing is built yet. The product questions are settled; building starts at step 1 of the build
-order below.
+Step 1 (skeleton) is under way: the shared package and the server are built and tested. The
+library page (a copy of breader's) comes next. See "The code" below for what exists.
 
 ### Decided
 
@@ -134,6 +134,51 @@ Each step ends working, committed, and with a short test checklist for the owner
 ### Later versions
 
 - Send a book straight to the breader library (v1 is an EPUB download).
+
+## The code
+
+npm workspaces, as in breader. Node 24 (`.nvmrc`).
+
+### `shared/` (`@writer/shared`)
+
+- `src/protocol.ts`: the zod shapes the server and the app exchange (`Me`, `Access`,
+  `BookCard`, `BookList`). Change a shape here and both sides get the type error.
+
+### `server/` (`@writer/server`)
+
+A Hono API, port 8790, built like breader's server.
+
+- `src/env.ts`: every setting, validated with zod. `DATABASE_URL` is the writer's tables;
+  `BREADER_DATABASE_URL` is where breader's logins are (unset in production, where it's the same
+  Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
+  the invite list.
+- `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`. Today: `books`
+  (owner's breader user id, title, colour, word goal, words written). drizzle-kit only sees this
+  file and this schema.
+- `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
+  reads. Breader owns and migrates them; the writer never writes to them.
+- `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
+  (`brdr.session_token`, or `__Secure-brdr.session_token` when secure) holds a session token
+  and its HMAC-SHA256 signature (base64) made with `SESSION_SECRET`. The writer checks the
+  signature, then looks the token up in breader's tables. Logging in and out stay breader's job.
+- `src/lib/access.ts`: `accessFor` decides `logged_out`, `unconfirmed`, `invite_only` or
+  `open`; `requireWriter` guards routes that need `open`. An unconfirmed address is told so
+  before the list is checked, so nobody learns whether an email they don't own is invited.
+- `src/routes/`: `GET /health`; `GET /v1/me` (the account and its access, for anyone);
+  `GET /v1/books` (the account's books, most recent first, `open` only).
+- `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
+  (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
+- `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
+  an advisory lock, as breader's do. drizzle-kit writes `CREATE SCHEMA "writer"`, which clashes
+  with the migrator making the schema first for its table, so the first migration says
+  `IF NOT EXISTS`. Watch for it if a migration ever makes another schema. Tables get row level
+  security, as breader's do. New migration: change `schema.ts`, then
+  `npm run db:generate -w server`.
+- `test/`: vitest against the writer's Docker Postgres (`npm run db`, port 54329), in a fresh
+  `writer_test` database. `test/breader.sql` makes breader's login tables, and `test/breader.ts`
+  is a stand-in for breader's server: a real Better Auth, the version breader pins (1.7.6),
+  configured as breader configures it. Tests log in through it and hand its cookie to the
+  writer. If breader upgrades Better Auth, upgrade it here too and run the tests.
 
 ## Breader, the sibling project
 
@@ -325,3 +370,8 @@ chat as the memory.
 
 - Node 24: `source ~/.nvm/nvm.sh && nvm use 24` (the default here is 18, which fails).
 - This Mac is a test machine. Breader's live server is the ThinkPad.
+- Docker is fine here for the writer. Its Postgres runs from `infra/compose.dev.yml` (project
+  `breader-writer`). Breader's handoff rule against starting the Mac's Docker stack is about
+  breader's own stack; don't stretch another project's rules over this one without asking.
+- Breader's prod settings are in `~/anubhav/breader/infra/.env`. Never print it. Read key names
+  only (`grep -o '^[A-Z0-9_]*='`).

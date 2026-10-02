@@ -1,0 +1,24 @@
+# The writer's own Postgres for development and tests: npm run db. Breader itself isn't run here;
+# locally the writer reads logins from prod breader (see CLAUDE.md, "Running it locally").
+# Its own project name: breader's compose files also live in a folder called infra.
+name: breader-writer
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: writer
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - writer-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  writer-db:

@@ -81,10 +81,15 @@ owner's test, and the relationship graph, which replaces setup's one line feelin
   rich, complex sheets; walk-ons stay small. The owner can open and edit any cast member's sheet
   at any time, and the edit reaches back through everything already played and written (see
   "Changing the past").
-- **Changing something changes it everywhere, back to the start.** When the owner changes a fact
-  later (a character's name, habits, personality, past, or anything else), every earlier place
-  that says otherwise is brought in line: the state, the summaries, the turns and the written
-  book. How it works is in "Changing the past" below; some of it is still open.
+- **A change can reach back to the start.** When the owner changes something later, every
+  earlier place that says otherwise can be brought in line: the state, the summaries, the turns
+  and the written book.
+  - **A rename always reaches back.** The new name is the name from the first page.
+  - **Anything else asks: "Always so, or from now on?"** (a habit, a personality, a past, a
+    relationship, the world). Always so rewrites the past to match. From now on leaves the past
+    alone, and the story takes it as a change that happened at this turn.
+
+  How it works is in "Changing the past" below.
 - **Relationships are a graph.** The people are its points and their relationships its lines,
   deep enough for a long story. It replaces setup's one line per person ("how they feel about").
   A line holds a bond and two sides:
@@ -134,9 +139,8 @@ owner's test, and the relationship graph, which replaces setup's one line feelin
 
 1. Design direction for each new screen (setup, play, cast sheets), asked when we reach it.
    The library and the book view start as copies of breader's pages.
-2. Changing the past: whether every change reaches back, or the owner says per change whether
-   it was always so or happens from now on; and whether rewritten scenes are shown before
-   they're kept.
+2. Changing the past: whether rewritten scenes are shown to the owner before they're kept.
+   Asked when we reach it (step 5).
 
 ### Build order
 
@@ -432,16 +436,19 @@ chat as the memory.
 
 ### Changing the past
 
-- **A change reaches back.** When the owner changes a fact later, everything earlier that says
-  otherwise is brought in line: facts, summaries, relationship history, the turns and the
-  written book. A rename rewrites the name wherever it's written, with its forms (possessives,
-  nicknames made from it). A change of habit, personality or past rewrites only the passages that
-  contradict it and keeps the rest word for word.
+- **Renames always reach back; anything else is "always so" or "from now on"**, the owner's
+  pick when saving (see "Decided").
+- **Always so reaches back.** Everything earlier that says otherwise is brought in line: facts,
+  summaries, relationship history, the turns and the written book. A rename rewrites the name
+  wherever it's written, with its forms (possessives, nicknames made from it). A change of habit,
+  personality or past rewrites only the passages that contradict it and keeps the rest word for
+  word.
+- **From now on is a change in the story**, tagged at the current turn like the narrator's own
+  changes, so the narrator plays it as something that just happened to the character.
 - **The play and the book are rewritten together**, so they still never disagree.
 - **Nothing is lost.** Every rewrite keeps the version it replaced, tagged with the change that
   caused it, so a change can be looked over and taken back.
-- Still open (see "Open"): whether the owner picks per change between "always so" and "from now
-  on", and whether rewritten scenes are shown before they're kept.
+- Still open (see "Open"): whether rewritten scenes are shown before they're kept.
 
 ### Tools
 

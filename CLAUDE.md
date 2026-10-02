@@ -23,7 +23,8 @@ the way a breader card fills with colour as you read.
 
 Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
 settings, world and cast) on its own page, and changing it later. What's left of it is the
-owner's test. See "The code" below for what exists.
+owner's test, and the relationship graph, which replaces setup's one line feelings once its
+design is settled (see "Open"). See "The code" below for what exists.
 
 ### Decided
 
@@ -68,7 +69,9 @@ owner's test. See "The code" below for what exists.
   note without the character saying it, and the book never mentions it.
 - **Undo works until the scene is written.** While a scene is being played you can take back
   your last turns, or ask for a different reply to the same move. Once the scene is written into
-  the book it's settled, so the book and the play never disagree.
+  the book it's settled, so the book and the play never disagree. Only a change to the story's
+  facts reaches back into it (see "Changing the past"), and that rewrites the play and the book
+  together.
 - **A character starts as a few fields plus notes:** name, who they are, personality, past, and
   how they feel about the others, plus a free notes box. Only the name is required; the AI can
   fill any blank.
@@ -76,7 +79,16 @@ owner's test. See "The code" below for what exists.
   developed (a new fear, a secret revealed, a changed loyalty, a habit), it adds to their sheet by
   itself, and those additions compound over the story. Characters who matter most end up with
   rich, complex sheets; walk-ons stay small. The owner can open and edit any cast member's sheet
-  at any time, and the story takes the edit as true from then on.
+  at any time, and the edit reaches back through everything already played and written (see
+  "Changing the past").
+- **Changing something changes it everywhere, back to the start.** When the owner changes a fact
+  later (a character's name, habits, personality, past, or anything else), every earlier place
+  that says otherwise is brought in line: the state, the summaries, the turns and the written
+  book. How it works is in "Changing the past" below; some of it is still open.
+- **Relationships are a graph.** The people are its points and their relationships its lines,
+  deep enough for a long story: what two people are to each other, how each one sees the other,
+  and how that changed as the story went. It replaces setup's one line per person ("how they feel
+  about"). What a line holds and how the graph is shown are still open.
 - **A world is a few fields plus notes too:** genre, tone, setting (when and where), the rules
   that matter (magic, technology, power), and a free notes box. All optional; the AI fills blanks.
 - **The story can bring in its own characters.** Anyone who sticks around gets a card in the cast
@@ -111,6 +123,11 @@ owner's test. See "The code" below for what exists.
 
 1. Design direction for each new screen (setup, play, cast sheets), asked when we reach it.
    The library and the book view start as copies of breader's pages.
+2. The relationship graph: what one relationship holds, then how the graph is shown in setup and
+   mid story.
+3. Changing the past: whether every change reaches back, or the owner says per change whether
+   it was always so or happens from now on; and whether rewritten scenes are shown before
+   they're kept.
 
 ### Build order
 
@@ -120,16 +137,18 @@ Each step ends working, committed, and with a short test checklist for the owner
    library page whole (header, gallery, key and login dialogs, tokens, fonts) and serve it under
    `/writer`. A server that reads breader's login, checks the allowlist, and owns the `writer`
    schema. No AI yet.
-2. **Setup.** Make a book: world, cast, point of view, length, content level. Cards in the
-   library fill with words written over the goal.
+2. **Setup.** Make a book: world, cast and the relationship graph between them, point of view,
+   length, content level. Cards in the library fill with words written over the goal.
 3. **AI plumbing.** Fork pi (`packages/pi-ai`, `packages/pi-agent`) and change it for us: the
-   durable story state, the working context rebuilt from it, and constant compaction (see "The
-   AI" below). Run CLIProxyAPI, sign in subscriptions and pick a model from settings, as Seelie
-   does. Set up Nunjucks prompt templates and their tests.
+   durable story state (with every version kept, see "Changing the past"), the working context
+   rebuilt from it, and constant compaction (see "The AI" below). Run CLIProxyAPI, sign in
+   subscriptions and pick a model from settings, as Seelie does. Set up Nunjucks prompt
+   templates and their tests.
 4. **Play.** The narrator agent and its tools: turns, the author toggle, hints on tap, undo
-   within a scene, scenes ending, the cast growing and new characters joining.
+   within a scene, scenes ending, the cast growing and new characters joining, relationships
+   shifting, and the owner's changes reaching back through the turns and the state.
 5. **The book.** The scene writer, the book view (a copy of breader's reader), the progress bar
-   and the EPUB download.
+   and the EPUB download, and the owner's changes reaching back into written scenes.
 6. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
    the writer's app, the writer API behind the tunnel, and the nightly backup.
 
@@ -355,10 +374,11 @@ The story must never forget anything, at any point. The way to get there is to s
 chat as the memory.
 
 - **Durable state is the memory.** Everything the story knows lives in Postgres (the `writer`
-  schema): the world sheet; the cast sheets as they grow; relationships; a ledger of canon facts,
-  each tied to the turn or scene it came from; open threads and promises the story has made; the
-  arc and its pacing (words written against the goal); a timeline; a summary of every scene; and
-  the raw text of every turn and every written scene. Nothing is ever deleted by compaction.
+  schema): the world sheet; the cast sheets as they grow; the relationship graph; a ledger of
+  canon facts, each tied to the turn or scene it came from; open threads and promises the story
+  has made; the arc and its pacing (words written against the goal); a timeline; a summary of
+  every scene; and the raw text of every turn and every written scene. Nothing is ever deleted
+  by compaction.
 - **The working context is rebuilt from that state** for every call: the instructions, then the
   story bible (world and cast), the arc and open threads, summaries of earlier scenes, the
   current scene's turns word for word, and last the new input. The model never relies on
@@ -382,6 +402,34 @@ chat as the memory.
 - **The owner's edits win.** An edit to any sheet is true from the next call on.
 - **Every change is tagged** with who made it (the owner or the agent) and the turn it came
   from. That is what lets undo within a scene roll the state back along with the turns.
+- **People are referred to by id, never by name**, everywhere in the structured state: sheets,
+  relationships, facts, threads, the timeline. A name is written once, on its sheet, and filled
+  in when the context is built. So renaming someone changes every structured place at once, and
+  only text (turns, summaries, written scenes) needs rewriting.
+
+### Relationships
+
+- **A graph, with people as points and relationships as lines.** Two people can be several
+  things to each other at once, and each can see the other differently.
+- **Every line keeps its history**: each change, tagged like any other with who made it and the
+  turn or scene, so the story knows how two people got where they are, and undo rolls it back.
+- **In the working context**, the relationships between the people in the current scene go in
+  full, their history folded to a summary; everyone else's go in short.
+- The narrator changes a line only through its tool (shift a relationship). What a line holds is
+  still open (see "Open").
+
+### Changing the past
+
+- **A change reaches back.** When the owner changes a fact later, everything earlier that says
+  otherwise is brought in line: facts, summaries, relationship history, the turns and the
+  written book. A rename rewrites the name wherever it's written, with its forms (possessives,
+  nicknames made from it). A change of habit, personality or past rewrites only the passages that
+  contradict it and keeps the rest word for word.
+- **The play and the book are rewritten together**, so they still never disagree.
+- **Nothing is lost.** Every rewrite keeps the version it replaced, tagged with the change that
+  caused it, so a change can be looked over and taken back.
+- Still open (see "Open"): whether the owner picks per change between "always so" and "from now
+  on", and whether rewritten scenes are shown before they're kept.
 
 ### Tools
 

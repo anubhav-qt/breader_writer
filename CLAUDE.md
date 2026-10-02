@@ -98,6 +98,14 @@ with the owner's design direction for the setup screen. See "The code" below for
 - **How dark a story goes is picked per book** at setup: Gentle (all ages), Mature (violence,
   grief, cruelty, romance, like a mainstream adult novel; the default) or Unflinching (whatever
   the model will write). The models' own filters apply on top.
+- **Setup is one full page**, of its own under `/writer`, scrolling top to bottom: the book
+  (title, length, point of view, how dark), then the world, then the cast as cards you add, and
+  Start at the end. Not a dialog and not steps: a big cast needs the room, and it's easy to look
+  back over before starting.
+- **A character opens as a sheet over the page**, a dialog like breader's: name, who they are,
+  personality, past, a line for how they feel about each other cast member, notes. It's the same
+  sheet that opens mid story to read or edit someone, so it's built once and looks the same
+  everywhere.
 
 ### Open (ask the owner one at a time, in roughly this order)
 

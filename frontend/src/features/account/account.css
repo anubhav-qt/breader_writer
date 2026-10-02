@@ -1,0 +1,67 @@
+/* Log in dialog */
+.login { display: grid; gap: 10px; }
+.login-input { font: var(--ui-w) 15px/1.2 var(--ui); padding: 11px 12px; }
+.login-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.login-row .add-label { margin-top: 0; }
+.login-link {
+  font: var(--ui-w) 12.5px/1.2 var(--ui);
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 140ms ease;
+}
+.login-link:hover { text-decoration-color: currentColor; }
+.login-google { width: 100%; height: 44px; }
+.login-google svg { width: 18px; height: 18px; }
+.login-submit { width: 100%; height: 44px; margin-top: 6px; }
+.login-switch { margin: 2px 0 0; text-align: center; font: var(--ui-w) 12.5px/1.4 var(--ui); color: var(--ink-2); }
+.login-note { margin: 0 0 4px; padding: 10px 12px; border-radius: 10px; background: var(--fill); font: var(--ui-w) 12.5px/1.45 var(--ui); }
+.add-choice > svg.login-go { width: 18px; height: 18px; margin-top: 2px; color: var(--ink-2); }
+
+/* Header: the account's initial and its menu */
+.acct { position: relative; }
+.acct-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--canvas);
+  font: var(--ui-w-strong) 15px/1 var(--ui);
+  transition: opacity 140ms ease, transform 160ms ease;
+}
+.acct-btn:hover { opacity: 0.86; }
+.acct-btn:active { transform: scale(0.95); }
+.acct-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(300px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--tile-border), var(--float-shadow);
+  transform-origin: top right;
+}
+.acct-who { display: grid; gap: 5px; }
+.acct-who span { font: var(--ui-w) 11.5px/1 var(--ui); color: var(--ink-2); }
+.acct-who b { font: var(--ui-w-strong) 14px/1.3 var(--ui); overflow-wrap: anywhere; }
+.acct-verify { display: grid; gap: 6px; justify-items: start; font: var(--ui-w) 12px/1.45 var(--ui); color: var(--ink-2); }
+.acct-message { margin: 0; font: var(--ui-w) 12px/1.45 var(--ui); }
+.acct-sep { height: 1px; background: var(--line); }
+.acct-item {
+  text-align: left;
+  padding: 9px 10px;
+  margin: -4px -6px;
+  border-radius: 9px;
+  font: var(--ui-w) 14px/1 var(--ui);
+  transition: background-color 140ms ease;
+}
+.acct-item:hover { background: var(--fill); }
+.acct-confirm p { margin: 0; font: var(--ui-w) 12.5px/1.45 var(--ui); color: var(--ink-2); }
+.acct-confirm .add-actions { margin-top: 10px; }

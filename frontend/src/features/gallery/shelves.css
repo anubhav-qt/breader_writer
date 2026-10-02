@@ -1,0 +1,167 @@
+/* Below Recent: every book again, by genre, series or date. Each shelf is a row that scrolls sideways. */
+.shelves { margin-top: 30px; }
+.shelves-head {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0 6px;
+  background: linear-gradient(var(--canvas) 72%, transparent);
+}
+/* The heading changes with the view; the old one leaves as the new one rises in. */
+.shelves-title { position: relative; min-width: 0; }
+.shelves-title h2 { margin: 0; font: var(--ui-w-strong) 15px/1 var(--ui); white-space: nowrap; }
+
+/* The views, set like the library's own tabs */
+.views { display: flex; gap: 22px; }
+.view-tab {
+  position: relative;
+  padding: 0 0 8px;
+  font: var(--ui-w) 14px/1 var(--ui);
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+.view-tab:hover, .view-tab[aria-selected="true"] { color: var(--ink); }
+.view-line { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 1px; background: var(--ink); }
+
+.shelf-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 26px; margin-top: 12px; }
+.shelf-empty { margin: 14px 0 0; font: var(--ui-w) 13px/1.5 var(--ui); color: var(--ink-2); }
+.shelf-more { height: 1px; margin-top: -26px; }
+
+/* A shelf's heading: its name, how many, and arrows at the right */
+.shelf-head { display: flex; align-items: center; gap: 12px; min-height: 30px; }
+.shelf-name {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--read);
+  font-weight: 700;
+  font-size: 27px;
+  line-height: 1;
+}
+.shelf-name span {
+  display: block;
+  min-width: 0;
+  /* Headroom for the reading face's tall letters, taken back so it doesn't move. */
+  padding-top: 0.2em;
+  margin-top: -0.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shelf-name button { display: flex; align-items: center; gap: 4px; max-width: 100%; font: inherit; color: inherit; text-align: left; }
+.shelf-name button svg { flex: none; width: 17px; height: 17px; color: var(--ink-2); transition: transform 180ms ease, color 180ms ease; }
+.shelf-name button:hover svg, .shelf-name button:focus-visible svg { color: var(--ink); transform: translateX(3px); }
+.shelf-name button:focus-visible { outline: none; }
+.shelf-name button:focus-visible span { text-decoration: underline 2px; text-underline-offset: 4px; }
+.shelf-meta { flex: none; font: var(--ui-w) 12px/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
+
+.shelf-nav { flex: none; margin-left: auto; display: flex; gap: 6px; transition: opacity 160ms ease; }
+.shelf-nav.is-idle { opacity: 0; visibility: hidden; }
+/* The arrows are set like a card's corner button. */
+.shelf-arrow {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--canvas) 82%, transparent);
+  box-shadow: inset 0 0 0 1px var(--tile-border);
+  transition: opacity 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+.shelf-arrow:hover:not(:disabled) { background: var(--canvas); box-shadow: inset 0 0 0 1px var(--tile-border-hover); }
+.shelf-arrow:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.shelf-arrow:disabled { opacity: 0.35; cursor: default; }
+.shelf-arrow svg { width: 16px; height: 16px; }
+
+/*
+ * The row. Room above and at the end for a series card's pages behind it; the edge with more
+ * beyond it fades out.
+ */
+@property --fade-l { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.shelf-row {
+  --fade-l: 36px;
+  --fade-r: 36px;
+  --shelf-w: 170px;
+  --shelf-h: 236px;
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 12px 12px 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 36px;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  transition: --fade-l 220ms ease, --fade-r 220ms ease;
+}
+.shelf-row::-webkit-scrollbar { display: none; }
+.shelf-row[data-start] { --fade-l: 0px; }
+.shelf-row[data-end] { --fade-r: 0px; }
+.shelf-row > .tile-slot:first-child { scroll-snap-align: start; }
+.shelf-tile { flex: none; width: var(--shelf-w); height: var(--shelf-h); scroll-snap-align: start; }
+@media (max-width: 720px) {
+  .shelf-row { --shelf-w: 144px; --shelf-h: 200px; --fade-l: 24px; --fade-r: 24px; scroll-padding-inline: 20px; }
+  .shelf-row[data-start] { --fade-l: 0px; }
+  .shelf-row[data-end] { --fade-r: 0px; }
+  .shelf-name { font-size: 25px; }
+  /* The name keeps the width; how many goes under it. */
+  .shelf-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name nav" "meta nav"; gap: 3px 12px; }
+  .shelf-name { grid-area: name; }
+  .shelf-meta { grid-area: meta; }
+  .shelf-nav { grid-area: nav; align-self: center; }
+}
+
+/* A whole series as one card: the pages of the books behind it show at its top and side. */
+.tile-slot.is-stack { isolation: isolate; }
+.tile-slot.is-stack::before, .tile-slot.is-stack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--canvas);
+  box-shadow: inset 0 0 0 1px var(--tile-border);
+  pointer-events: none;
+  transition: transform 220ms ease;
+}
+.tile-slot.is-stack::before { transform: translate(5px, -5px); }
+.tile-slot.is-stack::after { z-index: -2; transform: translate(10px, -10px); }
+.tile-slot.is-stack:hover::before { transform: translate(6px, -6px); }
+.tile-slot.is-stack:hover::after { transform: translate(12px, -12px); }
+/* No corner button on it to keep clear of. */
+.is-stack .tile-face > :first-child { padding-right: 0; }
+/* Narrow covers (a phone's shelves) leave the volume to the big number. */
+@container (max-width: 159px) {
+  .tile-cover .c-foot > :nth-child(2) { display: none; }
+}
+
+/* A series' dialog: its books in order, on cards all the same size */
+.sd { padding-bottom: 24px; }
+.sd .modal-head { margin-bottom: 4px; align-items: flex-start; }
+.sd .modal-title {
+  padding-top: 0.2em;
+  font-family: var(--read);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 1;
+  text-wrap: balance;
+}
+.sd-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 0 18px;
+  font: var(--ui-w) 12px/1.2 var(--ui);
+  color: var(--ink-2);
+}
+.sd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(144px, 1fr)); gap: 14px; }
+.sd-tile { aspect-ratio: 170 / 236; }

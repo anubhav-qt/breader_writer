@@ -1,0 +1,35 @@
+.modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  /* One column the width of the screen, so a dialog wider than a phone shrinks to fit it. */
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  padding: 24px 16px;
+}
+.modal-scrim { position: absolute; inset: 0; background: var(--scrim); }
+.modal {
+  position: relative;
+  max-width: 100%;
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  background: var(--paper);
+  border-radius: 18px;
+  box-shadow: 0 0 0 1px var(--line), var(--float-shadow);
+  padding: 20px 22px 22px;
+  outline: none;
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modal-title { margin: 0; font: var(--ui-w-strong) 16px/1.2 var(--ui); }
+.modal-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.modal-close:hover { background: var(--fill); color: var(--ink); }
+.modal-close svg { width: 18px; height: 18px; }

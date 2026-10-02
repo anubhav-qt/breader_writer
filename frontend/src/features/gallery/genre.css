@@ -1,0 +1,141 @@
+/* The genre field: an input's look, opening the list of genres */
+.genre-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.genre-field > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.genre-field.is-unset > span { color: var(--ink-2); }
+.genre-field svg { flex: none; width: 16px; height: 16px; color: var(--ink-2); }
+.genre-field:hover { border-color: var(--tile-border-hover); }
+.genre-field:focus-visible { border-color: var(--accent); }
+
+/* The list of genres, over the dialog or popover that opened it */
+.gp-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  padding: 24px 16px;
+}
+.gp-scrim { position: absolute; inset: 0; background: var(--scrim); }
+.gp {
+  position: relative;
+  width: 480px;
+  max-width: 100%;
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-radius: 18px;
+  box-shadow: 0 0 0 1px var(--line), var(--float-shadow);
+  outline: none;
+  overflow: hidden;
+}
+.gp-head { display: flex; align-items: center; gap: 6px; padding: 18px 14px 4px 22px; }
+.gp-title {
+  flex: 1;
+  margin: 0;
+  font: var(--ui-w-strong) 13px/1.2 var(--ui);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+.gp-clear {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font: var(--ui-w) 12px/1 var(--ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.gp-clear:hover { background: var(--fill); color: var(--ink); }
+.gp-x {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.gp-x:hover { background: var(--fill); color: var(--ink); }
+.gp-x svg { width: 18px; height: 18px; }
+.gp-note { margin: 0; padding: 0 22px 12px; font: var(--ui-w) 12px/1.45 var(--ui); color: var(--ink-2); }
+
+/* Two columns of flat tiles: the name in capitals, a dot that lights when it's picked. */
+.gp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 2px 22px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gp-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.gp-tile:hover { background: var(--fill); }
+.gp-tile:focus-visible { outline: none; border-color: var(--accent); }
+.gp-tile.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.gp-tile.is-asking { border-color: var(--accent); }
+.gp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.gp-name {
+  font: var(--ui-w-strong) 13px/1.15 var(--ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+.gp-tag, .gp-count { font: var(--ui-w) 10.5px/1.1 var(--ui); color: var(--ink-2); }
+.gp-count { flex: none; font-variant-numeric: tabular-nums; }
+.gp-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--tile-border-hover); transition: background-color 140ms ease, box-shadow 140ms ease; }
+.gp-tile.is-on .gp-dot { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* A book in a series: the genre tapped asks, under its row, this book or all of them. */
+.gp-ask {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--fill);
+  animation: gp-ask 160ms ease-out;
+}
+.gp-ask-title { font: var(--ui-w) 12px/1.2 var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+.gp-ask-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.gp-ask-row button {
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font: var(--ui-w-strong) 12.5px/1.1 var(--ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--line);
+  transition: box-shadow 140ms ease;
+}
+.gp-ask-row button:hover, .gp-ask-row button:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--accent); }
+@keyframes gp-ask { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .gp-ask { animation: none; } }
+
+@media (max-width: 560px) {
+  .gp-grid { padding: 2px 16px 16px; }
+  .gp-head { padding-left: 18px; }
+  .gp-note { padding-left: 18px; padding-right: 18px; }
+}

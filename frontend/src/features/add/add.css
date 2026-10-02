@@ -1,0 +1,85 @@
+.add { display: grid; gap: 12px; }
+.add-drop {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 28px 16px 22px;
+  text-align: center;
+  border-radius: 14px;
+  border: 1.5px dashed var(--dash);
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.add-drop.is-over { border-color: var(--accent); background: var(--accent-soft); }
+.add-drop svg { width: 30px; height: 30px; color: var(--accent); }
+.add-drop b { font: var(--ui-w-strong) 16px/1.3 var(--ui); }
+.add-drop span { font: var(--ui-w) 12.5px/1.3 var(--ui); color: var(--ink-2); margin-bottom: 8px; }
+.add-or { text-align: center; font: var(--ui-w) 12px/1 var(--ui); color: var(--ink-2); }
+.add-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  font: var(--ui-w) 14px/1 var(--ui);
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+.add-row:hover { background: var(--fill); }
+.add-row svg { width: 18px; height: 18px; color: var(--accent); }
+.add-label { font: var(--ui-w) 12.5px/1 var(--ui); color: var(--ink-2); margin-top: 4px; }
+.add-input, .add-text {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--canvas);
+  padding: 10px 12px;
+  font-family: var(--read);
+  font-size: 22px;
+  line-height: 1.2;
+  outline: none;
+  transition: border-color 140ms ease;
+}
+.add-input:focus, .add-text:focus { border-color: var(--accent); }
+.add-text { height: 220px; resize: vertical; }
+.key-input { font: var(--ui-w) 14px/1.2 var(--ui); letter-spacing: 0.02em; }
+.add-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.add-busy { display: flex; align-items: center; gap: 12px; padding: 28px 4px; font: var(--ui-w) 13px/1.4 var(--ui); color: var(--ink-2); }
+.add-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.add-file { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.add-fic { width: 34px; height: 48px; border-radius: 3px 6px 6px 3px; flex: none; background: var(--bc); box-shadow: inset 0 0 0 1px var(--tile-border); }
+.add-file b { display: block; font-family: var(--read); font-weight: 700; font-size: 26px; line-height: 1; }
+.add-file span { display: block; margin-top: 4px; font: var(--ui-w) 12px/1.3 var(--ui); color: var(--ink-2); }
+.add-choices { display: grid; gap: 8px; }
+.add-choice {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 20px;
+  gap: 12px;
+  align-items: start;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  text-align: left;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.add-choice:hover { background: var(--fill); }
+.add-choice > svg { width: 20px; height: 20px; color: var(--accent); margin-top: 1px; }
+.add-choice b { display: block; font: var(--ui-w-strong) 14px/1.2 var(--ui); }
+.add-choice span span { display: block; margin-top: 5px; font-family: var(--read); font-size: 21px; line-height: 1.1; color: var(--ink-2); }
+.add-choice.is-on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.add-radio { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ink-2); transition: box-shadow 160ms ease; }
+.add-choice.is-on .add-radio { box-shadow: inset 0 0 0 6px var(--accent); }
+.add-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.add-switch .add-label { margin: 0; }
+/* Clipped only while it opens and closes; the list of series is outside it. */
+.add-series { display: grid; gap: 7px; overflow: hidden; margin: -2px; padding: 2px; }
+.add-found { font: var(--ui-w) 11.5px/1.3 var(--ui); color: var(--ink-2); }
+.add-ai { margin: -4px 0 0; line-height: 1.4; }
+.add-local { margin: 0; font: var(--ui-w) 12px/1.5 var(--ui); color: var(--ink-2); }
+.add-keynote { margin: 0; font-size: 23px; line-height: 1.15; color: var(--ink-2); }
+.key-box { font: var(--ui-w-strong) 17px/1 var(--ui); text-align: center; padding: 16px 8px; border-radius: 12px; background: var(--fill); white-space: nowrap; overflow-x: auto; user-select: all; }
+.add-error { margin: 0; font-size: 23px; line-height: 1.15; }
+.add-sep { height: 1px; background: var(--line); margin: 8px 0 2px; }
+.key-error { color: var(--ink); }
+.key-actions { flex-wrap: wrap; }

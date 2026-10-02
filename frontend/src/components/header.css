@@ -1,0 +1,48 @@
+.hdr {
+  position: relative;
+  z-index: 10;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 44px;
+  padding: 0 36px;
+}
+.logo { width: 38px; height: 38px; flex: none; display: block; }
+.logo-b { fill: var(--ink); }
+.tabs { display: flex; gap: 28px; }
+.tab {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 0;
+  font: var(--ui-w) 14px/1 var(--ui);
+  color: var(--ink-2);
+  transition: color 160ms ease;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); }
+.tab-count { font: var(--ui-w) 12px/1 var(--ui); color: var(--ink-2); }
+.tab-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ink);
+}
+.hdr-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.tab { white-space: nowrap; }
+
+/* Phones: the tabs get their own row under the logo and buttons. */
+@media (max-width: 720px) {
+  .hdr { flex-wrap: wrap; height: auto; padding: 14px 16px 0; column-gap: 12px; row-gap: 4px; }
+  .tabs { order: 3; flex: 1 0 100%; gap: 24px; }
+}
+@media (max-width: 480px) {
+  .hdr-label { display: none; }
+  .hdr-actions { gap: 4px; }
+  .hdr-actions .btn { padding: 0 12px; }
+}

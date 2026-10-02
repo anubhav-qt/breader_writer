@@ -1,0 +1,27 @@
+/* Series name and number, with the library's series dropping down as the name is typed */
+.sf { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 8px; }
+.sf-num { text-align: center; }
+.sf-list {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--tile-border), var(--float-shadow);
+}
+.sf-opt {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px 5px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.sf-opt.is-on { background: var(--fill); }
+.sf-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--read); font-size: 21px; line-height: 1.1; }
+.sf-count { flex: none; font: var(--ui-w) 11px/1 var(--ui); color: var(--ink-2); }

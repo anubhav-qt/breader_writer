@@ -1,0 +1,22 @@
+.pv {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100vw - 32px);
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 1px dashed var(--dash);
+  box-shadow: var(--card-shadow);
+  font: var(--ui-w) 12px/1 var(--ui);
+}
+.pv-tag { padding: 0 8px 0 6px; color: var(--accent); }
+.pv button { padding: 8px 9px; border-radius: 8px; color: var(--ink-2); transition: background-color 140ms ease, color 140ms ease; }
+.pv button:hover { color: var(--ink); background: var(--fill); }
+.pv button[aria-pressed="true"] { background: var(--ink); color: var(--canvas); }
+.pv-sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }

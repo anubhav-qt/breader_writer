@@ -1,0 +1,171 @@
+/* Design tokens. The page is pure white or pure black; the only colour is the books'. */
+:root {
+  color-scheme: light;
+  --canvas: #FFFFFF;
+  --paper: #FFFFFF;
+  --ink: #000000;
+  --ink-2: #6B6B6B;
+  --line: #E6E6E6;
+  --fill: #F2F2F2;
+  /* The interface stays black and white; colour belongs to the books. */
+  --accent: #000000;
+  --accent-soft: rgba(0, 0, 0, 0.05);
+  --on-accent: #FFFFFF;
+  /* Red is kept for taking a book out of the library. */
+  --danger: #D70015;
+  --danger-soft: rgba(215, 0, 21, 0.07);
+  --danger-soft-2: rgba(215, 0, 21, 0.13);
+  --dash: rgba(0, 0, 0, 0.3);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 18px 40px -22px rgba(0, 0, 0, 0.35);
+  --float-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 24px 60px -20px rgba(0, 0, 0, 0.3);
+  --scrim: rgba(0, 0, 0, 0.28);
+  /* Card borders: a hairline of black in light mode, of white in dark mode. Hover strengthens it. */
+  --tile-border: rgba(0, 0, 0, 0.12);
+  --tile-border-hover: rgba(0, 0, 0, 0.32);
+
+  --ui: "Doto", ui-monospace, Menlo, Consolas, monospace;
+  /* Doto's weight is the size of its dots: phones get the heaviest, or small text turns faint. */
+  --ui-w: 700;
+  --ui-w-strong: 800;
+  --read: "Dongle", "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --oxanium: "Oxanium", system-ui, sans-serif;
+  --serif: "Literata", Georgia, serif;
+  --garamond: "EB Garamond", Garamond, Georgia, serif;
+  --atkinson: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --canvas: #000000;
+    --paper: #000000;
+    --ink: #FFFFFF;
+    --ink-2: #999999;
+    --line: #262626;
+    --fill: #141414;
+    --accent: #FFFFFF;
+    --accent-soft: rgba(255, 255, 255, 0.08);
+    --on-accent: #000000;
+    --danger: #FF453A;
+    --danger-soft: rgba(255, 69, 58, 0.14);
+    --danger-soft-2: rgba(255, 69, 58, 0.22);
+    --dash: rgba(255, 255, 255, 0.3);
+    --card-shadow: none;
+    --float-shadow: 0 28px 64px -18px rgba(0, 0, 0, 0.9);
+    --scrim: rgba(0, 0, 0, 0.6);
+    --tile-border: rgba(255, 255, 255, 0.14);
+    --tile-border-hover: rgba(255, 255, 255, 0.36);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #000000;
+  --paper: #000000;
+  --ink: #FFFFFF;
+  --ink-2: #999999;
+  --line: #262626;
+  --fill: #141414;
+  --accent: #FFFFFF;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --on-accent: #000000;
+  --danger: #FF453A;
+  --danger-soft: rgba(255, 69, 58, 0.14);
+  --danger-soft-2: rgba(255, 69, 58, 0.22);
+  --dash: rgba(255, 255, 255, 0.3);
+  --card-shadow: none;
+  --float-shadow: 0 28px 64px -18px rgba(0, 0, 0, 0.9);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --tile-border: rgba(255, 255, 255, 0.14);
+  --tile-border-hover: rgba(255, 255, 255, 0.36);
+}
+
+/* Book colours: solid, and AA-legible with their ink. Light pages get a deeper set, dark pages a
+   brighter one. The reading themes pick by their own page, so a Night book glows in a light app. */
+:root, .t-day, .t-warm {
+  --bc-rose: #942F44; --bc-rose-ink: #FFFFFF;
+  --bc-clay: #8E330C; --bc-clay-ink: #FFFFFF;
+  --bc-ochre: #AC7D02; --bc-ochre-ink: #2A1D01;
+  --bc-sand: #938567; --bc-sand-ink: #291D02;
+  --bc-sage: #798E6B; --bc-sage-ink: #142506;
+  --bc-moss: #37541B; --bc-moss-ink: #FFFFFF;
+  --bc-green: #00523D; --bc-green-ink: #FFFFFF;
+  --bc-teal: #004A4D; --bc-teal-ink: #FFFFFF;
+  --bc-sky: #115687; --bc-sky-ink: #FFFFFF;
+  --bc-indigo: #223170; --bc-indigo-ink: #FFFFFF;
+  --bc-lilac: #594685; --bc-lilac-ink: #FFFFFF;
+  --bc-plum: #581F45; --bc-plum-ink: #FFFFFF;
+  --bc-blush: #AC776E; --bc-blush-ink: #37120D;
+  --bc-graphite: #2A2E34; --bc-graphite-ink: #FFFFFF;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bc-rose: #FFA8B2; --bc-rose-ink: #310C13;
+    --bc-clay: #FEAA8D; --bc-clay-ink: #310E03;
+    --bc-ochre: #FFD078; --bc-ochre-ink: #251801;
+    --bc-sand: #E6D6B4; --bc-sand-ink: #241900;
+    --bc-sage: #C8E1B8; --bc-sage-ink: #0F2001;
+    --bc-moss: #A7CB8A; --bc-moss-ink: #102000;
+    --bc-green: #72D1AF; --bc-green-ink: #002117;
+    --bc-teal: #7DC9CC; --bc-teal-ink: #012021;
+    --bc-sky: #8AC8FE; --bc-sky-ink: #001C33;
+    --bc-indigo: #94AEFE; --bc-indigo-ink: #101836;
+    --bc-lilac: #C7B4FF; --bc-lilac-ink: #1D1333;
+    --bc-plum: #E399C5; --bc-plum-ink: #2D0D22;
+    --bc-blush: #FEC9C0; --bc-blush-ink: #310D09;
+    --bc-graphite: #A5ABB4; --bc-graphite-ink: #161B21;
+  }
+}
+:root[data-theme="dark"], .t-dusk, .t-night {
+  --bc-rose: #FFA8B2; --bc-rose-ink: #310C13;
+  --bc-clay: #FEAA8D; --bc-clay-ink: #310E03;
+  --bc-ochre: #FFD078; --bc-ochre-ink: #251801;
+  --bc-sand: #E6D6B4; --bc-sand-ink: #241900;
+  --bc-sage: #C8E1B8; --bc-sage-ink: #0F2001;
+  --bc-moss: #A7CB8A; --bc-moss-ink: #102000;
+  --bc-green: #72D1AF; --bc-green-ink: #002117;
+  --bc-teal: #7DC9CC; --bc-teal-ink: #012021;
+  --bc-sky: #8AC8FE; --bc-sky-ink: #001C33;
+  --bc-indigo: #94AEFE; --bc-indigo-ink: #101836;
+  --bc-lilac: #C7B4FF; --bc-lilac-ink: #1D1333;
+  --bc-plum: #E399C5; --bc-plum-ink: #2D0D22;
+  --bc-blush: #FEC9C0; --bc-blush-ink: #310D09;
+  --bc-graphite: #A5ABB4; --bc-graphite-ink: #161B21;
+}
+
+/* Phones: heavier dots and a stronger grey, so the small interface text stays readable. */
+@media (max-width: 720px) {
+  :root { --ui-w: 900; --ui-w-strong: 900; --ink-2: #555555; }
+  :root[data-theme="dark"] { --ink-2: #B8B8B8; }
+}
+@media (max-width: 720px) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --ink-2: #B8B8B8; }
+}
+
+/* Reading themes. Auto follows the app: pure white in light mode, pure black in dark mode. */
+.t-day, .t-auto {
+  --r-bg: #FFFFFF; --r-fg: #111111; --r-mu: #6B6B6B; --r-line: #E6E6E6; --r-fill: #F2F2F2;
+  --r-acc: #111111; --r-acc-soft: rgba(0, 0, 0, 0.07); --r-shadow: rgba(0, 0, 0, 0.16); --r-pdf: none; --r-pdf-pics: none;
+}
+.t-warm {
+  --r-bg: #F3E9D6; --r-fg: #3D3021; --r-mu: #76614B; --r-line: #E2D4BA; --r-fill: #EADDC4;
+  --r-acc: #3D3021; --r-acc-soft: rgba(61, 48, 33, 0.1); --r-shadow: rgba(61, 48, 33, 0.2); --r-pdf: sepia(0.3) saturate(0.9); --r-pdf-pics: var(--r-pdf);
+}
+.t-dusk {
+  --r-bg: #1C1C1C; --r-fg: #D6D6D6; --r-mu: #8E8E8E; --r-line: #2E2E2E; --r-fill: #262626;
+  --r-acc: #D6D6D6; --r-acc-soft: rgba(255, 255, 255, 0.09); --r-shadow: rgba(0, 0, 0, 0.5); --r-pdf: invert(0.88) hue-rotate(180deg); --r-pdf-pics: none;
+}
+.t-night {
+  --r-bg: #000000; --r-fg: #ABA69C; --r-mu: #7E7A72; --r-line: #1F1F1F; --r-fill: #141414;
+  --r-acc: #ABA69C; --r-acc-soft: rgba(171, 166, 156, 0.12); --r-shadow: rgba(0, 0, 0, 0.7); --r-pdf: invert(0.9) hue-rotate(180deg) brightness(0.8); --r-pdf-pics: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .t-auto {
+    --r-bg: #000000; --r-fg: #E6E6E6; --r-mu: #8E8E8E; --r-line: #222222; --r-fill: #141414;
+    --r-acc: #E6E6E6; --r-acc-soft: rgba(255, 255, 255, 0.09); --r-shadow: rgba(0, 0, 0, 0.6); --r-pdf: invert(0.9) hue-rotate(180deg); --r-pdf-pics: none;
+  }
+}
+:root[data-theme="dark"] .t-auto {
+  --r-bg: #000000; --r-fg: #E6E6E6; --r-mu: #8E8E8E; --r-line: #222222; --r-fill: #141414;
+  --r-acc: #E6E6E6; --r-acc-soft: rgba(255, 255, 255, 0.09); --r-shadow: rgba(0, 0, 0, 0.6); --r-pdf: invert(0.9) hue-rotate(180deg); --r-pdf-pics: none;
+}

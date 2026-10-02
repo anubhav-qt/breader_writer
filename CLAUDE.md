@@ -43,12 +43,16 @@ order below.
   words written over that goal, and the story paces its arc to end near it, so a full bar means a
   finished book. The lengths, at roughly 2,000 words a scene:
 
-  | Length | Words | Scenes, about |
-  | --- | --- | --- |
-  | Short story | 8,000 | 4 |
-  | Novella | 30,000 | 15 |
-  | Light novel | 50,000 | 25 |
-  | Novel | 80,000 | 40 |
+  | Length | Words | Scenes, about | Style |
+  | --- | --- | --- | --- |
+  | Short story | 8,000 | 4 | conventional prose |
+  | Novella | 30,000 | 15 | conventional prose |
+  | Light novel | 50,000 | 25 | light novel |
+  | Novel | 80,000 | 40 | conventional prose |
+- **Light novel is a style as well as a length.** Picking it sets 50,000 words and writes the
+  book the way light novels read: dialogue forward, short paragraphs, plenty of the protagonist's
+  inner voice, brisk pacing, and short chapters with long descriptive titles. Point of view is
+  still picked per book; light novels lean first person, so setup suggests it.
 - **The AI is a hard fork of pi, the way Seelie is in POM** (see below). We fork the generalized
   harness and change it for our use. Models come from the owner's subscriptions (Google
   Antigravity first, with ChatGPT Codex and Claude as other options) through CLIProxyAPI.
@@ -109,10 +113,12 @@ Each step ends working, committed, and with a short test checklist for the owner
    schema. No AI yet.
 2. **Setup.** Make a book: world, cast, point of view, length, content level. Cards in the
    library fill with words written over the goal.
-3. **AI plumbing.** Fork pi (`packages/pi-ai`, `packages/pi-agent`), run CLIProxyAPI, sign in
-   subscriptions and pick a model from settings, as Seelie does.
-4. **Play.** The narrator agent: turns, the author toggle, hints on tap, undo within a scene,
-   scenes ending, the cast growing and new characters joining.
+3. **AI plumbing.** Fork pi (`packages/pi-ai`, `packages/pi-agent`) and change it for us: the
+   durable story state, the working context rebuilt from it, and constant compaction (see "The
+   AI" below). Run CLIProxyAPI, sign in subscriptions and pick a model from settings, as Seelie
+   does. Set up Nunjucks prompt templates and their tests.
+4. **Play.** The narrator agent and its tools: turns, the author toggle, hints on tap, undo
+   within a scene, scenes ending, the cast growing and new characters joining.
 5. **The book.** The scene writer, the book view (a copy of breader's reader), the progress bar
    and the EPUB download.
 6. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
@@ -179,6 +185,101 @@ the same pattern:
 - **Runs survive the tab.** A reply runs detached from the request and is mirrored to Postgres as
   it goes, so it keeps going when the tab closes and the stream resumes on return
   (`src/lib/seelie/engine.ts`).
+
+## The AI: harness, memory, tools and prompts
+
+These are the owner's requirements for the AI. They apply from step 3 on.
+
+### The harness
+
+- **Fork upstream pi and change it to our needs.** Upstream is `github.com/earendil-works/pi`
+  (MIT). Its `packages/ai` becomes our `packages/pi-ai` and `packages/agent` our
+  `packages/pi-agent`, kept with their LICENSE files, as POM did. Trim what we don't use and
+  change what we need; it's a hard fork, not a dependency we keep in sync.
+- **Borrow pi's compaction ideas** from `packages/coding-agent/docs/compaction.md`,
+  `packages/coding-agent/src/core/compaction/` and `packages/durable/src/harness/compaction.ts`:
+  cut only at clean boundaries (never between a tool call and its result), summarize
+  iteratively by passing the previous summary in, and keep raw history stored even when it's no
+  longer sent.
+- **Default model: Gemini 3.8 Flash, thinking high**, the same default as Seelie. Its window is
+  1.05M tokens. The model and thinking level can be changed from settings.
+
+### Never forget, and compact constantly
+
+The story must never forget anything, at any point. The way to get there is to stop treating the
+chat as the memory.
+
+- **Durable state is the memory.** Everything the story knows lives in Postgres (the `writer`
+  schema): the world sheet; the cast sheets as they grow; relationships; a ledger of canon facts,
+  each tied to the turn or scene it came from; open threads and promises the story has made; the
+  arc and its pacing (words written against the goal); a timeline; a summary of every scene; and
+  the raw text of every turn and every written scene. Nothing is ever deleted by compaction.
+- **The working context is rebuilt from that state** for every call: the instructions, then the
+  story bible (world and cast), the arc and open threads, summaries of earlier scenes, the
+  current scene's turns word for word, and last the new input. The model never relies on
+  something that only lives in an old message.
+- **Compact constantly, within the same chat.** Keep the working context under **200k tokens**
+  out of the 1.05M window. Compaction is routine, not an emergency:
+  - At every scene end, that scene's turns fold into its summary and into the state (facts,
+    sheets, threads), and leave the context.
+  - Mid scene, when the context passes the 200k budget, the oldest turns of the scene fold the
+    same way.
+  - Compaction writes to the durable state first and trims second. Never trim what hasn't been
+    saved.
+- **Recall exact words on demand.** A tool searches the raw turns and the written book, so when a
+  summary isn't enough the model can look up exactly what was said.
+- **Measure it.** Record the tokens each call used, so the budget is visible and testable.
+
+### State
+
+- **One source of truth:** the database. The agent changes state only through tools; it never
+  keeps state only in its context.
+- **The owner's edits win.** An edit to any sheet is true from the next call on.
+- **Every change is tagged** with who made it (the owner or the agent) and the turn it came
+  from. That is what lets undo within a scene roll the state back along with the turns.
+
+### Tools
+
+- Few, each doing one thing, with a clear name, a precise description and a typed schema
+  (typebox, as pi uses), validated before running.
+- Results are short and say what changed. Errors say how to fix the call.
+- Safe to repeat where possible, so a retry never doubles a change.
+- Likely set for the narrator (designed properly in step 4): end the scene, add to a character's
+  sheet, introduce a character, shift a relationship, record a fact, open or close a thread,
+  recall earlier text.
+
+### The roles
+
+- **Narrator:** plays the world around the protagonist, turn by turn, and keeps the state.
+- **Author:** writes each finished scene into the book, in the book's point of view, style and
+  content level, from the scene's turns and the state.
+- **Hints:** a small call that suggests 3 moves when the owner taps for them.
+
+### Prompt templates
+
+- **Nunjucks** (`.njk`), the TypeScript world's Jinja, as POM's Seelie studio uses
+  (`src/lib/seelie/studio/templates/`). Templates use partials, macros and simple conditionals;
+  any real logic stays in TypeScript, which hands the template a typed object.
+- **Dynamic:** every prompt is assembled per call from the book's settings (point of view,
+  length and style, content level), its pacing (where we are in the arc against the goal), and
+  the state.
+- **Tested:** each template renders against fixture data in tests, so a broken variable or an
+  empty section fails a test instead of reaching the model.
+- **Fetch the guides from the web first.** Before writing or changing any prompt, fetch the
+  current official prompting guide for the model family it targets and follow it; they change
+  with every model. Start from:
+  - Gemini: `ai.google.dev/gemini-api/docs/prompting-strategies`, the Gemini 3 developer guide
+    `ai.google.dev/gemini-api/docs/gemini-3`, and the Gemini 3 prompting guide on Vertex AI
+    `docs.cloud.google.com/vertex-ai/generative-ai/docs/start/gemini-3-prompting-guide`.
+  - Claude: `platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview` and its
+    long context tips.
+  - OpenAI: the prompting guides in the cookbook, `cookbook.openai.com`.
+  - Nunjucks: `mozilla.github.io/nunjucks/templating.html`.
+- **What the guides said when this was written** (October 2026, Gemini 3): be concise and direct;
+  put the persona, the rules and the output format in the system instruction; put long context
+  first and the instruction or question last; keep temperature at its default of 1.0; don't write
+  chain of thought instructions (the thinking level does that); and ask for length and detail
+  explicitly, since the model defaults to concise.
 
 ## How we work
 

@@ -21,8 +21,9 @@ the way a breader card fills with colour as you read.
 
 ## Status
 
-Step 1 (skeleton) is under way: the shared package, the server and the library page are built.
-Running it locally against production breader comes next. See "The code" below for what exists.
+Step 1 (skeleton) is built: the shared package, the server and the library page, and running it
+locally against production breader. What's left of it is the owner's test. See "The code" below
+for what exists.
 
 ### Decided
 
@@ -211,6 +212,28 @@ A Hono API, port 8790, built like breader's server.
   is a stand-in for breader's server: a real Better Auth, the version breader pins (1.7.6),
   configured as breader configures it. Tests log in through it and hand its cookie to the
   writer. If breader upgrades Better Auth, upgrade it here too and run the tests.
+
+### Running it locally
+
+The writer runs here against production breader: log in on breader.site as usual, and the local
+writer reads that login. Only the writer's own tables are local.
+
+1. Once, the owner adds `127.0.0.1 local.breader.site` to `/etc/hosts` (it needs sudo). Breader's
+   login cookie is on `breader.site` and its subdomains, so the app has to be opened as one.
+2. `npm run dev:env` (`scripts/dev-env.mjs`) writes `server/.env` from breader's `infra/.env`:
+   `SESSION_SECRET`, `COOKIE_SECURE`, and `PRIMARY_URL` and `PRIMARY_SSL` as
+   `BREADER_DATABASE_URL` and `BREADER_DATABASE_SSL`. It prints none of them and keeps the rest of
+   `server/.env`. The invited emails go in `WRITER_EMAILS` there.
+3. `npm run db`, `npm run migrate`, then `npm run api` (port 8790) and `npm run web` (5174).
+4. Open `https://local.breader.site:5174/writer/`. The certificate is self-signed
+   (`@vitejs/plugin-basic-ssl`), so the browser warns once; HTTPS is needed because breader's
+   cookie is Secure. The in-app browser of the desktop app refuses it, so check there with
+   `curl -k --resolve local.breader.site:5174:127.0.0.1` instead.
+
+The writer's own Log in button doesn't work locally: breader's API only answers its own addresses
+(its `ALLOWED_ORIGINS`), so log in on breader.site. Locally the writer reads production breader's
+`users` and `auth_sessions` and never writes to them. `.claude/launch.json` has `web` and `api`
+for the desktop app.
 
 ## Breader, the sibling project
 

@@ -13,6 +13,7 @@
     "web": "npm run dev -w frontend",
     "api": "npm run dev -w server",
     "migrate": "npm run migrate -w server",
+    "dev:env": "node scripts/dev-env.mjs",
     "db": "docker compose -f infra/compose.dev.yml up -d --wait",
     "db:down": "docker compose -f infra/compose.dev.yml down",
     "test": "npm test -w server",

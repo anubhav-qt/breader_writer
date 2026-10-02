@@ -8,12 +8,14 @@ interface Props {
   count: number;
   /** Starts a new book. No button while the library is empty: it has its own, in the middle. */
   onNew?: () => void;
+  /** The model the stories run on, for an account that can write. */
+  picker?: ReactNode;
   /** Log in, or the account's menu. */
   account: ReactNode;
 }
 
-/** The logo, the library's one tab, and New book and the account at the right. */
-export function Header({ count, onNew, account }: Props) {
+/** The logo, the library's one tab, and New book, the model and the account at the right. */
+export function Header({ count, onNew, picker, account }: Props) {
   return (
     <header className="hdr">
       <Logo />
@@ -31,6 +33,7 @@ export function Header({ count, onNew, account }: Props) {
             <IconPlus /> <span className="hdr-label">New book</span>
           </button>
         )}
+        {picker}
         {account}
       </div>
     </header>

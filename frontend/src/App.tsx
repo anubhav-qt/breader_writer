@@ -10,6 +10,7 @@ import { pickColor } from './data/colors';
 import { PREVIEW_MODES, previewBooks, previewNote, type PreviewMode } from './data/preview';
 import { AccountMenu } from './features/account/AccountMenu';
 import { LoginDialog } from './features/account/LoginDialog';
+import { ModelPicker } from './features/models/ModelPicker';
 import { Gallery } from './features/gallery/Gallery';
 import { logOut, refreshMe, useAccount, type AccountState } from './lib/account';
 import { OfflineError } from './lib/api';
@@ -196,9 +197,18 @@ export default function App() {
   } else if (route.page === 'setup' && canWrite) {
     page = <EditSetup key={route.bookId} bookId={route.bookId} onSaved={onSaved} onClose={toLibrary} />;
   } else {
+    let picker: ReactNode = null;
+    if (canWrite) {
+      picker = <ModelPicker />;
+    }
     page = (
       <div className="lib">
-        <Header count={count} onNew={onNew} account={<AccountMenu account={account} onLogin={openLogin} onLogOut={onLogOut} />} />
+        <Header
+          count={count}
+          onNew={onNew}
+          picker={picker}
+          account={<AccountMenu account={account} onLogin={openLogin} onLogOut={onLogOut} />}
+        />
         {library.show === 'books' && (
           <Gallery books={library.books} now={now} id="library-mine" labelledBy="tab-mine" onOpen={onOpen} />
         )}

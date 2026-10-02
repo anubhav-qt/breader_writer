@@ -1,0 +1,70 @@
+/* The header's model picker: a chip, and a menu like the account's under it. */
+
+/* The menu hangs from the right edge of the header's buttons, so it fits on a phone. */
+.hdr-actions { position: relative; }
+
+.pick-btn {
+  height: 36px;
+  max-width: 260px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 14px;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font: var(--ui-w) 13px/1 var(--ui);
+  color: var(--ink);
+  transition: background-color 140ms ease, box-shadow 140ms ease, transform 160ms ease;
+}
+.pick-btn:hover { background: var(--fill); }
+.pick-btn:active { transform: scale(0.97); }
+.pick-btn[aria-expanded="true"] { box-shadow: inset 0 0 0 1px var(--tile-border-hover); }
+.pick-btn.is-quiet { color: var(--ink-2); }
+.pick-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-chevron { flex: none; width: 15px; height: 15px; transform: rotate(90deg); transition: transform 160ms ease; }
+.pick-btn[aria-expanded="true"] .pick-chevron { transform: rotate(-90deg); }
+
+.pick-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(330px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 110px));
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--tile-border), var(--float-shadow);
+  transform-origin: top right;
+}
+.pick-menu .clbl { margin-bottom: -4px; }
+.pick-menu .ctl { margin-bottom: 0; }
+
+.pick-list { display: grid; gap: 2px; margin: 0 -6px; }
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+.pick-row:hover { background: var(--fill); }
+.pick-row.is-on { background: var(--accent-soft); }
+.pick-row-text { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.pick-row-text b { font: var(--ui-w-strong) 14px/1.2 var(--ui); overflow-wrap: anywhere; }
+.pick-row-text span { font: var(--ui-w) 11.5px/1.2 var(--ui); color: var(--ink-2); }
+.pick-check { flex: none; width: 16px; height: 16px; }
+
+.pick-note { margin: 0; font: var(--ui-w) 12px/1.45 var(--ui); color: var(--ink-2); }
+.pick-message { color: var(--ink); }
+.pick-out { display: grid; gap: 8px; justify-items: start; }
+
+/* Phones: the chip keeps to the model's name. */
+@media (max-width: 480px) {
+  .pick-btn { max-width: 150px; padding: 0 8px 0 12px; }
+}

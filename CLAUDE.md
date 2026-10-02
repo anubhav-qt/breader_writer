@@ -280,6 +280,12 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   of it is built to open mid story too.
   `Fields.tsx` holds the text fields and radio cards, which are breader's Add a book dialog's
   (`features/add/add.css`, kept whole from breader); `setup.css` is only what the page adds.
+- `src/features/models/ModelPicker.tsx` and `src/data/models.ts`: the header's model picker,
+  for an account that can write. The chip says the model and its thinking level; it drops down
+  the models (`GET /v1/settings`, asked again on each opening) and the thinking levels the
+  model takes, as breader's segmented control (`components/Segmented.tsx`, copied from breader's
+  reader settings). A pick shows at once and is saved (`PUT /v1/settings`), and goes back if the
+  server says no. Moving to another model keeps the thinking level, or the nearest it takes.
 - `src/features/gallery/`: breader's cards, bento and shelves, without series, genres, real
   covers, editing or sharing. A card fills with the book's colour as it's written; the two most
   recent get a drawn cover. Below Recent, once there are more than 9, every book again by date.

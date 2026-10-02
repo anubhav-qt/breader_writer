@@ -9,3 +9,5 @@ dist/
 .claude/settings.local.json
 # Local HTTPS certificates for local.breader.site (npm run certs).
 .certs/
+# Local dumps of the writer database. They hold book text: never commit them.
+.backups/

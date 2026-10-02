@@ -1,0 +1,24 @@
+{#-
+  The fold's message: the story first (the long context), then the scene with its summary so far
+  and the turns to fold, then the task, last, with the output's limits at its end, as Google's
+  Gemini 3 guides advise. Takes a FoldPrompt.
+-#}
+{% from "partials/scene.njk" import scene %}
+{% include "partials/story.njk" %}
+
+<scene_to_fold>
+{{ scene(fold, story.protagonist) -}}
+</scene_to_fold>
+
+{% if fold.summary %}
+Based on the story above, fold the turns in scene {{ fold.number }} into its summary, keeping everything the summary already says.
+{% else %}
+Based on the story above, fold the turns in scene {{ fold.number }} into a summary of the scene.
+{% endif %}
+{% if ending %}
+These are the scene's last turns: it has ended, so the summary covers the whole scene.
+{% else %}
+The scene is still being played, so the summary stops where these turns stop.
+{% endif %}
+
+Write the summary in plain prose, in the past tense, naming people. Make it as long as it needs to be to keep everything your instructions list, and never leave something out to make it shorter. No headings, lists, preamble or closing remarks: start with what happened first.

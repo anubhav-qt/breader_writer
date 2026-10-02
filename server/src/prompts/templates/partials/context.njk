@@ -1,0 +1,12 @@
+{#-
+  The story and the scene being played, word for word: what every call that plays the story
+  starts from, before its own task. Takes `story`, a StoryView.
+-#}
+{% from "partials/scene.njk" import scene %}
+{% include "partials/story.njk" %}
+{% if story.scene %}
+
+<current_scene>
+{{ scene(story.scene, story.protagonist) -}}
+</current_scene>
+{% endif %}

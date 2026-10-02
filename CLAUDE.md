@@ -56,9 +56,14 @@ Nothing is built yet. We are settling the design with the owner, one question at
 - **Undo works until the scene is written.** While a scene is being played you can take back
   your last turns, or ask for a different reply to the same move. Once the scene is written into
   the book it's settled, so the book and the play never disagree.
-- **A character is a few fields plus notes:** name, who they are, personality, past, and how
-  they feel about the others, plus a free notes box. Only the name is required; the AI can fill
-  any blank.
+- **A character starts as a few fields plus notes:** name, who they are, personality, past, and
+  how they feel about the others, plus a free notes box. Only the name is required; the AI can
+  fill any blank.
+- **Characters grow as the story goes.** Whenever the agent judges that a character has
+  developed (a new fear, a secret revealed, a changed loyalty, a habit), it adds to their sheet by
+  itself, and those additions compound over the story. Characters who matter most end up with
+  rich, complex sheets; walk-ons stay small. The owner can open and edit any cast member's sheet
+  at any time, and the story takes the edit as true from then on.
 - **A world is a few fields plus notes too:** genre, tone, setting (when and where), the rules
   that matter (magic, technology, power), and a free notes box. All optional; the AI fills blanks.
 - **The story can bring in its own characters.** Anyone who sticks around gets a card in the cast
@@ -72,14 +77,20 @@ Nothing is built yet. We are settling the design with the owner, one question at
   breader's own tables (its change feed), so it won't include ours. The writer runs its own
   nightly dump of the `writer` schema, encrypted to the same backup key, into the same R2 bucket
   under `writer/`.
+- **A book leaves the writer as an EPUB download, for now.** The owner adds it to breader by
+  hand. A later version will send it to the breader library directly; keep the EPUB export clean
+  enough that breader reads it well (chapters as sections, no publisher CSS tricks).
 
 ### Open (ask the owner one at a time, in roughly this order)
 
-1. Whether a book can go to the breader library to be read there.
-2. What the writer does while the ThinkPad is off.
-3. How dark stories may go (the models' own filters apply either way).
-4. The word counts behind short story, novella and novel.
-5. Design direction for the UI, before any UI is designed.
+1. What the writer does while the ThinkPad is off.
+2. How dark stories may go (the models' own filters apply either way).
+3. The word counts behind short story, novella and novel.
+4. Design direction for the UI, before any UI is designed.
+
+### Later versions
+
+- Send a book straight to the breader library (v1 is an EPUB download).
 
 ## Breader, the sibling project
 
@@ -106,8 +117,9 @@ The main checkout is `~/anubhav/breader` on branch `dev` (production). It is pub
 - **Owner's rules there** are in `ai/HANDOFF.md` on the `ai/kimi` branch. The ones that carry over
   are below.
 
-Breader's code is dense in places. When we bring a piece over, we rewrite it to the standards
-below rather than copying it as it is.
+**How we reuse breader's UI:** copy the entire page from breader first, as it is, then edit and
+change it for the writer's needs. Don't redraw a page from scratch that breader already has.
+Whatever we write or change in it follows the code standards below.
 
 ## POM and Seelie, the model for our AI
 

@@ -51,3 +51,38 @@ export const BookList = z.object({
   books: z.array(BookCard),
 });
 export type BookList = z.infer<typeof BookList>;
+
+/** How hard a model thinks before it answers, weakest first. A model takes some of them. */
+export const ThinkingLevel = z.enum(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+export type ThinkingLevel = z.infer<typeof ThinkingLevel>;
+
+/** A model the accounts signed in to the proxy can serve, as settings show it. */
+export const ModelInfo = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** The account kind serving it: antigravity, codex, claude. */
+  provider: z.string(),
+  /** In tokens. */
+  contextWindow: z.number().int(),
+  /** The levels it takes, weakest first. Just "off" for a model that doesn't think. */
+  thinkingLevels: z.array(ThinkingLevel),
+});
+export type ModelInfo = z.infer<typeof ModelInfo>;
+
+/** The model the story runs on, and how hard it thinks. PUT /v1/settings. */
+export const ModelChoice = z.object({
+  model: z.string().min(1).max(200),
+  thinking: ThinkingLevel,
+});
+export type ModelChoice = z.infer<typeof ModelChoice>;
+
+/**
+ * GET and PUT /v1/settings. `using` is what the story runs on now: the account's choice, or the
+ * default until it makes one, moved to the nearest the model takes. `models` is null while the
+ * proxy can't be reached, and then the AI is offline.
+ */
+export const Settings = z.object({
+  using: ModelChoice,
+  models: z.array(ModelInfo).nullable(),
+});
+export type Settings = z.infer<typeof Settings>;

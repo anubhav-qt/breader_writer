@@ -1,4 +1,6 @@
 import { serve } from '@hono/node-server';
+import { Catalog } from './ai/catalog.ts';
+import { proxyFrom } from './ai/proxy.ts';
 import { makeApp } from './app.ts';
 import { breaderDb, makePool, writerDb } from './db/client.ts';
 import { loadEnv } from './env.ts';
@@ -16,7 +18,16 @@ if (env.WRITER_EMAILS.length === 0) {
   log.warn('WRITER_EMAILS is empty, so nobody can write');
 }
 
-const deps = { env, db: writerDb(pool), pool, breader: breaderDb(breaderPool) };
+// The models come through Seelie's CLIProxyAPI. Without one, the AI is offline here.
+const proxy = proxyFrom(env);
+let catalog: Catalog | null = null;
+if (proxy) {
+  catalog = new Catalog(proxy);
+} else {
+  log.warn('CLIPROXY_URL is unset, so the AI is offline');
+}
+
+const deps = { env, db: writerDb(pool), pool, breader: breaderDb(breaderPool), catalog };
 const server = serve({ fetch: makeApp(deps).fetch, port: env.PORT, hostname: '0.0.0.0' }, (info) => {
   log.info({ port: info.port, release: env.RELEASE }, 'writer api listening');
 });

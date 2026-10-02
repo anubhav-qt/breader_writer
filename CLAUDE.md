@@ -24,7 +24,8 @@ the way a breader card fills with colour as you read.
 Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
 settings, world, cast and the relationship graph between them) on its own page, and changing it
 later. What's left of it is the owner's test. Step 3 (AI plumbing) is under way: pi is forked
-(`packages/`). The owner has a real book set up locally that they mean to play through before
+(`packages/`), and the server reads the models from Seelie's proxy and keeps each account's pick
+of model and thinking level. The owner has a real book set up locally that they mean to play through before
 production, so its data must survive every change (see "Running it locally"). See "The code"
 below for what exists.
 
@@ -293,16 +294,31 @@ A Hono API, port 8790, built like breader's server.
 - `src/env.ts`: every setting, validated with zod. `DATABASE_URL` is the writer's tables;
   `BREADER_DATABASE_URL` is where breader's logins are (unset in production, where it's the same
   Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
-  the invite list.
+  the invite list. `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are Seelie's
+  CLIProxyAPI, shared; no URL means the AI is offline.
 - `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`: `books` (owner's
   breader user id, title, colour, length, word goal, words written, point of view, darkness),
   `worlds` (one per book), `characters` (role `protagonist` or `cast`, in order; the key is the
   book and the app made id together, so no book can reach another's characters) and
   `relationships` (one row per pair, smaller id first, which a check enforces: the bond and each
-  side's "sees" and "hides"). drizzle-kit only sees this file and this schema.
+  side's "sees" and "hides"), and `settings` (one per account: its model and thinking level).
+  drizzle-kit only sees this file and this schema.
 - `src/books/setup.ts`: a book's setup in and out of those tables. Saving keeps the ids of
   characters who stay and removes only those who left, since later steps hang the story off
   them. Relationships are written whole on each save, and read back in pair order.
+- `src/ai/`: the models.
+  - `proxy.ts` reads the shared CLIProxyAPI: the models its accounts serve (`/v1/models`, with
+    the API key), and what it knows about them (the management API's model definitions, with the
+    management key, read only). Answers are checked with zod; a proxy that can't be reached or
+    says no is a `ProxyError`.
+  - `catalog.ts` turns those into pi models (`Catalog`, read again once a minute at most): which
+    of pi's APIs speaks to each, by its id, and the thinking levels each takes. Models that draw
+    pictures are left out. Without the management key, nothing is known about them, so they
+    show no thinking levels and pi sends none, and the model thinks at its own default. The
+    default is Gemini 3.8 Flash (`gemini-3.8-flash-high` as Antigravity names it), thinking high.
+  - `settings.ts` decides the model an account's story runs on (`modelInUse`): its choice while
+    an account serves it, else the default, else the first; its thinking moves to the nearest
+    level the model takes.
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -315,7 +331,8 @@ A Hono API, port 8790, built like breader's server.
 - `src/routes/`: `GET /health`; `GET /v1/me` (the account and its access, for anyone);
   `GET /v1/books` (the account's books, most recent first), `POST /v1/books` (make one from its
   setup), and `GET` and `PUT /v1/books/:id/setup` (what it was set up with), all `open` only.
-  Another account's book is a 404, the same as no book.
+  Another account's book is a 404, the same as no book. `GET` and `PUT /v1/settings` (the model
+  in use and every model to pick from, or `models: null` while the AI is offline), `open` only.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
@@ -330,7 +347,8 @@ A Hono API, port 8790, built like breader's server.
   `writer_test` database. `test/breader.sql` makes breader's login tables, and `test/breader.ts`
   is a stand-in for breader's server: a real Better Auth, the version breader pins (1.7.6),
   configured as breader configures it. Tests log in through it and hand its cookie to the
-  writer. If breader upgrades Better Auth, upgrade it here too and run the tests.
+  writer. If breader upgrades Better Auth, upgrade it here too and run the tests. `test/proxy.ts`
+  is a stand-in for CLIProxyAPI, so no test reaches a real model.
 
 ### Running it locally
 
@@ -341,8 +359,11 @@ writer reads that login. Only the writer's own tables are local.
    login cookie is on `breader.site` and its subdomains, so the app has to be opened as one.
 2. `npm run dev:env` (`scripts/dev-env.mjs`) writes `server/.env` from breader's `infra/.env`:
    `SESSION_SECRET`, `COOKIE_SECURE`, and `PRIMARY_URL` and `PRIMARY_SSL` as
-   `BREADER_DATABASE_URL` and `BREADER_DATABASE_SSL`. It prints none of them and keeps the rest of
-   `server/.env`. The invited emails go in `WRITER_EMAILS` there.
+   `BREADER_DATABASE_URL` and `BREADER_DATABASE_SSL`. From the CLIProxyAPI Homebrew runs here
+   (`/opt/homebrew/etc/cliproxyapi.conf`, the one Seelie uses too) it takes `CLIPROXY_URL` and
+   `CLIPROXY_API_KEY`. It prints none of them and keeps the rest of `server/.env`. The invited
+   emails go in `WRITER_EMAILS` there, and the proxy's management key in
+   `CLIPROXY_MANAGEMENT_KEY` (its config only keeps a hash of it, so it comes from the owner).
 3. `npm run db`, `npm run migrate`, then `npm run api` (port 8790) and `npm run web` (5174).
 4. Open `https://local.breader.site:5174/writer/`. The certificate is self-signed
    (`@vitejs/plugin-basic-ssl`), so the browser warns once; HTTPS is needed because breader's

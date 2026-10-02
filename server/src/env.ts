@@ -39,6 +39,19 @@ const Env = z.object({
    * SPEECH_EMAILS. Everyone else sees that the writer is invite only.
    */
   WRITER_EMAILS: list.transform((emails) => emails.map((e) => e.toLowerCase())).default([]),
+
+  /**
+   * Seelie's CLIProxyAPI, which the writer shares (see CLAUDE.md): its address, like
+   * http://127.0.0.1:8317. Unset means no AI here, and the writer says it's offline.
+   */
+  CLIPROXY_URL: z.string().optional(),
+  /** The key its model endpoints take (one of its `api-keys`). */
+  CLIPROXY_API_KEY: z.string().default(''),
+  /**
+   * Its management API's key, read only, for what it knows about each model (its name, context
+   * and thinking levels). Without it the models still work, without thinking levels.
+   */
+  CLIPROXY_MANAGEMENT_KEY: z.string().default(''),
 });
 
 export type Env = z.infer<typeof Env>;

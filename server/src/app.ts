@@ -8,6 +8,7 @@ import { log } from './log.ts';
 import { bookRoutes } from './routes/books.ts';
 import { healthRoutes } from './routes/health.ts';
 import { meRoutes } from './routes/me.ts';
+import { settingsRoutes } from './routes/settings.ts';
 
 export function makeApp(deps: Deps) {
   const allowed = deps.env.ALLOWED_ORIGINS;
@@ -54,6 +55,7 @@ export function makeApp(deps: Deps) {
   app.route('/', healthRoutes(deps));
   app.route('/v1', meRoutes(deps));
   app.route('/v1', bookRoutes(deps));
+  app.route('/v1', settingsRoutes(deps));
 
   app.notFound((c) => c.json({ code: 'not_found', message: 'No such endpoint.' }, 404));
   app.onError(onError);

@@ -98,3 +98,14 @@ export const relationships = writer.table(
     foreignKey({ columns: [t.bookId, t.bId], foreignColumns: [characters.bookId, characters.id] }).onDelete('cascade'),
   ],
 );
+
+/** An account's own settings: the model its stories run on, and how hard it thinks. */
+export const settings = writer.table('settings', {
+  /** The breader account (its Better Auth user id). */
+  userId: text('user_id').primaryKey(),
+  /** A model id as the proxy lists it. */
+  model: text('model').notNull(),
+  /** off, minimal, low, medium, high, xhigh or max. */
+  thinking: text('thinking').notNull(),
+  updatedAt: at('updated_at').notNull().defaultNow(),
+});

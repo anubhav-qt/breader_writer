@@ -29,6 +29,13 @@
       "when": 1790978448853,
       "tag": "0003_no_feelings",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790980340666,
+      "tag": "0004_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -86,9 +86,17 @@ design is settled (see "Open"). See "The code" below for what exists.
   that says otherwise is brought in line: the state, the summaries, the turns and the written
   book. How it works is in "Changing the past" below; some of it is still open.
 - **Relationships are a graph.** The people are its points and their relationships its lines,
-  deep enough for a long story: what two people are to each other, how each one sees the other,
-  and how that changed as the story went. It replaces setup's one line per person ("how they feel
-  about"). What a line holds and how the graph is shown are still open.
+  deep enough for a long story. It replaces setup's one line per person ("how they feel about").
+  A line holds a bond and two sides:
+  - **The bond:** what the two are to each other, shared, and often several things at once
+    ("sisters, rivals for the throne").
+  - **Each side:** how that one sees the other (the two can differ), and what they hide from the
+    other.
+  - **History:** every change, tied to the scene it happened in ("Scene 4, the trial: Mara stops
+    trusting her").
+
+  No levels or scores: the model keeps words straighter than numbers. How the graph is shown is
+  still open.
 - **A world is a few fields plus notes too:** genre, tone, setting (when and where), the rules
   that matter (magic, technology, power), and a free notes box. All optional; the AI fills blanks.
 - **The story can bring in its own characters.** Anyone who sticks around gets a card in the cast
@@ -123,8 +131,7 @@ design is settled (see "Open"). See "The code" below for what exists.
 
 1. Design direction for each new screen (setup, play, cast sheets), asked when we reach it.
    The library and the book view start as copies of breader's pages.
-2. The relationship graph: what one relationship holds, then how the graph is shown in setup and
-   mid story.
+2. How the relationship graph is shown, in setup and mid story.
 3. Changing the past: whether every change reaches back, or the owner says per change whether
    it was always so or happens from now on; and whether rewritten scenes are shown before
    they're kept.
@@ -415,8 +422,11 @@ chat as the memory.
   turn or scene, so the story knows how two people got where they are, and undo rolls it back.
 - **In the working context**, the relationships between the people in the current scene go in
   full, their history folded to a summary; everyone else's go in short.
-- The narrator changes a line only through its tool (shift a relationship). What a line holds is
-  still open (see "Open").
+- **A line is a bond and two sides** (see "Decided"): the shared bond, each side's view of the
+  other and what they hide, and the history. What a side hides is for the narrator to play, not
+  for the other character to know until the story reveals it.
+- The narrator changes a line only through its tool (shift a relationship), which says what
+  changed and why, and that becomes the history entry.
 
 ### Changing the past
 

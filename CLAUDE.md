@@ -21,7 +21,8 @@ the way a breader card fills with colour as you read.
 
 ## Status
 
-Nothing is built yet. We are settling the design with the owner, one question at a time.
+Nothing is built yet. The product questions are settled; building starts at step 1 of the build
+order below.
 
 ### Decided
 
@@ -38,9 +39,16 @@ Nothing is built yet. We are settling the design with the owner, one question at
   or third person omniscient.
 - **The book is one tap away while you play.** The play fills the screen; a quiet mark says a
   new scene has landed in the book. Same on a phone and a laptop.
-- **Progress is words written against a length goal.** At setup you pick a length (short story,
-  novella or novel). The bar is words written over that goal, and the story paces its arc to end
-  near it, so a full bar means a finished book.
+- **Progress is words written against a length goal.** At setup you pick a length. The bar is
+  words written over that goal, and the story paces its arc to end near it, so a full bar means a
+  finished book. The lengths, at roughly 2,000 words a scene:
+
+  | Length | Words | Scenes, about |
+  | --- | --- | --- |
+  | Short story | 8,000 | 4 |
+  | Novella | 30,000 | 15 |
+  | Light novel | 50,000 | 25 |
+  | Novel | 80,000 | 40 |
 - **The AI is a hard fork of pi, the way Seelie is in POM** (see below). We fork the generalized
   harness and change it for our use. Models come from the owner's subscriptions (Google
   Antigravity first, with ChatGPT Codex and Claude as other options) through CLIProxyAPI.
@@ -80,13 +88,42 @@ Nothing is built yet. We are settling the design with the owner, one question at
 - **A book leaves the writer as an EPUB download, for now.** The owner adds it to breader by
   hand. A later version will send it to the breader library directly; keep the EPUB export clean
   enough that breader reads it well (chapters as sections, no publisher CSS tricks).
+- **While the ThinkPad is off, the writer shows offline**, like Seelie, and comes back by itself.
+  No fallback server. The downloaded EPUB is the reading copy meanwhile.
+- **How dark a story goes is picked per book** at setup: Gentle (all ages), Mature (violence,
+  grief, cruelty, romance, like a mainstream adult novel; the default) or Unflinching (whatever
+  the model will write). The models' own filters apply on top.
 
 ### Open (ask the owner one at a time, in roughly this order)
 
-1. What the writer does while the ThinkPad is off.
-2. How dark stories may go (the models' own filters apply either way).
-3. The word counts behind short story, novella and novel.
-4. Design direction for the UI, before any UI is designed.
+1. Design direction for each new screen (setup, play, cast sheets), asked when we reach it.
+   The library and the book view start as copies of breader's pages.
+
+### Build order
+
+Each step ends working, committed, and with a short test checklist for the owner.
+
+1. **Skeleton.** npm workspaces like breader's (`frontend`, `server`, `shared`). Copy breader's
+   library page whole (header, gallery, key and login dialogs, tokens, fonts) and serve it under
+   `/writer`. A server that reads breader's login, checks the allowlist, and owns the `writer`
+   schema. No AI yet.
+2. **Setup.** Make a book: world, cast, point of view, length, content level. Cards in the
+   library fill with words written over the goal.
+3. **AI plumbing.** Fork pi (`packages/pi-ai`, `packages/pi-agent`), run CLIProxyAPI, sign in
+   subscriptions and pick a model from settings, as Seelie does.
+4. **Play.** The narrator agent: turns, the author toggle, hints on tap, undo within a scene,
+   scenes ending, the cast growing and new characters joining.
+5. **The book.** The scene writer, the book view (a copy of breader's reader), the progress bar
+   and the EPUB download.
+6. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
+   the writer's app, the writer API behind the tunnel, and the nightly backup.
+
+### Notes for step 1
+
+- Books belong to a breader **account** (its Better Auth user id), since only allowlisted
+  accounts can play. A key session alone can open the writer and see the invite note.
+- Logging in happens through breader's own API (`/v1/auth/*`), with breader's login dialog. The
+  writer server only reads the session, against breader's database.
 
 ### Later versions
 

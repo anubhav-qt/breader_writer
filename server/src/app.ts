@@ -35,7 +35,7 @@ export function makeApp(deps: Deps) {
         return null;
       },
       credentials: true,
-      allowMethods: ['GET', 'POST', 'PATCH', 'DELETE'],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
       allowHeaders: ['content-type'],
       maxAge: 600,
     }),

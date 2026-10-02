@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Length } from './book.ts';
 
 /*
  * What the writer's server and app say to each other. Both import these shapes, so changing one
@@ -30,12 +31,13 @@ export const Me = z.object({
 });
 export type Me = z.infer<typeof Me>;
 
-/** A book as its card in the library shows it. Times are milliseconds since 1970. */
+/** A book as its card in the library shows it. Times are milliseconds since 1970. POST /v1/books answers with it too. */
 export const BookCard = z.object({
   id: z.string(),
   title: z.string(),
   /** A palette key from the app's book colours (frontend/src/data/colors.ts). */
   color: z.string(),
+  length: Length,
   wordsWritten: z.number().int(),
   wordGoal: z.number().int(),
   createdAt: z.number(),

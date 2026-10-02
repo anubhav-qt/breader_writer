@@ -1,3 +1,4 @@
+import { WORD_GOALS, type Length } from '@writer/shared/book';
 import type { Book } from './books';
 
 /*
@@ -26,7 +27,7 @@ const HOUR = 3_600_000;
 interface Seed {
   title: string;
   color: string;
-  wordGoal: number;
+  length: Length;
   /** How much is written, from 0 to 1. */
   share: number;
   hoursAgo: number;
@@ -34,36 +35,38 @@ interface Seed {
 
 /* Made up stories, at every length and every stage, played over the last few months. */
 const SEEDS: Seed[] = [
-  { title: 'Salt and Iron', color: 'teal', wordGoal: 80000, share: 0.42, hoursAgo: 2 },
-  { title: 'The Clockmaker’s Debt', color: 'clay', wordGoal: 30000, share: 0.8, hoursAgo: 20 },
-  { title: 'Reincarnated as the Villain’s Butler, I Refuse to Let Him Lose', color: 'lilac', wordGoal: 50000, share: 0.3, hoursAgo: 30 },
-  { title: 'A Quiet Kind of Storm', color: 'sky', wordGoal: 8000, share: 1, hoursAgo: 52 },
-  { title: 'Ninth Bell', color: 'graphite', wordGoal: 8000, share: 0, hoursAgo: 70 },
-  { title: 'Where the Rivers Forget', color: 'moss', wordGoal: 80000, share: 0.12, hoursAgo: 100 },
-  { title: 'The Cartographer of Ash', color: 'ochre', wordGoal: 30000, share: 0.55, hoursAgo: 130 },
-  { title: 'Lanterns Under Kestrel Hill', color: 'green', wordGoal: 80000, share: 0.05, hoursAgo: 190 },
-  { title: 'My Classmate Is a Retired Demon Lord and Keeps Asking Me for Homework Help', color: 'rose', wordGoal: 50000, share: 0.66, hoursAgo: 240 },
-  { title: 'Glass Orchard', color: 'sage', wordGoal: 8000, share: 0.5, hoursAgo: 300 },
-  { title: 'The Last Train to Vell', color: 'indigo', wordGoal: 30000, share: 0, hoursAgo: 420 },
-  { title: 'Hollow Crown, Burning Sea', color: 'plum', wordGoal: 80000, share: 0.9, hoursAgo: 600 },
-  { title: 'Small Gods of the Kitchen', color: 'sand', wordGoal: 8000, share: 1, hoursAgo: 800 },
-  { title: 'The Winter Ledger', color: 'blush', wordGoal: 30000, share: 0.25, hoursAgo: 1000 },
-  { title: 'Seven Doors in Marrow Street', color: 'teal', wordGoal: 80000, share: 0.33, hoursAgo: 1300 },
-  { title: 'Ashfall', color: 'clay', wordGoal: 50000, share: 0.1, hoursAgo: 1700 },
-  { title: 'The Moth Archive', color: 'ochre', wordGoal: 30000, share: 1, hoursAgo: 2200 },
-  { title: 'Letters to a Drowned City', color: 'sky', wordGoal: 80000, share: 0.6, hoursAgo: 3000 },
-  { title: 'The Summer the Bees Left', color: 'moss', wordGoal: 8000, share: 0.75, hoursAgo: 4000 },
-  { title: 'Iron Saints', color: 'graphite', wordGoal: 80000, share: 0, hoursAgo: 6000 },
+  { title: 'Salt and Iron', color: 'teal', length: 'novel', share: 0.42, hoursAgo: 2 },
+  { title: 'The Clockmaker’s Debt', color: 'clay', length: 'novella', share: 0.8, hoursAgo: 20 },
+  { title: 'Reincarnated as the Villain’s Butler, I Refuse to Let Him Lose', color: 'lilac', length: 'light_novel', share: 0.3, hoursAgo: 30 },
+  { title: 'A Quiet Kind of Storm', color: 'sky', length: 'short_story', share: 1, hoursAgo: 52 },
+  { title: 'Ninth Bell', color: 'graphite', length: 'short_story', share: 0, hoursAgo: 70 },
+  { title: 'Where the Rivers Forget', color: 'moss', length: 'novel', share: 0.12, hoursAgo: 100 },
+  { title: 'The Cartographer of Ash', color: 'ochre', length: 'novella', share: 0.55, hoursAgo: 130 },
+  { title: 'Lanterns Under Kestrel Hill', color: 'green', length: 'novel', share: 0.05, hoursAgo: 190 },
+  { title: 'My Classmate Is a Retired Demon Lord and Keeps Asking Me for Homework Help', color: 'rose', length: 'light_novel', share: 0.66, hoursAgo: 240 },
+  { title: 'Glass Orchard', color: 'sage', length: 'short_story', share: 0.5, hoursAgo: 300 },
+  { title: 'The Last Train to Vell', color: 'indigo', length: 'novella', share: 0, hoursAgo: 420 },
+  { title: 'Hollow Crown, Burning Sea', color: 'plum', length: 'novel', share: 0.9, hoursAgo: 600 },
+  { title: 'Small Gods of the Kitchen', color: 'sand', length: 'short_story', share: 1, hoursAgo: 800 },
+  { title: 'The Winter Ledger', color: 'blush', length: 'novella', share: 0.25, hoursAgo: 1000 },
+  { title: 'Seven Doors in Marrow Street', color: 'teal', length: 'novel', share: 0.33, hoursAgo: 1300 },
+  { title: 'Ashfall', color: 'clay', length: 'light_novel', share: 0.1, hoursAgo: 1700 },
+  { title: 'The Moth Archive', color: 'ochre', length: 'novella', share: 1, hoursAgo: 2200 },
+  { title: 'Letters to a Drowned City', color: 'sky', length: 'novel', share: 0.6, hoursAgo: 3000 },
+  { title: 'The Summer the Bees Left', color: 'moss', length: 'short_story', share: 0.75, hoursAgo: 4000 },
+  { title: 'Iron Saints', color: 'graphite', length: 'novel', share: 0, hoursAgo: 6000 },
 ];
 
 function bookFrom(seed: Seed, index: number, now: number): Book {
   const updatedAt = now - seed.hoursAgo * HOUR;
+  const wordGoal = WORD_GOALS[seed.length];
   return {
     id: `preview-${index}`,
     title: seed.title,
     color: seed.color,
-    wordGoal: seed.wordGoal,
-    wordsWritten: Math.round(seed.wordGoal * seed.share),
+    length: seed.length,
+    wordGoal,
+    wordsWritten: Math.round(wordGoal * seed.share),
     createdAt: updatedAt - 72 * HOUR,
     updatedAt,
   };

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./book": "./src/book.ts",
     "./protocol": "./src/protocol.ts"
   },
   "scripts": {

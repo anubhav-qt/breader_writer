@@ -4,6 +4,9 @@ import { users } from '../src/db/breader.ts';
 import { books } from '../src/db/schema.ts';
 import { account, address, call, deps, writer } from './helpers.ts';
 
+/** A book row's settings, for books put straight into the table. */
+const SETTINGS = { length: 'short_story', wordGoal: 8000, pov: 'third_close', darkness: 'mature' };
+
 async function userId(email: string) {
   const [user] = await deps.breader.select().from(users).where(eq(users.email, email));
   return user.id;
@@ -42,15 +45,15 @@ describe('GET /v1/books', () => {
     const them = await userId(theirs);
     const hour = 3_600_000;
     await deps.db.insert(books).values([
-      { userId: me, title: 'Older', color: 'teal', wordGoal: 8000, wordsWritten: 2000, updatedAt: new Date(Date.now() - 2 * hour) },
-      { userId: me, title: 'Newer', color: 'rose', wordGoal: 50000, wordsWritten: 0, updatedAt: new Date(Date.now() - hour) },
-      { userId: them, title: 'Not yours', color: 'moss', wordGoal: 8000 },
+      { ...SETTINGS, userId: me, title: 'Older', color: 'teal', wordsWritten: 2000, updatedAt: new Date(Date.now() - 2 * hour) },
+      { ...SETTINGS, userId: me, title: 'Newer', color: 'rose', length: 'light_novel', wordGoal: 50000, updatedAt: new Date(Date.now() - hour) },
+      { ...SETTINGS, userId: them, title: 'Not yours', color: 'moss' },
     ]);
 
     const r = await call(app, 'GET', '/v1/books', cookie);
     expect(r.body.books.map((b: { title: string }) => b.title)).toEqual(['Newer', 'Older']);
     const older = r.body.books[1];
-    expect(older).toMatchObject({ title: 'Older', color: 'teal', wordGoal: 8000, wordsWritten: 2000 });
+    expect(older).toMatchObject({ title: 'Older', color: 'teal', length: 'short_story', wordGoal: 8000, wordsWritten: 2000 });
     expect(typeof older.updatedAt).toBe('number');
   });
 });

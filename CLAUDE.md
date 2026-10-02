@@ -155,6 +155,11 @@ npm workspaces, as in breader. Node 24 (`.nvmrc`).
 
 - `src/protocol.ts`: the zod shapes the server and the app exchange (`Me`, `Access`,
   `BookCard`, `BookList`). Change a shape here and both sides get the type error.
+- `src/book.ts`: what a book is set up with (`BookSetup`): its length (and each length's word
+  goal), point of view, darkness (the content level), its world and its characters' sheets. The
+  app makes each character's id, so sheets can say how they feel about each other before the
+  book is saved. `BookSetup` turns away two characters with one id, and feelings about themselves
+  or about someone not in the cast.
 
 ### `frontend/` (`@writer/frontend`)
 
@@ -193,9 +198,15 @@ A Hono API, port 8790, built like breader's server.
   `BREADER_DATABASE_URL` is where breader's logins are (unset in production, where it's the same
   Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
   the invite list.
-- `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`. Today: `books`
-  (owner's breader user id, title, colour, word goal, words written). drizzle-kit only sees this
+- `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`: `books` (owner's
+  breader user id, title, colour, length, word goal, words written, point of view, darkness),
+  `worlds` (one per book), `characters` (role `protagonist` or `cast`, in order; the key is the
+  book and the app made id together, so no book can reach another's characters) and `feelings`
+  (one character about another, only lines with something in them). drizzle-kit only sees this
   file and this schema.
+- `src/books/setup.ts`: a book's setup in and out of those tables. Saving keeps the ids of
+  characters who stay and removes only those who left, since later steps hang the story off
+  them.
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -206,7 +217,9 @@ A Hono API, port 8790, built like breader's server.
   `open`; `requireWriter` guards routes that need `open`. An unconfirmed address is told so
   before the list is checked, so nobody learns whether an email they don't own is invited.
 - `src/routes/`: `GET /health`; `GET /v1/me` (the account and its access, for anyone);
-  `GET /v1/books` (the account's books, most recent first, `open` only).
+  `GET /v1/books` (the account's books, most recent first), `POST /v1/books` (make one from its
+  setup), and `GET` and `PUT /v1/books/:id/setup` (what it was set up with), all `open` only.
+  Another account's book is a 404, the same as no book.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under

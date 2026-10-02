@@ -40,6 +40,20 @@ export async function call(app: Writer, method: string, path: string, cookie = '
     headers.cookie = cookie;
   }
   const res = await app.request(path, { method, headers });
+  return answer(res);
+}
+
+/** A request with a JSON body from the app's own page, with this browser's cookies. */
+export async function send(app: Writer, method: string, path: string, cookie: string, body: unknown) {
+  const headers: Record<string, string> = { origin: ORIGIN, 'content-type': 'application/json' };
+  if (cookie) {
+    headers.cookie = cookie;
+  }
+  const res = await app.request(path, { method, headers, body: JSON.stringify(body) });
+  return answer(res);
+}
+
+async function answer(res: Response) {
   const text = await res.text();
   let body = null;
   if (text) {

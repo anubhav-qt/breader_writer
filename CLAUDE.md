@@ -21,9 +21,9 @@ the way a breader card fills with colour as you read.
 
 ## Status
 
-Step 1 (skeleton) is built: the shared package, the server and the library page, and running it
-locally against production breader. What's left of it is the owner's test. See "The code" below
-for what exists.
+Step 1 (skeleton) is done and tested by the owner: the shared package, the server and the
+library page, and running it locally against production breader. Step 2 (setup) is next, starting
+with the owner's design direction for the setup screen. See "The code" below for what exists.
 
 ### Decided
 

@@ -44,15 +44,42 @@ Nothing is built yet. We are settling the design with the owner, one question at
 - **The AI is a hard fork of pi, the way Seelie is in POM** (see below). We fork the generalized
   harness and change it for our use. Models come from the owner's subscriptions (Google
   Antigravity first, with ChatGPT Codex and Claude as other options) through CLIProxyAPI.
+- **Only allowlisted accounts can play.** Like breader's `SPEECH_EMAILS`: a list of emails, each
+  with a confirmed address. Everyone else can see the writer, with a quiet note that it's invite
+  only. This keeps the subscriptions personal and inside their limits. A key on its own isn't
+  enough to play, since a key has no email.
+- **Your turn is free text, with hints on tap.** One box where you write what you do and say in
+  your own words. A tap shows 3 possible moves when you're stuck; otherwise nothing is suggested.
+- **Author notes come from a toggle on the box.** One tap switches it from "as <protagonist>" to
+  "as the author" ("skip to the next morning", "make the storm worse"). The story follows the
+  note without the character saying it, and the book never mentions it.
+- **Undo works until the scene is written.** While a scene is being played you can take back
+  your last turns, or ask for a different reply to the same move. Once the scene is written into
+  the book it's settled, so the book and the play never disagree.
+- **A character is a few fields plus notes:** name, who they are, personality, past, and how
+  they feel about the others, plus a free notes box. Only the name is required; the AI can fill
+  any blank.
+- **A world is a few fields plus notes too:** genre, tone, setting (when and where), the rules
+  that matter (magic, technology, power), and a free notes box. All optional; the AI fills blanks.
+- **The story can bring in its own characters.** Anyone who sticks around gets a card in the cast
+  like the owner's own, readable and editable. Passing extras need no card.
+- **Writer has its own server, on breader's database.** A small server in this repo runs on the
+  ThinkPad beside breader and CLIProxyAPI. It uses breader's Supabase and breader's
+  `SESSION_SECRET`, so whoever is logged in to breader is logged in to the writer. Its tables live
+  in their own Postgres schema, `writer`, with their own migrations table, so the two projects
+  never step on each other's migrations.
+- **Writer backs itself up.** Breader's nightly backup dumps the laptop's copy, which only holds
+  breader's own tables (its change feed), so it won't include ours. The writer runs its own
+  nightly dump of the `writer` schema, encrypted to the same backup key, into the same R2 bucket
+  under `writer/`.
 
 ### Open (ask the owner one at a time, in roughly this order)
 
-1. Who may use the AI: it runs on the owner's own subscriptions.
-2. What you can type while playing (speech, actions, out of character requests, undo).
-3. What a character and a world are made of in setup, and whether the story may add characters.
-4. Where stories are stored, and whether writer shares breader's server and database.
-5. Whether a finished book can go to the breader library to be read there.
-6. The word counts behind short story, novella and novel.
+1. Whether a book can go to the breader library to be read there.
+2. What the writer does while the ThinkPad is off.
+3. How dark stories may go (the models' own filters apply either way).
+4. The word counts behind short story, novella and novel.
+5. Design direction for the UI, before any UI is designed.
 
 ## Breader, the sibling project
 

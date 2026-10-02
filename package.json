@@ -4,7 +4,9 @@
   "workspaces": [
     "frontend",
     "shared",
-    "server"
+    "server",
+    "packages/pi-ai",
+    "packages/pi-agent"
   ],
   "engines": {
     "node": ">=24"
@@ -17,6 +19,6 @@
     "db": "docker compose -f infra/compose.dev.yml up -d --wait",
     "db:down": "docker compose -f infra/compose.dev.yml down",
     "test": "npm test -w server",
-    "typecheck": "npm run typecheck -w shared -w server && npm run build -w frontend"
+    "typecheck": "npm run typecheck -w shared -w packages/pi-ai -w packages/pi-agent -w server && npm run build -w frontend"
   }
 }

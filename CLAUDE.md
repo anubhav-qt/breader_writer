@@ -23,9 +23,10 @@ the way a breader card fills with colour as you read.
 
 Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
 settings, world, cast and the relationship graph between them) on its own page, and changing it
-later. What's left of it is the owner's test. The owner has a real book set up locally that they
-mean to play through before production, so its data must survive every change (see "Running it
-locally"). See "The code" below for what exists.
+later. What's left of it is the owner's test. Step 3 (AI plumbing) is under way: pi is forked
+(`packages/`). The owner has a real book set up locally that they mean to play through before
+production, so its data must survive every change (see "Running it locally"). See "The code"
+below for what exists.
 
 ### Decided
 
@@ -204,6 +205,21 @@ Each step ends working, committed, and with a short test checklist for the owner
 ## The code
 
 npm workspaces, as in breader. Node 24 (`.nvmrc`).
+
+### `packages/` (`@writer/pi-ai`, `@writer/pi-agent`)
+
+Our hard fork of pi (`github.com/earendil-works/pi`, MIT, forked at `a276dab`), cut the way POM
+cut it for Seelie. Each keeps pi's LICENSE. They're TypeScript sources (`exports` points at
+`src/index.ts`), run by tsx like the server, and keep pi's own style (tabs, its idioms): it's
+their code, changed where we need, not rewritten to ours.
+
+- `pi-ai`: streaming one model reply over four APIs (Gemini, Anthropic Messages, OpenAI
+  Responses, OpenAI Chat Completions), which is all CLIProxyAPI speaks. `streamSimple` in
+  `src/stream.ts` picks the API by `model.api` and loads it on first use. Dropped from upstream:
+  every other API, the provider catalogs, OAuth and credentials, images, telemetry. Kept on top
+  of POM's cut: the token estimates (`utils/estimate.ts`), for the context budget.
+- `pi-agent`: the agent loop (a reply, its tool calls, their results, again until it's done)
+  and its events. Dropped: the proxy transport.
 
 ### `shared/` (`@writer/shared`)
 

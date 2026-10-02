@@ -1,0 +1,25 @@
+{
+  "name": "@writer/pi-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The writer's hard fork of pi-ai (earendil-works/pi, MIT): four streaming APIs (Gemini, Anthropic Messages, OpenAI Responses, OpenAI Chat Completions), changed for the writer only",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.129.0",
+    "@google/genai": "2.21.0",
+    "openai": "7.19.0",
+    "partial-json": "0.1.7",
+    "typebox": "1.3.27"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "typescript": "~5.8.3"
+  }
+}

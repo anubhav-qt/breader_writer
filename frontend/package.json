@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@writer/shared": "*",
+    "d3-force": "^3.0.0",
     "motion": "^13.4.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@types/d3-force": "^3.0.10",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-basic-ssl": "^2.3.0",

@@ -15,6 +15,20 @@
       "when": 1790967463493,
       "tag": "0001_setup",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790978448596,
+      "tag": "0002_relationships",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790978448853,
+      "tag": "0003_no_feelings",
+      "breakpoints": true
     }
   ]
 }

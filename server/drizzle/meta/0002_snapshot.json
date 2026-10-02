@@ -1,0 +1,498 @@
+{
+  "id": "c7ae589d-675a-4bac-8048-695289e7e879",
+  "prevId": "02ab424e-a7c0-4450-b3e4-1cb464380a29",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "writer.books": {
+      "name": "books",
+      "schema": "writer",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "length": {
+          "name": "length",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "word_goal": {
+          "name": "word_goal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pov": {
+          "name": "pov",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "darkness": {
+          "name": "darkness",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "words_written": {
+          "name": "words_written",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "books_user_idx": {
+          "name": "books_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "writer.characters": {
+      "name": "characters",
+      "schema": "writer",
+      "columns": {
+        "book_id": {
+          "name": "book_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "who": {
+          "name": "who",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "personality": {
+          "name": "personality",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "past": {
+          "name": "past",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        }
+      },
+      "indexes": {
+        "characters_one_protagonist": {
+          "name": "characters_one_protagonist",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "role = 'protagonist'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "characters_book_id_books_id_fk": {
+          "name": "characters_book_id_books_id_fk",
+          "tableFrom": "characters",
+          "tableTo": "books",
+          "schemaTo": "writer",
+          "columnsFrom": [
+            "book_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "characters_book_id_id_pk": {
+          "name": "characters_book_id_id_pk",
+          "columns": [
+            "book_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "writer.feelings": {
+      "name": "feelings",
+      "schema": "writer",
+      "columns": {
+        "book_id": {
+          "name": "book_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "character_id": {
+          "name": "character_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "about_id": {
+          "name": "about_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "feelings_book_id_character_id_characters_book_id_id_fk": {
+          "name": "feelings_book_id_character_id_characters_book_id_id_fk",
+          "tableFrom": "feelings",
+          "tableTo": "characters",
+          "schemaTo": "writer",
+          "columnsFrom": [
+            "book_id",
+            "character_id"
+          ],
+          "columnsTo": [
+            "book_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "feelings_book_id_about_id_characters_book_id_id_fk": {
+          "name": "feelings_book_id_about_id_characters_book_id_id_fk",
+          "tableFrom": "feelings",
+          "tableTo": "characters",
+          "schemaTo": "writer",
+          "columnsFrom": [
+            "book_id",
+            "about_id"
+          ],
+          "columnsTo": [
+            "book_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "feelings_book_id_character_id_about_id_pk": {
+          "name": "feelings_book_id_character_id_about_id_pk",
+          "columns": [
+            "book_id",
+            "character_id",
+            "about_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "writer.relationships": {
+      "name": "relationships",
+      "schema": "writer",
+      "columns": {
+        "book_id": {
+          "name": "book_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "a_id": {
+          "name": "a_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "b_id": {
+          "name": "b_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bond": {
+          "name": "bond",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "a_sees": {
+          "name": "a_sees",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "a_hides": {
+          "name": "a_hides",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "b_sees": {
+          "name": "b_sees",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "b_hides": {
+          "name": "b_hides",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "relationships_book_id_a_id_characters_book_id_id_fk": {
+          "name": "relationships_book_id_a_id_characters_book_id_id_fk",
+          "tableFrom": "relationships",
+          "tableTo": "characters",
+          "schemaTo": "writer",
+          "columnsFrom": [
+            "book_id",
+            "a_id"
+          ],
+          "columnsTo": [
+            "book_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "relationships_book_id_b_id_characters_book_id_id_fk": {
+          "name": "relationships_book_id_b_id_characters_book_id_id_fk",
+          "tableFrom": "relationships",
+          "tableTo": "characters",
+          "schemaTo": "writer",
+          "columnsFrom": [
+            "book_id",
+            "b_id"
+          ],
+          "columnsTo": [
+            "book_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "relationships_book_id_a_id_b_id_pk": {
+          "name": "relationships_book_id_a_id_b_id_pk",
+          "columns": [
+            "book_id",
+            "a_id",
+            "b_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "relationships_in_order": {
+          "name": "relationships_in_order",
+          "value": "\"writer\".\"relationships\".\"a_id\" < \"writer\".\"relationships\".\"b_id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "writer.worlds": {
+      "name": "worlds",
+      "schema": "writer",
+      "columns": {
+        "book_id": {
+          "name": "book_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "genre": {
+          "name": "genre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "tone": {
+          "name": "tone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "setting": {
+          "name": "setting",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "rules": {
+          "name": "rules",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "worlds_book_id_books_id_fk": {
+          "name": "worlds_book_id_books_id_fk",
+          "tableFrom": "worlds",
+          "tableTo": "books",
+          "schemaTo": "writer",
+          "columnsFrom": [
+            "book_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {
+    "writer": "writer"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

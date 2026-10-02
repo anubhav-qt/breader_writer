@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { foreignKey, index, integer, pgSchema, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { check, foreignKey, index, integer, pgSchema, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 /*
  * The writer's tables. They live in breader's database, in their own Postgres schema, `writer`,
@@ -75,18 +75,26 @@ export const characters = writer.table(
   ],
 );
 
-/** How one character feels about another. Only lines with something in them are kept. */
-export const feelings = writer.table(
-  'feelings',
+/**
+ * A line in the relationship graph: the bond the two share, and each one's side (how they see the
+ * other, what they hide from them). The pair is stored smaller id first, so it has one row.
+ */
+export const relationships = writer.table(
+  'relationships',
   {
     bookId: uuid('book_id').notNull(),
-    characterId: uuid('character_id').notNull(),
-    aboutId: uuid('about_id').notNull(),
-    text: text('text').notNull(),
+    aId: uuid('a_id').notNull(),
+    bId: uuid('b_id').notNull(),
+    bond: text('bond').notNull().default(''),
+    aSees: text('a_sees').notNull().default(''),
+    aHides: text('a_hides').notNull().default(''),
+    bSees: text('b_sees').notNull().default(''),
+    bHides: text('b_hides').notNull().default(''),
   },
   (t) => [
-    primaryKey({ columns: [t.bookId, t.characterId, t.aboutId] }),
-    foreignKey({ columns: [t.bookId, t.characterId], foreignColumns: [characters.bookId, characters.id] }).onDelete('cascade'),
-    foreignKey({ columns: [t.bookId, t.aboutId], foreignColumns: [characters.bookId, characters.id] }).onDelete('cascade'),
+    primaryKey({ columns: [t.bookId, t.aId, t.bId] }),
+    check('relationships_in_order', sql`${t.aId} < ${t.bId}`),
+    foreignKey({ columns: [t.bookId, t.aId], foreignColumns: [characters.bookId, characters.id] }).onDelete('cascade'),
+    foreignKey({ columns: [t.bookId, t.bId], foreignColumns: [characters.bookId, characters.id] }).onDelete('cascade'),
   ],
 );

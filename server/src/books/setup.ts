@@ -1,17 +1,28 @@
 import { and, asc, eq, notInArray } from 'drizzle-orm';
-import { everyone, WORD_GOALS, type BookSetup, type Character, type Darkness, type Length, type Pov } from '@writer/shared/book';
+import {
+  everyone,
+  inOrder,
+  WORD_GOALS,
+  type BookSetup,
+  type Character,
+  type Darkness,
+  type Length,
+  type Pov,
+  type Relationship,
+} from '@writer/shared/book';
 import type { BookCard } from '@writer/shared/protocol';
 import type { Db } from '../db/client.ts';
-import { books, characters, feelings, worlds } from '../db/schema.ts';
+import { books, characters, relationships, worlds } from '../db/schema.ts';
 
 /*
  * A book's setup in the database: the book's own row (title, colour, length, point of view,
- * darkness), its world, its characters and how they feel about each other.
+ * darkness), its world, its characters and the relationships between them.
  */
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type BookRow = typeof books.$inferSelect;
 type CharacterRow = typeof characters.$inferSelect;
+type RelationshipRow = typeof relationships.$inferSelect;
 type Role = 'protagonist' | 'cast';
 
 export function toCard(row: BookRow): BookCard {
@@ -71,8 +82,22 @@ async function saveCharacter(tx: Tx, row: CharacterRow) {
     });
 }
 
+function relationshipRow(bookId: string, relationship: Relationship): RelationshipRow {
+  const stored = inOrder(relationship);
+  return {
+    bookId,
+    aId: stored.a.id,
+    bId: stored.b.id,
+    bond: stored.bond,
+    aSees: stored.a.sees,
+    aHides: stored.a.hides,
+    bSees: stored.b.sees,
+    bHides: stored.b.hides,
+  };
+}
+
 /**
- * Writes the book's world, cast and feelings as the setup has them. Characters keep their ids, so
+ * Writes the book's world, cast and relationships as the setup has them. Characters keep their ids, so
  * a character who stays is updated rather than made again, and only those no longer in the setup
  * are removed.
  */
@@ -94,17 +119,10 @@ async function saveSheets(tx: Tx, bookId: string, setup: BookSetup) {
   }
   await saveCharacter(tx, characterRow(bookId, setup.protagonist, 'protagonist', 0));
 
-  await tx.delete(feelings).where(eq(feelings.bookId, bookId));
-  const lines = [];
-  for (const character of everyone(setup)) {
-    for (const [aboutId, text] of Object.entries(character.feelings)) {
-      if (text) {
-        lines.push({ bookId, characterId: character.id, aboutId, text });
-      }
-    }
-  }
-  if (lines.length > 0) {
-    await tx.insert(feelings).values(lines);
+  await tx.delete(relationships).where(eq(relationships.bookId, bookId));
+  const rows = setup.relationships.map((relationship) => relationshipRow(bookId, relationship));
+  if (rows.length > 0) {
+    await tx.insert(relationships).values(rows);
   }
 }
 
@@ -145,19 +163,22 @@ export async function updateSetup(db: Db, bookId: string, setup: BookSetup): Pro
   });
 }
 
-function toCharacter(row: CharacterRow, feelingsOf: Map<string, Record<string, string>>): Character {
-  let lines = feelingsOf.get(row.id);
-  if (!lines) {
-    lines = {};
-  }
+function toCharacter(row: CharacterRow): Character {
   return {
     id: row.id,
     name: row.name,
     who: row.who,
     personality: row.personality,
     past: row.past,
-    feelings: lines,
     notes: row.notes,
+  };
+}
+
+function toRelationship(row: RelationshipRow): Relationship {
+  return {
+    bond: row.bond,
+    a: { id: row.aId, sees: row.aSees, hides: row.aHides },
+    b: { id: row.bId, sees: row.bSees, hides: row.bHides },
   };
 }
 
@@ -165,22 +186,16 @@ function toCharacter(row: CharacterRow, feelingsOf: Map<string, Record<string, s
 export async function readSetup(db: Db, book: BookRow): Promise<BookSetup> {
   const [world] = await db.select().from(worlds).where(eq(worlds.bookId, book.id));
   const rows = await db.select().from(characters).where(eq(characters.bookId, book.id)).orderBy(asc(characters.position));
-  const lines = await db.select().from(feelings).where(eq(feelings.bookId, book.id));
-
-  const feelingsOf = new Map<string, Record<string, string>>();
-  for (const line of lines) {
-    let theirs = feelingsOf.get(line.characterId);
-    if (!theirs) {
-      theirs = {};
-      feelingsOf.set(line.characterId, theirs);
-    }
-    theirs[line.aboutId] = line.text;
-  }
+  const lines = await db
+    .select()
+    .from(relationships)
+    .where(eq(relationships.bookId, book.id))
+    .orderBy(asc(relationships.aId), asc(relationships.bId));
 
   let protagonist: Character | null = null;
   const cast: Character[] = [];
   for (const row of rows) {
-    const character = toCharacter(row, feelingsOf);
+    const character = toCharacter(row);
     if (row.role === 'protagonist') {
       protagonist = character;
     } else {
@@ -206,5 +221,6 @@ export async function readSetup(db: Db, book: BookRow): Promise<BookSetup> {
     },
     protagonist,
     cast,
+    relationships: lines.map(toRelationship),
   };
 }

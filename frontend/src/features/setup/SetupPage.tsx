@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { CAST_LIMIT, everyone, type BookSetup, type Character, type Length, type Pov, type World } from '@writer/shared/book';
+import { CAST_LIMIT, everyone, type BookSetup, type Character, type Length, type Pov, type Relationship, type World } from '@writer/shared/book';
 import { IconClose, IconPlus } from '../../components/icons';
 import { Logo } from '../../components/Logo';
 import {
@@ -10,11 +10,17 @@ import {
   LIGHT_NOVEL_POV,
   POVS,
   blankCharacter,
+  blankRelationship,
+  findRelationship,
   withCharacter,
   withoutCharacter,
+  withoutRelationship,
+  withRelationship,
 } from '../../data/setup';
 import { CharacterSheet } from './CharacterSheet';
 import { Choices, Field } from './Fields';
+import { RelationshipGraph } from './RelationshipGraph';
+import { RelationshipSheet } from './RelationshipSheet';
 import '../add/add.css';
 import './setup.css';
 
@@ -45,11 +51,13 @@ interface FormProps {
 }
 
 /**
- * One page, top to bottom (see CLAUDE.md): the book, the world, the cast as cards, and the
- * actions at the end. A card opens the character's sheet over the page.
+ * One page, top to bottom (see CLAUDE.md): the book, the world, the cast as cards, the
+ * relationships as a graph, and the actions at the end. A card opens the character's sheet over
+ * the page, and a line in the graph opens the relationship's.
  */
 export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, actions }: FormProps) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [openPair, setOpenPair] = useState<[string, string] | null>(null);
 
   const pickLength = (length: Length) => {
     let pov = setup.pov;
@@ -86,7 +94,24 @@ export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, a
     }
   };
 
+  // Tying two people who aren't tied yet starts a blank line between them.
+  const openRelationship = (oneId: string, otherId: string) => {
+    if (!findRelationship(setup, oneId, otherId)) {
+      onChange(withRelationship(setup, blankRelationship(oneId, otherId)));
+    }
+    setOpenPair([oneId, otherId]);
+  };
+  const untie = (oneId: string, otherId: string) => {
+    setOpenPair(null);
+    onChange(withoutRelationship(setup, oneId, otherId));
+  };
+
   const open = findCharacter(setup, openId);
+  let openLine: Relationship | undefined;
+  if (openPair) {
+    openLine = findRelationship(setup, openPair[0], openPair[1]);
+  }
+  const people = everyone(setup);
   let povNotes: Partial<Record<Pov, string>> = {};
   if (setup.length === 'light_novel') {
     povNotes = { [LIGHT_NOVEL_POV]: 'Light novels usually are' };
@@ -132,6 +157,11 @@ export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, a
         </div>
       </section>
 
+      <section className="setup-section" aria-labelledby="setup-relationships">
+        <h2 id="setup-relationships">Relationships</h2>
+        <RelationshipGraph people={people} protagonistId={setup.protagonist.id} relationships={setup.relationships} onOpen={openRelationship} />
+      </section>
+
       <div className="setup-end">{actions}</div>
 
       <AnimatePresence>
@@ -139,11 +169,21 @@ export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, a
           <CharacterSheet
             key={open.id}
             character={open}
-            others={everyone(setup).filter((character) => character.id !== open.id)}
             plays={open.id === setup.protagonist.id}
             onChange={(character) => onChange(withCharacter(setup, character))}
             onRemove={() => removeCharacter(open.id)}
             onClose={closeSheet}
+          />
+        )}
+        {openLine && (
+          <RelationshipSheet
+            key={`${openLine.a.id} ${openLine.b.id}`}
+            relationship={openLine}
+            people={people}
+            protagonistId={setup.protagonist.id}
+            onChange={(relationship) => onChange(withRelationship(setup, relationship))}
+            onUntie={() => untie(openLine.a.id, openLine.b.id)}
+            onClose={() => setOpenPair(null)}
           />
         )}
       </AnimatePresence>

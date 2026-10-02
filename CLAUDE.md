@@ -22,9 +22,10 @@ the way a breader card fills with colour as you read.
 ## Status
 
 Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
-settings, world and cast) on its own page, and changing it later. What's left of it is the
-owner's test, and the relationship graph, which replaces setup's one line feelings (see
-"Relationships are a graph"). See "The code" below for what exists.
+settings, world, cast and the relationship graph between them) on its own page, and changing it
+later. What's left of it is the owner's test. The owner has a real book set up locally that they
+mean to play through before production, so its data must survive every change (see "Running it
+locally"). See "The code" below for what exists.
 
 ### Decided
 
@@ -184,6 +185,15 @@ Each step ends working, committed, and with a short test checklist for the owner
 - Picking Light novel switches the point of view to first person, and back, until the owner picks
   a point of view themselves.
 - A cast member whose sheet is closed without a name is dropped. The protagonist always stays.
+- In the graph, tapping one person picks them, tapping another opens the line between them (tying
+  them first if they weren't), and tapping the first again or the empty graph lets go. A line
+  with nothing written on it is kept: the story fills it in. Untie removes it, and removing a
+  person removes their lines. A bond shows on its line while one of the two is picked or the
+  line is pointed at. A sheet's two sides come in cast order, the one the owner plays first.
+- Before the graph, each sheet had a line of feelings about each of the others. Migration 0002
+  copied those into relationships (each feeling became its owner's side, "how they see"), and an
+  old draft in the browser is converted the same way when it's read. The draft isn't written
+  until something is typed, so a draft the page can't read is never overwritten by opening it.
 - The pages have their own addresses (`/writer/new`, `/writer/books/<id>/setup`), so in
   production whatever serves `/writer` must answer every path under it with `index.html` (step 6).
 
@@ -200,10 +210,12 @@ npm workspaces, as in breader. Node 24 (`.nvmrc`).
 - `src/protocol.ts`: the zod shapes the server and the app exchange (`Me`, `Access`,
   `BookCard`, `BookList`). Change a shape here and both sides get the type error.
 - `src/book.ts`: what a book is set up with (`BookSetup`): its length (and each length's word
-  goal), point of view, darkness (the content level), its world and its characters' sheets. The
-  app makes each character's id, so sheets can say how they feel about each other before the
-  book is saved. `BookSetup` turns away two characters with one id, and feelings about themselves
-  or about someone not in the cast.
+  goal), point of view, darkness (the content level), its world, its characters' sheets and the
+  relationships between them (a bond and two sides, `Relationship`). The app makes each
+  character's id, so people can be tied before the book is saved. `BookSetup` turns away two
+  characters with one id, and a relationship with oneself, with someone not in the cast, or a
+  second one between the same two. `pairKey` is a pair's key either way round; `inOrder` puts a
+  relationship's smaller id first, as it's stored.
 
 ### `frontend/` (`@writer/frontend`)
 
@@ -228,11 +240,16 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
 - `src/data/books.ts`: a book as its card shows it, its length's name, and how much is written
   (words written over the goal, 0 to 1).
 - `src/data/setup.ts`: a setup while it's being made: the choices' names and descriptions,
-  blank sheets, adding and removing characters (removing one drops everyone's feelings about
-  them), what's still missing, the draft kept in this browser, and the server calls.
+  blank sheets, adding and removing characters (removing one removes their relationships),
+  tying, changing and untying relationships, what's still missing, the draft kept in this
+  browser (and turning an old draft's feelings into relationships), and the server calls.
 - `src/features/setup/`: the setup page. `SetupPage.tsx` is the page (the book, the world, the
-  cast as cards); `NewBook.tsx` starts a book from it and `EditSetup.tsx` changes one.
-  `CharacterSheet.tsx` is a character's sheet over the page, built to open mid story too.
+  cast as cards, the relationships); `NewBook.tsx` starts a book from it and `EditSetup.tsx`
+  changes one. `CharacterSheet.tsx` is a character's sheet over the page, and
+  `RelationshipSheet.tsx` a relationship's; `RelationshipGraph.tsx` draws the graph (SVG, moved
+  with `motion`) and `graphLayout.ts` places its dots with `d3-force`, starting from where they
+  were so a change nudges the graph instead of shuffling it, and keeping them inside the box. All
+  of it is built to open mid story too.
   `Fields.tsx` holds the text fields and radio cards, which are breader's Add a book dialog's
   (`features/add/add.css`, kept whole from breader); `setup.css` is only what the page adds.
 - `src/features/gallery/`: breader's cards, bento and shelves, without series, genres, real
@@ -257,12 +274,12 @@ A Hono API, port 8790, built like breader's server.
 - `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`: `books` (owner's
   breader user id, title, colour, length, word goal, words written, point of view, darkness),
   `worlds` (one per book), `characters` (role `protagonist` or `cast`, in order; the key is the
-  book and the app made id together, so no book can reach another's characters) and `feelings`
-  (one character about another, only lines with something in them). drizzle-kit only sees this
-  file and this schema.
+  book and the app made id together, so no book can reach another's characters) and
+  `relationships` (one row per pair, smaller id first, which a check enforces: the bond and each
+  side's "sees" and "hides"). drizzle-kit only sees this file and this schema.
 - `src/books/setup.ts`: a book's setup in and out of those tables. Saving keeps the ids of
   characters who stay and removes only those who left, since later steps hang the story off
-  them.
+  them. Relationships are written whole on each save, and read back in pair order.
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -283,7 +300,9 @@ A Hono API, port 8790, built like breader's server.
   with the migrator making the schema first for its table, so the first migration says
   `IF NOT EXISTS`. Watch for it if a migration ever makes another schema. Tables get row level
   security, as breader's do. New migration: change `schema.ts`, then
-  `npm run db:generate -w server`.
+  `npm run db:generate -w server`. When a table looks renamed, drizzle-kit asks about it in the
+  terminal and fails anywhere else; make it two migrations instead (add the new table and copy
+  the data, then drop the old one), as 0002 and 0003 did.
 - `test/`: vitest against the writer's Docker Postgres (`npm run db`, port 54329), in a fresh
   `writer_test` database. `test/breader.sql` makes breader's login tables, and `test/breader.ts`
   is a stand-in for breader's server: a real Better Auth, the version breader pins (1.7.6),
@@ -306,6 +325,11 @@ writer reads that login. Only the writer's own tables are local.
    (`@vitejs/plugin-basic-ssl`), so the browser warns once; HTTPS is needed because breader's
    cookie is Secure. The in-app browser of the desktop app refuses it, so check there with
    `curl -k --resolve local.breader.site:5174:127.0.0.1` instead.
+
+**The owner's local book is real.** Before a migration that changes what's stored, dump the
+`writer` schema into `.backups/` (gitignored, since it holds book text), try the migration on a
+copy, and check the data came through:
+`docker exec breader-writer-db-1 pg_dump -U postgres -d writer --schema=writer > .backups/<date>-<what>.sql`.
 
 The writer's own Log in button doesn't work locally: breader's API only answers its own addresses
 (its `ALLOWED_ORIGINS`), so log in on breader.site. Locally the writer reads production breader's

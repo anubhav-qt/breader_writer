@@ -23,8 +23,8 @@ the way a breader card fills with colour as you read.
 
 Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
 settings, world and cast) on its own page, and changing it later. What's left of it is the
-owner's test, and the relationship graph, which replaces setup's one line feelings once its
-design is settled (see "Open"). See "The code" below for what exists.
+owner's test, and the relationship graph, which replaces setup's one line feelings (see
+"Relationships are a graph"). See "The code" below for what exists.
 
 ### Decided
 
@@ -73,8 +73,8 @@ design is settled (see "Open"). See "The code" below for what exists.
   facts reaches back into it (see "Changing the past"), and that rewrites the play and the book
   together.
 - **A character starts as a few fields plus notes:** name, who they are, personality, past, and
-  how they feel about the others, plus a free notes box. Only the name is required; the AI can
-  fill any blank.
+  a free notes box. Only the name is required; the AI can fill any blank. How they relate to the
+  others is in the relationship graph.
 - **Characters grow as the story goes.** Whenever the agent judges that a character has
   developed (a new fear, a secret revealed, a changed loyalty, a habit), it adds to their sheet by
   itself, and those additions compound over the story. Characters who matter most end up with
@@ -95,8 +95,11 @@ design is settled (see "Open"). See "The code" below for what exists.
   - **History:** every change, tied to the scene it happened in ("Scene 4, the trial: Mara stops
     trusting her").
 
-  No levels or scores: the model keeps words straighter than numbers. How the graph is shown is
-  still open.
+  No levels or scores: the model keeps words straighter than numbers.
+- **The graph is the one place relationships show.** Setup has a Relationships section below the
+  cast: everyone drawn as points, with a line for each relationship. Tap two people to tie them,
+  or a line to open it as a sheet over the page. Mid story it's the same graph. Character sheets
+  stay about the person alone.
 - **A world is a few fields plus notes too:** genre, tone, setting (when and where), the rules
   that matter (magic, technology, power), and a free notes box. All optional; the AI fills blanks.
 - **The story can bring in its own characters.** Anyone who sticks around gets a card in the cast
@@ -119,20 +122,19 @@ design is settled (see "Open"). See "The code" below for what exists.
   grief, cruelty, romance, like a mainstream adult novel; the default) or Unflinching (whatever
   the model will write). The models' own filters apply on top.
 - **Setup is one full page**, of its own under `/writer`, scrolling top to bottom: the book
-  (title, length, point of view, how dark), then the world, then the cast as cards you add, and
-  Start at the end. Not a dialog and not steps: a big cast needs the room, and it's easy to look
-  back over before starting.
+  (title, length, point of view, how dark), then the world, then the cast as cards you add, then
+  the relationships as a graph, and Start at the end. Not a dialog and not steps: a big cast
+  needs the room, and it's easy to look back over before starting.
 - **A character opens as a sheet over the page**, a dialog like breader's: name, who they are,
-  personality, past, a line for how they feel about each other cast member, notes. It's the same
-  sheet that opens mid story to read or edit someone, so it's built once and looks the same
-  everywhere.
+  personality, past, notes. It's the same sheet that opens mid story to read or edit someone, so
+  it's built once and looks the same everywhere. A relationship opens the same way, as its own
+  sheet.
 
 ### Open (ask the owner one at a time, in roughly this order)
 
 1. Design direction for each new screen (setup, play, cast sheets), asked when we reach it.
    The library and the book view start as copies of breader's pages.
-2. How the relationship graph is shown, in setup and mid story.
-3. Changing the past: whether every change reaches back, or the owner says per change whether
+2. Changing the past: whether every change reaches back, or the owner says per change whether
    it was always so or happens from now on; and whether rewritten scenes are shown before
    they're kept.
 

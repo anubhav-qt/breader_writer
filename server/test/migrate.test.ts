@@ -12,7 +12,25 @@ async function tables(schema: string) {
 
 describe('the writer schema', () => {
   it('keeps the writer’s tables and migrations to itself', async () => {
-    expect(await tables('writer')).toEqual(['books', 'characters', 'migrations', 'relationships', 'settings', 'worlds']);
+    expect(await tables('writer')).toEqual([
+      'arcs',
+      'books',
+      'calls',
+      'changes',
+      'characters',
+      'facts',
+      'growth',
+      'migrations',
+      'relationship_history',
+      'relationships',
+      'scenes',
+      'settings',
+      'threads',
+      'timeline',
+      'turns',
+      'versions',
+      'worlds',
+    ]);
     // Only breader's own tables (from test/breader.sql) are in public: the writer added nothing.
     expect(await tables('public')).toEqual(['accounts', 'auth_sessions', 'users', 'verifications']);
     expect(await tables('drizzle')).toEqual([]);

@@ -24,8 +24,8 @@ the way a breader card fills with colour as you read.
 Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
 settings, world, cast and the relationship graph between them) on its own page, and changing it
 later. What's left of it is the owner's test. Step 3 (AI plumbing) is under way: pi is forked
-(`packages/`), and the server reads the models from Seelie's proxy and keeps each account's pick
-of model and thinking level. The owner has a real book set up locally that they mean to play through before
+(`packages/`), the server reads the models from Seelie's proxy and keeps each account's pick
+of model and thinking level, and the story has its tables and its change log (`server/src/story/`). The owner has a real book set up locally that they mean to play through before
 production, so its data must survive every change (see "Running it locally"). See "The code"
 below for what exists.
 
@@ -210,6 +210,15 @@ Each step ends working, committed, and with a short test checklist for the owner
 - The pages have their own addresses (`/writer/new`, `/writer/books/<id>/setup`), so in
   production whatever serves `/writer` must answer every path under it with `index.html` (step 6).
 
+### Notes for step 3
+
+- The setup page still saves a book's sheets directly, not through the change log. Once a book
+  is being played (step 4), the owner's edits go through the log, asking "always so, or from
+  now on?".
+- A relationship's history goes into the context whole for the people in the scene. If it grows
+  long enough to matter, fold it to a summary at the scene's end (step 4, when the narrator
+  starts writing it).
+
 ### Later versions
 
 - Send a book straight to the breader library (v1 is an EPUB download).
@@ -313,7 +322,13 @@ A Hono API, port 8790, built like breader's server.
   book and the app made id together, so no book can reach another's characters) and
   `relationships` (one row per pair, smaller id first, which a check enforces: the bond and each
   side's "sees" and "hides"), and `settings` (one per account: its model and thinking level).
-  drizzle-kit only sees this file and this schema.
+  The story's own tables follow (see `src/story/`): `scenes` (numbered, one playing at a time,
+  with where, when, who is in it and its summary), `turns` (the owner's move and the narrator's
+  reply, word for word, numbered through the book), `changes` and `versions` (the change log),
+  `facts`, `threads`, `timeline`, `growth` (what the story added to a character's sheet),
+  `relationship_history`, `arcs` (the narrator's plan), and `calls` (each model call and the
+  tokens it used). The story's tables keep no times of their own; the change that made a row
+  has it. drizzle-kit only sees this file and this schema.
 - `src/books/setup.ts`: a book's setup in and out of those tables. Saving keeps the ids of
   characters who stay and removes only those who left, since later steps hang the story off
   them. Relationships are written whole on each save, and read back in pair order.
@@ -330,6 +345,20 @@ A Hono API, port 8790, built like breader's server.
   - `settings.ts` decides the model an account's story runs on (`modelInUse`): its choice while
     an account serves it, else the default, else the first; its thinking moves to the nearest
     level the model takes.
+- `src/story/`: the story's memory.
+  - `changes.ts` is the change log. A change (`startChange`) is tagged with who made it (the
+    owner or the agent) and the turn it came from, and every row it touches goes through
+    `make`, `edit` or `remove`, which keep the row's version before and after (an edit keeps
+    only the columns it changed). `takeBack` puts every row a change touched back as it was, as
+    a new change of its own. A change that a later one built on waits until the later one is
+    taken back, so nothing is quietly lost; a change and its take-back cancel out, and a
+    take-back isn't taken back itself. Undo takes back the newest first.
+  - `scenes.ts`: starting and ending scenes, and turns. Turns are raw history: making one isn't
+    a change (changes are tagged with turns), but rewriting one is.
+  - `ledger.ts`: facts, threads, the timeline, growth, relationship shifts (tying the two first
+    if they weren't, and adding to the line's history) and the arc. It turns away blank text and
+    mentions of anyone not in the cast. The narrator's tools (step 4) call these.
+  - `mentions.ts`: in that structured text a person is `<@id>`, named when the context is built.
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -359,7 +388,8 @@ A Hono API, port 8790, built like breader's server.
   is a stand-in for breader's server: a real Better Auth, the version breader pins (1.7.6),
   configured as breader configures it. Tests log in through it and hand its cookie to the
   writer. If breader upgrades Better Auth, upgrade it here too and run the tests. `test/proxy.ts`
-  is a stand-in for CLIProxyAPI, so no test reaches a real model.
+  is a stand-in for CLIProxyAPI, so no test reaches a real model. `test/story.test.ts` covers
+  the change log and the ledgers.
 
 ### Running it locally
 

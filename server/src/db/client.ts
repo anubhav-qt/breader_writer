@@ -6,6 +6,8 @@ import * as schema from './schema.ts';
 
 export type Db = NodePgDatabase<typeof schema>;
 export type BreaderDb = NodePgDatabase<typeof breaderSchema>;
+/** A transaction on the writer's tables. */
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 // Postgres bigint comes back as a string by default; every bigint here fits a JS number.
 pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v));

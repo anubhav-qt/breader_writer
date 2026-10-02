@@ -11,7 +11,7 @@ import {
   type Relationship,
 } from '@writer/shared/book';
 import type { BookCard } from '@writer/shared/protocol';
-import type { Db } from '../db/client.ts';
+import type { Db, Tx } from '../db/client.ts';
 import { books, characters, relationships, worlds } from '../db/schema.ts';
 
 /*
@@ -19,7 +19,6 @@ import { books, characters, relationships, worlds } from '../db/schema.ts';
  * darkness), its world, its characters and the relationships between them.
  */
 
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type BookRow = typeof books.$inferSelect;
 type CharacterRow = typeof characters.$inferSelect;
 type RelationshipRow = typeof relationships.$inferSelect;

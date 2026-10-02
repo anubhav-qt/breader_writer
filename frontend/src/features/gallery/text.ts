@@ -1,33 +1,44 @@
-import type { ShelfItem } from '../../data/useLibrary';
-import { duration, minutesFor, whenPhrase } from '../../lib/format';
+import { written, type Book } from '../../data/books';
+import { whenPhrase } from '../../lib/format';
 
-const isNew = (b: ShelfItem) => b.progress <= 0 && !b.opened;
-const isDone = (b: ShelfItem) => b.progress >= 1;
+const isNew = (b: Book) => b.wordsWritten <= 0;
+const isDone = (b: Book) => written(b) >= 1;
 
-export function verbFor(b: ShelfItem) {
-  if (b.shared && !b.opened) return 'Shared';
+const count = (n: number) => n.toLocaleString('en-GB');
+const percent = (b: Book) => `${Math.round(written(b) * 100)}%`;
+
+function verbFor(b: Book) {
   if (isDone(b)) return 'Finished';
-  if (isNew(b)) return 'Added';
-  return 'Read';
+  if (isNew(b)) return 'Made';
+  return 'Played';
 }
 
-export const when = (b: ShelfItem, now: number) => whenPhrase(verbFor(b), b.lastOpened, now);
+/** "Played yesterday", "Made on Sunday", "Finished in August". */
+export const when = (b: Book, now: number) => whenPhrase(verbFor(b), b.updatedAt, now);
 
-export function progressText(b: ShelfItem) {
+/** How much is written, in full. */
+export function progressText(b: Book) {
   if (isDone(b)) return 'Finished';
-  const left = duration(minutesFor(b.words * (1 - b.progress)));
-  if (isNew(b)) return `Not started · ${left}`;
-  return `${Math.round(b.progress * 100)}% · ${left} left`;
+  if (isNew(b)) return `Not started · ${count(b.wordGoal)} words`;
+  return `${count(b.wordsWritten)} of ${count(b.wordGoal)} words`;
 }
 
 /** How much is left, in one short phrase. */
-export function timeLeft(b: ShelfItem) {
+export function wordsLeft(b: Book) {
   if (isDone(b)) return 'Finished';
-  const m = duration(minutesFor(b.words * (1 - b.progress)));
-  return isNew(b) ? `${m} read` : `${Math.round(b.progress * 100)}% · ${m} left`;
+  if (isNew(b)) return `${count(b.wordGoal)} words`;
+  const left = b.wordGoal - b.wordsWritten;
+  return `${percent(b)} · ${count(left)} to go`;
 }
 
-export const shortProgress = (b: ShelfItem) => (isDone(b) ? 'Finished' : isNew(b) ? 'New' : `${Math.round(b.progress * 100)}%`);
+export function shortProgress(b: Book) {
+  if (isDone(b)) return 'Finished';
+  if (isNew(b)) return 'New';
+  return percent(b);
+}
 
-
-export const actionLabel = (b: ShelfItem) => (isDone(b) ? 'Read again' : isNew(b) ? 'Start reading' : 'Continue');
+export function actionLabel(b: Book) {
+  if (isDone(b)) return 'Read';
+  if (isNew(b)) return 'Start';
+  return 'Continue';
+}

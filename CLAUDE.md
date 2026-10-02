@@ -21,8 +21,8 @@ the way a breader card fills with colour as you read.
 
 ## Status
 
-Step 1 (skeleton) is under way: the shared package and the server are built and tested. The
-library page (a copy of breader's) comes next. See "The code" below for what exists.
+Step 1 (skeleton) is under way: the shared package, the server and the library page are built.
+Running it locally against production breader comes next. See "The code" below for what exists.
 
 ### Decided
 
@@ -130,6 +130,9 @@ Each step ends working, committed, and with a short test checklist for the owner
   accounts can play. A key session alone can open the writer and see the invite note.
 - Logging in happens through breader's own API (`/v1/auth/*`), with breader's login dialog. The
   writer server only reads the session, against breader's database.
+- The writer has no Key button: a key can't play, so the writer is accounts only.
+- It's one login with breader, so logging out of the writer logs out of breader too (the menu
+  says so). It doesn't touch breader's library in the browser.
 
 ### Later versions
 
@@ -143,6 +146,35 @@ npm workspaces, as in breader. Node 24 (`.nvmrc`).
 
 - `src/protocol.ts`: the zod shapes the server and the app exchange (`Me`, `Access`,
   `BookCard`, `BookList`). Change a shape here and both sides get the type error.
+
+### `frontend/` (`@writer/frontend`)
+
+A copy of breader's library page (breader at `2226591`), cut down to the writer's. React 19,
+Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
+
+- `src/App.tsx`: the library. It asks the writer's server who is logged in, then shows the
+  books, or a quiet note in their place: log in, confirm your email, invite only, offline, or no
+  books yet. Cards don't open yet.
+- `src/lib/api.ts`: two servers. The writer's API (`VITE_API_URL`, default `/writer/api` on the
+  app's own address; the dev server proxies it to port 8790) and breader's (`VITE_BREADER_API_URL`,
+  default `https://api.breader.site`) for logging in. A writer API that can't be reached throws
+  `OfflineError`.
+- `src/lib/account.ts`: the account and its access from `/v1/me`, remembered under
+  `writer.me.v1`. Logging in, signing up, Google, reset links and logging out all go to breader's
+  Better Auth; reset and confirm links open breader. While the server is down it's asked again
+  every minute, so the writer comes back by itself.
+- `src/data/books.ts`: a book as its card shows it, its length's name from its word goal, and
+  how much is written (words written over the goal, 0 to 1).
+- `src/features/gallery/`: breader's cards, bento and shelves, without series, genres, real
+  covers, editing or sharing. A card fills with the book's colour as it's written; the two most
+  recent get a drawn cover. Below Recent, once there are more than 9, every book again by date.
+- `src/features/account/`: breader's login dialog (log in, sign up, Google, forgot password) and
+  account menu.
+- `src/data/preview.ts` and `components/PreviewBar.tsx`: development only. Placeholder
+  libraries and every note, with `?preview=` and `?theme=`.
+- In production the app is on breader's origin (`breader.site/writer`), so it shares
+  localStorage and IndexedDB with breader. The writer's keys start with `writer.`; never touch
+  breader's.
 
 ### `server/` (`@writer/server`)
 

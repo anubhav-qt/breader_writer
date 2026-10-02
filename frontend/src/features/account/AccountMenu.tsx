@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useSyncStatus } from '../../data/sync';
 import { loginError, sendVerification, type AccountState } from '../../lib/account';
 import { springs } from '../../lib/springs';
 import './account.css';
@@ -8,7 +7,7 @@ import './account.css';
 interface Props {
   account: AccountState;
   onLogin: () => void;
-  /** Ends the login and clears this browser's library. */
+  /** Ends the login, for breader too. */
   onLogOut: () => Promise<void>;
 }
 
@@ -19,7 +18,6 @@ export function AccountMenu({ account, onLogin, onLogOut }: Props) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
-  const sync = useSyncStatus();
 
   useEffect(() => {
     if (!open) return;
@@ -39,7 +37,7 @@ export function AccountMenu({ account, onLogin, onLogOut }: Props) {
     setMessage(null);
   }, [open]);
 
-  const user = account.status === 'in' ? account.user : null;
+  const user = account.me?.account ?? null;
   if (!user) {
     return (
       <button type="button" className="btn btn-ghost" onClick={onLogin}>
@@ -91,7 +89,7 @@ export function AccountMenu({ account, onLogin, onLogOut }: Props) {
             </div>
             {!user.emailVerified && (
               <div className="acct-verify">
-                <span>Confirm your email with the link we sent you.</span>
+                <span>Confirm your email with the link breader sent you.</span>
                 <button type="button" className="login-link" disabled={busy} onClick={() => void run(async () => { await sendVerification(); setMessage('Sent. Check your inbox.'); })}>
                   Send it again
                 </button>
@@ -101,11 +99,7 @@ export function AccountMenu({ account, onLogin, onLogOut }: Props) {
             <div className="acct-sep" />
             {confirming ? (
               <div className="acct-confirm">
-                <p>
-                  {sync.pending
-                    ? `${sync.pending === 1 ? '1 change hasn’t' : `${sync.pending} changes haven’t`} reached your account yet, and would be lost. Log out anyway?`
-                    : 'Your books stay in your account. Logging out removes them from this browser.'}
-                </p>
+                <p>It’s the same login as breader’s, so this logs you out of breader too.</p>
                 <div className="add-actions">
                   <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)} disabled={busy}>Cancel</button>
                   <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void run(onLogOut)}>

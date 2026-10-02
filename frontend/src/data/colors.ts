@@ -22,13 +22,6 @@ export type BookColor = (typeof BOOK_COLORS)[number]['key'];
 
 const KEYS = new Set<string>(BOOK_COLORS.map((c) => c.key));
 
-/** Hex colours saved by earlier builds, mapped to the nearest palette colour. */
-const LEGACY: Record<string, BookColor> = {
-  '#B4545E': 'rose', '#1F5F63': 'teal', '#2B3A67': 'indigo', '#C9A227': 'ochre', '#3F4652': 'graphite',
-  '#4F6B3A': 'moss', '#5B2A4B': 'plum', '#8A4B2A': 'clay', '#2F6F8F': 'sky', '#6B5B95': 'lilac',
-  '#9C3D54': 'rose', '#355C4B': 'green', '#A0673A': 'clay', '#D8C9A8': 'sand',
-};
-
 /** A stable default colour picked from the title. */
 export function colorKeyFor(title: string): BookColor {
   let h = 0;
@@ -49,9 +42,9 @@ export function pickColor(given: string[]): BookColor {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+/** The book's colour, or one picked from its title when it isn't one of the palette's. */
 export function normColor(value: string | undefined, title: string): BookColor {
   if (value && KEYS.has(value)) return value as BookColor;
-  if (value && LEGACY[value.toUpperCase()]) return LEGACY[value.toUpperCase()];
   return colorKeyFor(title);
 }
 

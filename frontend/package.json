@@ -1,24 +1,17 @@
 {
-  "name": "breader",
+  "name": "@writer/frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/voices.mjs --if-pages && tsc -b && vite build",
-    "voices": "node scripts/voices.mjs",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@breader/shared": "*",
-    "dompurify": "^3.4.16",
-    "idb-keyval": "^6.3.0",
-    "jszip": "^3.10.2",
-    "marked": "^18.0.14",
+    "@writer/shared": "*",
     "motion": "^13.4.4",
-    "onnxruntime-web": "1.30.0",
-    "pdfjs-dist": "^4.8.69",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

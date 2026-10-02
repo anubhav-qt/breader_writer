@@ -1,46 +1,25 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import type { AccountResponse } from '@breader/shared/protocol';
 import { Modal } from '../../components/Modal';
-import { IconChevron, IconKey, IconUpload } from '../../components/icons';
-import { logIn, logInWithGoogle, loginError, refreshAccount, requestReset, resetPassword, signUp } from '../../lib/account';
+import { logIn, logInWithGoogle, loginError, requestReset, signUp } from '../../lib/account';
 import { springs } from '../../lib/springs';
 import '../add/add.css';
 import './account.css';
 
 /*
- * Logging in, and what happens to this browser's books after (data/sync.ts enterAccount):
+ * Logging in with a breader account, through breader's own API:
  *
  *   login, signup   email and password, or Google
- *   forgot, sent    a reset link by email
- *   reset           the page that link opens: choose a new password
- *   entering        logged in; moving this browser to the account's library
- *   choose          this browser holds books the account doesn't: move them in, or leave them
+ *   forgot, sent    a reset link by email; it opens breader, which has the page for a new password
  */
-
-export type LoginStart =
-  | { mode: 'login' | 'signup' }
-  | { mode: 'reset'; token: string }
-  /** Back from Google, or logged in by an email link: go straight to the library. */
-  | { mode: 'entering' };
 
 type Step =
   | { mode: 'login' | 'signup' | 'forgot' }
-  | { mode: 'sent'; email: string }
-  | { mode: 'reset'; token: string }
-  | { mode: 'entering'; claim?: boolean }
-  | { mode: 'choose'; books: number }
-  | { mode: 'failed'; message: string };
+  | { mode: 'sent'; email: string };
 
 interface Props {
-  start: LoginStart;
   google: boolean;
-  /** Waits for the library to load before moving it. */
-  ready: boolean;
-  /** This browser's key, shown when its books are left under it. */
-  localKey: string | null;
-  enter: (claim?: boolean) => Promise<AccountResponse>;
-  onDone: (res: AccountResponse) => void;
+  onDone: () => void;
   onClose: () => void;
 }
 
@@ -49,10 +28,12 @@ const TITLES: Record<Step['mode'], string> = {
   signup: 'Create an account',
   forgot: 'Reset your password',
   sent: 'Check your email',
-  reset: 'Choose a new password',
-  entering: 'Opening your library',
-  choose: 'Books in this browser',
-  failed: 'Your library',
+};
+
+const SUBMIT = {
+  login: 'Log in',
+  signup: 'Create account',
+  forgot: 'Send link',
 };
 
 const GoogleG = () => (
@@ -64,16 +45,12 @@ const GoogleG = () => (
   </svg>
 );
 
-export function LoginDialog({ start, google, ready, localKey, enter, onDone, onClose }: Props) {
-  const [step, setStep] = useState<Step>(start);
+export function LoginDialog({ google, onDone, onClose }: Props) {
+  const [step, setStep] = useState<Step>({ mode: 'login' });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
-  const running = useRef(false);
-  const latest = useRef({ enter, onDone });
-  latest.current = { enter, onDone };
 
   const go = (next: Step) => {
     setStep(next);
@@ -93,44 +70,33 @@ export function LoginDialog({ start, google, ready, localKey, enter, onDone, onC
     }
   };
 
-  // Logged in: move this browser to the account's library, once the library has loaded.
-  useEffect(() => {
-    if (step.mode !== 'entering' || !ready || running.current) return;
-    running.current = true;
-    void latest.current.enter(step.claim)
-      .then((res) => {
-        if (res.outcome === 'choose') go({ mode: 'choose', books: res.books ?? 0 });
-        else latest.current.onDone(res);
-      })
-      .catch((e) => go({ mode: 'failed', message: loginError(e) }))
-      .finally(() => { running.current = false; });
-  }, [step, ready]);
-
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
     const address = email.trim();
-    if (step.mode === 'login') void attempt(async () => { await logIn(address, password); go({ mode: 'entering' }); });
-    else if (step.mode === 'signup') void attempt(async () => { await signUp(address, password); go({ mode: 'entering' }); });
-    else if (step.mode === 'forgot') void attempt(async () => { await requestReset(address); go({ mode: 'sent', email: address }); });
-    else if (step.mode === 'reset') {
-      const { token } = step;
+    if (step.mode === 'login') {
       void attempt(async () => {
-        await resetPassword(token, password);
-        // A new password ends every login, this browser's included.
-        await refreshAccount();
-        setPassword('');
-        setNote('Your password is changed. Log in with the new one.');
-        go({ mode: 'login' });
+        await logIn(address, password);
+        onDone();
+      });
+    } else if (step.mode === 'signup') {
+      void attempt(async () => {
+        await signUp(address, password);
+        onDone();
+      });
+    } else if (step.mode === 'forgot') {
+      void attempt(async () => {
+        await requestReset(address);
+        go({ mode: 'sent', email: address });
       });
     }
   };
 
   const google_ = () => void attempt(() => logInWithGoogle());
-  const form = step.mode === 'login' || step.mode === 'signup' || step.mode === 'forgot' || step.mode === 'reset';
-  const needsEmail = step.mode !== 'reset';
   const needsPassword = step.mode !== 'forgot';
-  const valid = (!needsEmail || /^\S+@\S+\.\S+$/.test(email.trim())) && (!needsPassword || password.length >= (step.mode === 'login' ? 1 : 8));
+  const minimum = step.mode === 'login' ? 1 : 8;
+  let valid = /^\S+@\S+\.\S+$/.test(email.trim());
+  if (needsPassword && password.length < minimum) valid = false;
 
   return (
     <Modal title={TITLES[step.mode]} onClose={onClose} width={420}>
@@ -143,11 +109,11 @@ export function LoginDialog({ start, google, ready, localKey, enter, onDone, onC
           transition={springs.snappy}
           className="add"
         >
-          {form && (
+          {step.mode !== 'sent' && (
             <form className="login" onSubmit={submit} noValidate>
-              {note && step.mode === 'login' && <p className="login-note" role="status">{note}</p>}
+              {step.mode === 'login' && <p className="add-local">The writer uses your breader account.</p>}
               {step.mode === 'forgot' && <p className="add-local">We’ll email you a link to choose a new password.</p>}
-              {google && (step.mode === 'login' || step.mode === 'signup') && (
+              {google && step.mode !== 'forgot' && (
                 <>
                   <button type="button" className="btn btn-quiet login-google" disabled={busy} onClick={google_}>
                     <GoogleG /> Continue with Google
@@ -155,26 +121,22 @@ export function LoginDialog({ start, google, ready, localKey, enter, onDone, onC
                   <div className="add-or">or</div>
                 </>
               )}
-              {needsEmail && (
-                <>
-                  <label className="add-label" htmlFor="login-email">Email</label>
-                  <input
-                    id="login-email"
-                    className="add-input login-input"
-                    type="email"
-                    autoComplete="email"
-                    inputMode="email"
-                    autoFocus
-                    value={email}
-                    onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                    disabled={busy}
-                  />
-                </>
-              )}
+              <label className="add-label" htmlFor="login-email">Email</label>
+              <input
+                id="login-email"
+                className="add-input login-input"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                autoFocus
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                disabled={busy}
+              />
               {needsPassword && (
                 <>
                   <div className="login-row">
-                    <label className="add-label" htmlFor="login-password">{step.mode === 'reset' ? 'New password' : 'Password'}</label>
+                    <label className="add-label" htmlFor="login-password">Password</label>
                     {step.mode === 'login' && (
                       <button type="button" className="login-link" onClick={() => go({ mode: 'forgot' })}>Forgot password?</button>
                     )}
@@ -184,17 +146,16 @@ export function LoginDialog({ start, google, ready, localKey, enter, onDone, onC
                     className="add-input login-input"
                     type="password"
                     autoComplete={step.mode === 'login' ? 'current-password' : 'new-password'}
-                    autoFocus={step.mode === 'reset'}
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(null); }}
                     disabled={busy}
                   />
-                  {step.mode !== 'login' && <p className="add-local">At least 8 characters.</p>}
+                  {step.mode === 'signup' && <p className="add-local">At least 8 characters.</p>}
                 </>
               )}
               {error && <p className="add-local key-error" role="alert">{error}</p>}
               <button type="submit" className="btn btn-primary login-submit" disabled={!valid || busy}>
-                {busy ? 'One moment…' : { login: 'Log in', signup: 'Create account', forgot: 'Send link', reset: 'Save password' }[step.mode]}
+                {busy ? 'One moment…' : SUBMIT[step.mode]}
               </button>
               {step.mode === 'login' && (
                 <p className="login-switch">New here? <button type="button" className="login-link" onClick={() => go({ mode: 'signup' })}>Create an account</button></p>
@@ -213,46 +174,6 @@ export function LoginDialog({ start, google, ready, localKey, enter, onDone, onC
               <p className="add-keynote">If there’s an account for {step.email}, a link to reset its password is on its way. It works for an hour.</p>
               <div className="add-actions">
                 <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
-              </div>
-            </>
-          )}
-
-          {step.mode === 'entering' && (
-            <div className="add-busy">
-              <span className="add-spinner" aria-hidden="true" />
-              <span>{step.claim ? 'Moving your books…' : 'Opening your library…'}</span>
-            </div>
-          )}
-
-          {step.mode === 'choose' && (
-            <>
-              <p className="add-keynote">
-                This browser has {step.books === 1 ? 'a book' : `${step.books} books`} that {step.books === 1 ? 'isn’t' : 'aren’t'} in your account yet.
-              </p>
-              <div className="add-choices">
-                <button type="button" className="add-choice" onClick={() => go({ mode: 'entering', claim: true })}>
-                  <IconUpload />
-                  <span><b>Move {step.books === 1 ? 'it' : 'them'} to my account</b><span>Your account keeps them from now on, with your other books.</span></span>
-                  <IconChevron className="login-go" />
-                </button>
-                <button type="button" className="add-choice" onClick={() => go({ mode: 'entering', claim: false })}>
-                  <IconKey />
-                  <span>
-                    <b>Keep {step.books === 1 ? 'it' : 'them'} separate</b>
-                    <span>{localKey ? `Only the key ${localKey} opens ${step.books === 1 ? 'it' : 'them'}. Copy it first if you haven’t kept it.` : 'They stay in their own library.'}</span>
-                  </span>
-                  <IconChevron className="login-go" />
-                </button>
-              </div>
-            </>
-          )}
-
-          {step.mode === 'failed' && (
-            <>
-              <p className="add-keynote">You’re logged in, but Breader couldn’t open your library. {step.message}</p>
-              <div className="add-actions">
-                <button type="button" className="btn btn-ghost" onClick={onClose}>Not now</button>
-                <button type="button" className="btn btn-primary" onClick={() => go({ mode: 'entering' })}>Try again</button>
               </div>
             </>
           )}

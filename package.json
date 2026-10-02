@@ -10,11 +10,12 @@
     "node": ">=24"
   },
   "scripts": {
+    "web": "npm run dev -w frontend",
     "api": "npm run dev -w server",
     "migrate": "npm run migrate -w server",
     "db": "docker compose -f infra/compose.dev.yml up -d --wait",
     "db:down": "docker compose -f infra/compose.dev.yml down",
     "test": "npm test -w server",
-    "typecheck": "npm run typecheck -w shared -w server"
+    "typecheck": "npm run typecheck -w shared -w server && npm run build -w frontend"
   }
 }

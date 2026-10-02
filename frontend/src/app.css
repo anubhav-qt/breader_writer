@@ -1,17 +1,17 @@
 .lib { height: 100dvh; display: flex; flex-direction: column; }
 
-.rd-host { position: fixed; inset: 0; z-index: 40; }
-.rd-host.is-leaving { pointer-events: none; }
-.opening {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: var(--r-bg);
+/* A quiet note where the books would be: none yet, or why this browser can't write. */
+.note {
+  flex: 1;
   display: grid;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 0 24px 76px;
+  text-align: center;
 }
-.opening-note, .loading { display: flex; align-items: center; gap: 12px; font: var(--ui-w) 13px/1 var(--ui); color: var(--ink-2); }
-.loading { position: fixed; inset: 0; justify-content: center; }
+.note p { margin: 0; max-width: 36ch; font: var(--ui-w) 14px/1.5 var(--ui); color: var(--ink-2); text-wrap: balance; }
+.note-action { height: 50px; padding: 0 22px; border-radius: 14px; font-size: 15px; }
 
 .toast-host {
   position: fixed;
@@ -67,14 +67,3 @@
 }
 .toast-close:hover { opacity: 1; background: color-mix(in srgb, var(--canvas) 16%, transparent); }
 .toast-close:focus-visible { outline-color: var(--canvas); outline-offset: 2px; }
-
-/* While files are dragged over the library, the window gets a quiet frame. */
-.drop-over {
-  position: fixed;
-  inset: 10px;
-  z-index: 65;
-  border-radius: 22px;
-  box-shadow: inset 0 0 0 2px var(--accent);
-  background: var(--accent-soft);
-  pointer-events: none;
-}

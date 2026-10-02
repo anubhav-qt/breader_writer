@@ -1,80 +1,85 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import type { Account } from '@breader/shared/protocol';
-import { api, ApiError, OfflineError } from './api';
-import { readLocal } from './store';
+import { Me } from '@writer/shared/protocol';
+import { ApiError, OfflineError, breader, writer } from './api';
+import { readLocal, writeLocal } from './store';
 
 /*
- * Logging in (backend design §4). The server's Better Auth session, at /v1/auth/*, says who the
- * reader is. The library itself still syncs with its key: after a login, data/sync.ts enterAccount
- * swaps this browser to the account's library and keeps that library's key like any other.
+ * Who is logged in, and whether they may write. Logging in is breader's: its Better Auth, at
+ * breader's /v1/auth/*, sets one login for breader and the writer both. The writer's server reads
+ * that login and answers /v1/me with the account and its access.
  *
- * The account is remembered here too, so the header shows it while the server can't be reached.
+ * What it said last is remembered, so the header still shows the account while the writer is
+ * offline. The writer shares breader.site's storage with breader, so its keys start with writer.
  */
 
 export interface AccountState {
-  /** 'unknown' until the server has answered, or while it can't be reached and nothing is remembered. */
-  status: 'unknown' | 'out' | 'in';
-  user: Account | null;
-  /** The server can log in with Google. */
+  /** What the writer's server last said, or null if it never has in this browser. */
+  me: Me | null;
+  /** Whether the writer's server answered when last asked. */
+  server: 'checking' | 'up' | 'down';
+  /** Breader can log in with Google. */
   google: boolean;
 }
 
-const REMEMBERED = 'breader.account.v1';
+const REMEMBERED = 'writer.me.v1';
+/** While the writer's server is down, it's asked again this often. */
+const RETRY_EVERY = 60_000;
 
-let state: AccountState = (() => {
-  const user = readLocal<Account | null>(REMEMBERED, null);
-  return { status: user ? 'in' : 'unknown', user, google: false };
-})();
+function remembered(): Me | null {
+  const saved = Me.safeParse(readLocal<unknown>(REMEMBERED, null));
+  if (saved.success) return saved.data;
+  return null;
+}
+
+let state: AccountState = { me: remembered(), server: 'checking', google: false };
 const subscribers = new Set<() => void>();
 
 function set(next: Partial<AccountState>) {
   state = { ...state, ...next };
-  try {
-    if (state.user) localStorage.setItem(REMEMBERED, JSON.stringify(state.user));
-    else localStorage.removeItem(REMEMBERED);
-  } catch { /* storage blocked */ }
   subscribers.forEach((s) => s());
 }
 
-const signedIn = (user: Account | null) => set({ status: user ? 'in' : 'out', user });
-/** A user as Better Auth sends it, with more fields than Breader keeps. */
-type User = { email: string; name: string; emailVerified: boolean };
-const toAccount = (u: User): Account => ({ email: u.email, name: u.name, emailVerified: u.emailVerified });
-
-/** Asks the server who is logged in. Keeps what it knew if the server can't be reached. */
-export async function refreshAccount(): Promise<AccountState> {
-  try {
-    const [session, options] = await Promise.all([
-      api.get<{ user: User } | null>('/v1/auth/get-session'),
-      api.get<{ google: boolean }>('/v1/login-options').catch(() => ({ google: state.google })),
-    ]);
-    set({ google: options.google });
-    signedIn(session?.user ? toAccount(session.user) : null);
-  } catch (e) {
-    if (!(e instanceof OfflineError)) console.warn('Couldn’t check the login:', e);
-  }
-  return state;
+function remember(me: Me) {
+  writeLocal(REMEMBERED, me);
+  set({ me });
 }
 
-const auth = <T>(path: string, body: unknown) => api.post<T>(`/v1/auth${path}`, body, 10_000);
+/** Asks the writer's server who is logged in and whether they may write. */
+export async function refreshMe(): Promise<void> {
+  try {
+    const data = await writer.get<unknown>('/v1/me');
+    remember(Me.parse(data));
+    set({ server: 'up' });
+  } catch (e) {
+    if (!(e instanceof OfflineError)) console.warn('Couldn’t ask the writer who is logged in:', e);
+    set({ server: 'down' });
+  }
+}
+
+async function checkGoogle() {
+  try {
+    const options = await breader.get<{ google: boolean }>('/v1/login-options');
+    set({ google: options.google === true });
+  } catch {
+    // Without an answer, the login dialog offers email and password only.
+  }
+}
+
+const auth = <T>(path: string, body: unknown) => breader.post<T>(`/v1/auth${path}`, body, 10_000);
 
 export async function signUp(email: string, password: string) {
-  const r = await auth<{ user: User }>('/sign-up/email', {
-    email,
-    password,
-    name: email.split('@')[0],
-  });
-  signedIn(toAccount(r.user));
+  await auth('/sign-up/email', { email, password, name: email.split('@')[0] });
+  await refreshMe();
 }
 
 export async function logIn(email: string, password: string) {
-  const r = await auth<{ user: User }>('/sign-in/email', { email, password, rememberMe: true });
-  signedIn(toAccount(r.user));
+  await auth('/sign-in/email', { email, password, rememberMe: true });
+  await refreshMe();
 }
 
-/** Leaves for Google; it sends the reader back to /?login=google, or /?login=failed. */
+/** Leaves for Google; it sends the owner back to the writer with ?login=google, or ?login=failed. */
 export async function logInWithGoogle() {
-  const back = `${location.origin}/`;
+  const back = `${location.origin}${import.meta.env.BASE_URL}`;
   const r = await auth<{ url: string }>('/sign-in/social', {
     provider: 'google',
     callbackURL: `${back}?login=google`,
@@ -83,25 +88,19 @@ export async function logInWithGoogle() {
   location.assign(r.url);
 }
 
+/** The link in the email opens breader, which has the page for choosing a new password. */
 export const requestReset = (email: string) => auth('/request-password-reset', { email, redirectTo: `${location.origin}/` });
 
-export const resetPassword = (token: string, newPassword: string) => auth('/reset-password', { token, newPassword });
-
-/** Confirms the email from its link. The link also logs this browser in if it wasn't. */
-export async function verifyEmail(token: string) {
-  await api.get(`/v1/auth/verify-email?token=${encodeURIComponent(token)}`, 10_000);
-  return refreshAccount();
-}
-
 export async function sendVerification() {
-  if (!state.user) return;
-  await auth('/send-verification-email', { email: state.user.email, callbackURL: `${location.origin}/` });
+  const email = state.me?.account?.email;
+  if (!email) return;
+  await auth('/send-verification-email', { email, callbackURL: `${location.origin}/` });
 }
 
-/** Ends the login on the server. The caller clears the library from this browser. */
+/** Ends the login. It's breader's login too, so this logs out of breader as well. */
 export async function logOut() {
   await auth('/sign-out', {});
-  signedIn(null);
+  remember({ account: null, access: 'logged_out' });
 }
 
 const MESSAGES: Record<string, string> = {
@@ -111,18 +110,17 @@ const MESSAGES: Record<string, string> = {
   INVALID_EMAIL: 'That doesn’t look like an email address.',
   PASSWORD_TOO_SHORT: 'Use at least 8 characters for your password.',
   PASSWORD_TOO_LONG: 'That password is too long. Use 128 characters or fewer.',
-  INVALID_TOKEN: 'This link has expired or was already used. Ask for a new one.',
-  TOKEN_EXPIRED: 'This link has expired. Ask for a new one.',
 };
 
-/** What to tell the reader when a login step fails. */
+/** What to tell the owner when a login step fails. */
 export function loginError(e: unknown): string {
   if (e instanceof OfflineError) return e.message;
   if (e instanceof ApiError) {
     if (e.status === 429) return 'Too many tries. Wait a few minutes, then try again.';
     return MESSAGES[e.code] ?? e.message;
   }
-  return e instanceof Error ? e.message : 'Something went wrong. Try again.';
+  if (e instanceof Error) return e.message;
+  return 'Something went wrong. Try again.';
 }
 
 const subscribe = (fn: () => void) => {
@@ -133,10 +131,21 @@ const get = () => state;
 let checked = false;
 
 export function useAccount(): AccountState {
+  const account = useSyncExternalStore(subscribe, get);
+
   useEffect(() => {
     if (checked) return;
     checked = true;
-    void refreshAccount();
+    void refreshMe();
+    void checkGoogle();
   }, []);
-  return useSyncExternalStore(subscribe, get);
+
+  // The writer comes back by itself when its server does.
+  useEffect(() => {
+    if (account.server !== 'down') return;
+    const timer = window.setInterval(() => void refreshMe(), RETRY_EVERY);
+    return () => window.clearInterval(timer);
+  }, [account.server]);
+
+  return account;
 }

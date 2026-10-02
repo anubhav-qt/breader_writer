@@ -1,4 +1,4 @@
-import { PREVIEW_MODES, type PreviewMode } from '../data/library';
+import { PREVIEW_MODES, type PreviewMode } from '../data/preview';
 import './preview-bar.css';
 
 export type AppTheme = 'auto' | 'light' | 'dark';
@@ -8,11 +8,10 @@ interface Props {
   onMode: (m: PreviewMode) => void;
   theme: AppTheme;
   onTheme: (t: AppTheme) => void;
-  onReset: () => void;
 }
 
-/** Development only: switch between real data and placeholder libraries, and force a theme. */
-export function PreviewBar({ mode, onMode, theme, onTheme, onReset }: Props) {
+/** Development only: switch between real data, placeholder libraries and notes, and force a theme. */
+export function PreviewBar({ mode, onMode, theme, onTheme }: Props) {
   return (
     <div className="pv" role="group" aria-label="Preview controls">
       <span className="pv-tag">preview</span>
@@ -27,10 +26,6 @@ export function PreviewBar({ mode, onMode, theme, onTheme, onReset }: Props) {
           {t}
         </button>
       ))}
-      <span className="pv-sep" />
-      <button type="button" onClick={onReset} title="Clear this browser's Breader data and reload">
-        reset
-      </button>
     </div>
   );
 }

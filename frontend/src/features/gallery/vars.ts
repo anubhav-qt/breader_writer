@@ -1,8 +1,8 @@
 import type { CSSProperties } from 'react';
-import { colorVars } from '../../data/colors';
-import type { ShelfItem } from '../../data/useLibrary';
+import type { Book } from '../../data/books';
+import { colorVars, normColor } from '../../data/colors';
 
 /** A book's colour and ink as CSS variables for its card. */
-export function bookVars(b: ShelfItem): CSSProperties {
-  return colorVars(b.color);
+export function bookVars(b: Book): CSSProperties {
+  return colorVars(normColor(b.color, b.title));
 }

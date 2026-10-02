@@ -10,9 +10,6 @@
 }
 .gallery > * { max-width: 1400px; margin-inline: auto; }
 .gallery[hidden] { display: none; }
-.gallery.is-empty:not([hidden]) { display: grid; place-items: center; padding-bottom: 76px; }
-.gallery-add { height: 50px; padding: 0 22px; border-radius: 14px; font-size: 15px; }
-.gallery-add svg { width: 18px; height: 18px; }
 
 .gallery-head {
   position: sticky;
@@ -69,27 +66,8 @@
   pointer-events: none;
 }
 .tile-face.is-ink { z-index: 1; background: var(--bc); color: var(--bc-ink); }
-/* The first line of text keeps clear of the corner button. */
-.tile-face > :first-child { padding-right: 36px; }
 .tile-hit { position: absolute; inset: 0; z-index: 2; border-radius: inherit; }
 .tile-hit:focus-visible { outline: none; }
-
-.tile-tools { position: absolute; top: 12px; right: 12px; z-index: 5; display: flex; align-items: center; gap: 6px; }
-.tile-more, .tile-fav {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--canvas) 82%, transparent);
-  box-shadow: inset 0 0 0 1px var(--tile-border);
-}
-.tile-more { opacity: 0.55; transition: opacity 160ms ease, background-color 160ms ease; }
-.tile:hover .tile-more, .tile-more:focus-visible, .tile-more[aria-expanded="true"] { opacity: 1; }
-.tile-more:hover { background: var(--canvas); }
-.tile-more svg, .tile-fav svg { width: 16px; height: 16px; }
-.tile-fav svg { fill: currentColor; }
 
 /* Type inside cards */
 .t-eyebrow { font: var(--ui-w) 12px/1 var(--ui); opacity: 0.75; margin-bottom: 12px; }
@@ -114,32 +92,6 @@
 }
 .t-author { font: var(--ui-w) 12.5px/1.3 var(--ui); opacity: 0.75; margin-top: 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .t-meta { font: var(--ui-w) 12.5px/1.2 var(--ui); opacity: 0.78; white-space: nowrap; }
-/* The line where the reader stopped: one style on every card that shows it. */
-.t-line {
-  max-width: 100%;
-  margin-top: auto;
-  padding-top: 0.3em;
-  font-family: var(--read);
-  font-size: 24px;
-  line-height: 1.1;
-  text-wrap: pretty;
-  overflow-wrap: break-word;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-.t-subtitle {
-  max-width: 100%;
-  margin-top: 2px;
-  font-family: var(--read);
-  font-size: 24px;
-  line-height: 1.05;
-  opacity: 0.72;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .t-foot { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-top: 18px; }
 .t-cta { margin-left: auto; padding: 11px 16px; border-radius: 999px; font: var(--ui-w) 13px/1 var(--ui); white-space: nowrap; background: var(--ink); color: var(--canvas); }
 .is-ink .t-cta { background: var(--bc-ink); color: var(--bc); }
@@ -165,14 +117,8 @@
 @container (max-width: 599px) {
   .tile-hero .t-title { font-size: 36px; }
 }
-@container (max-width: 469px) {
-  .t-subtitle { font-size: 20px; }
-}
 @container (max-width: 379px) {
   .tile-square .t-title { font-size: 26px; }
-}
-@container (max-width: 229px) {
-  .c-name .c-sub { font-size: 17px; }
 }
 @container (max-width: 189px) {
   .tile-tall .t-title { font-size: 24px; }
@@ -183,8 +129,8 @@
 }
 
 /*
- * Cards without a cover beside them are set like one: the author, a big dotted mark (the volume's
- * number, or the title's first letter) in the book's colour, the title at the foot, and how far.
+ * Cards without a cover beside them are set like one: the book's length, a big dotted mark (the
+ * title's first letter) in the book's colour, the title at the foot, and how much is written.
  */
 .tile:not(.has-art) > .tile-face {
   display: grid;
@@ -217,18 +163,6 @@
   justify-content: flex-end;
   align-items: flex-start;
 }
-.c-sub {
-  max-width: 100%;
-  margin-top: 3px;
-  font-family: var(--read);
-  font-size: 20px;
-  line-height: 1.02;
-  opacity: 0.72;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
 .c-foot {
   grid-area: foot;
   width: 100%;
@@ -249,7 +183,7 @@
 .tile-cover .c-mark { font-size: min(26cqh, 48cqw); }
 /* Small cards: the mark, the title, and how far under it. */
 .tile-small:not(.has-art) > .tile-face { grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "mark" "name" "foot"; }
-.tile-small .c-by, .tile-small .c-sub, .tile-small .c-foot > :nth-child(2) { display: none; }
+.tile-small .c-by { display: none; }
 .tile-small > .tile-face > .c-mark { margin-top: 0; font-size: min(22cqh, 30cqw); }
 .tile-small > .tile-face .t-title { -webkit-line-clamp: 2; }
 .tile-small .c-foot { margin-top: 4px; padding: 0; border: 0; }
@@ -262,15 +196,12 @@
 }
 .tile-wide .c-mark { margin: 0; align-self: center; font-size: min(66cqh, 22cqw); }
 .tile-wide .c-name .t-title { -webkit-line-clamp: 2; }
-/* Room for two lines of title between the author and the foot. */
+/* Room for two lines of title between the length and the foot. */
 .tile-wide .c-foot { margin-top: 8px; }
-/* Shorter cards keep the subtitle for the ones with room, and short squares (a phone's wall) are set out like the small ones. */
-@container (max-height: 299px) {
-  .tile:not(.tile-hero) .c-sub { display: none; }
-}
+/* Short squares (a phone's wall) are set out like the small ones. */
 @container (max-height: 199px) {
   .tile:is(.tile-square, .tile-cover):not(.has-art) > .tile-face { grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "mark" "name" "foot"; }
-  .tile:is(.tile-square, .tile-cover) :is(.c-by, .c-foot > :nth-child(2), .c-long) { display: none; }
+  .tile:is(.tile-square, .tile-cover) :is(.c-by, .c-long) { display: none; }
   .tile-square .c-short { display: inline; }
   .tile:is(.tile-square, .tile-cover) > .tile-face > .c-mark { margin-top: 0; font-size: min(22cqh, 30cqw); }
   .tile:is(.tile-square, .tile-cover) .c-foot { margin-top: 4px; padding: 0; border: 0; }
@@ -285,16 +216,10 @@
 @container (max-height: 259px) {
   .tile:not(.tile-hero) .t-eyebrow { display: none; }
 }
-@container (max-width: 229px) {
-  .t-line { display: none; }
-}
-@container (max-height: 199px) {
-  .tile-square .t-line { display: none; }
-}
 
 /*
- * Covers, on the two most recent books only. The cover keeps its own proportions (never cropped),
- * sits centred top to bottom, clear of the corner button, and has the same corners all round.
+ * Covers, drawn for the two most recent books only. The cover sits centred top to bottom, with
+ * room above and below, and has the same corners all round.
  */
 .tile { --art-inset: 50px; --art-w: min(40cqw, (100cqh - 2 * var(--art-inset)) * var(--art-ratio, 0.6667)); }
 .tile-art { display: none; }
@@ -314,7 +239,7 @@
     pointer-events: none;
   }
   .tile.has-art > .tile-face { padding-right: calc(var(--pad-x) + var(--art-w) + 28px); }
-  /* The cover drawn for a recent book without one: its colour, author, mark and title. */
+  /* The cover drawn for a recent book: its colour, length, mark and title. */
   .tile.has-art > .tile-art.is-made {
     display: flex;
     flex-direction: column;
@@ -325,7 +250,6 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--bc-ink) 14%, transparent);
   }
 }
-.tile-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tile.has-art .t-foot { margin-top: 14px; }
 .mc-by { max-width: 100%; font: var(--ui-w) 10px/1.2 var(--ui); text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mc-mark { margin-top: 8px; font: 900 calc(var(--art-w) * 0.42) / 0.82 var(--ui); letter-spacing: -0.02em; }
@@ -368,87 +292,3 @@
 
 /* Recent: bento. Positioned, so a card being removed can fade out where it stood. */
 .bento { position: relative; display: grid; grid-auto-rows: 132px; gap: 14px; }
-
-/* Edit popover: name, colour, favourite, remove */
-.ep {
-  position: fixed;
-  z-index: 75;
-  display: grid;
-  /* One column the popover's width: a long genre's name shortens rather than widening it. */
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-  padding: 14px;
-  border-radius: 16px;
-  background: var(--paper);
-  box-shadow: 0 0 0 1px var(--tile-border), var(--float-shadow);
-  outline: none;
-}
-.ep-label { font: var(--ui-w) 11.5px/1 var(--ui); color: var(--ink-2); margin-top: 2px; }
-/* The name's label shares its row with close, which sits in the corner like the dialogs' one. */
-.ep-head { display: flex; align-items: center; justify-content: space-between; margin: -6px -6px -4px 0; }
-.ep-head .ep-label { margin: 0; }
-.ep-x { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--ink-2); transition: background-color 140ms ease, color 140ms ease; }
-.ep-x:hover { background: var(--fill); color: var(--ink); }
-.ep-x svg { width: 15px; height: 15px; }
-.ep-input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--canvas);
-  font-family: var(--read);
-  font-size: 22px;
-  line-height: 1.1;
-  outline: none;
-  transition: border-color 140ms ease;
-}
-.ep-input:focus { border-color: var(--accent); }
-.ep-swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; }
-.ep-sw {
-  aspect-ratio: 1;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--bc);
-  color: var(--bc-ink);
-  box-shadow: inset 0 0 0 1px var(--tile-border);
-  transition: box-shadow 140ms ease;
-}
-.ep-sw:hover { box-shadow: inset 0 0 0 1px var(--tile-border-hover); }
-.ep-sw.is-on { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink); }
-.ep-sw svg { width: 14px; height: 14px; }
-.ep-share { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
-.ep-share .ep-label { margin: 0; }
-.ep-note { margin: -4px 0 0; font: var(--ui-w) 11.5px/1.35 var(--ui); color: var(--ink-2); }
-.ep-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.ep-act {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 38px;
-  padding: 0 10px;
-  border-radius: 10px;
-  font: var(--ui-w) 13px/1 var(--ui);
-  white-space: nowrap;
-  transition: color 140ms ease, background-color 140ms ease;
-}
-.ep-act svg { width: 17px; height: 17px; flex: none; }
-.ep-fav { background: var(--fill); color: var(--ink-2); }
-.ep-fav:hover { color: var(--ink); background: var(--line); }
-.ep-fav.is-on { color: var(--ink); }
-.ep-fav.is-on svg { fill: currentColor; }
-.ep-remove { background: var(--danger-soft); color: var(--danger); }
-/* Finished: a row of its own, in the book's colour once it is, as its card is. */
-.ep-done { flex-basis: 100%; background: var(--fill); color: var(--ink-2); }
-.ep-done:hover { color: var(--ink); background: var(--line); }
-.ep-done.is-on, .ep-done.is-on:hover { background: var(--bc); color: var(--bc-ink); }
-.ep-remove:hover { background: var(--danger-soft-2); }
-
-/* Removing a book that's in both places */
-.rm { display: grid; gap: 10px; }
-.rm-ask { margin: 0; font-size: 23px; line-height: 1.15; }
-.rm-note { margin: 0; font: var(--ui-w) 12px/1.5 var(--ui); color: var(--ink-2); }
-.rm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 8px; }

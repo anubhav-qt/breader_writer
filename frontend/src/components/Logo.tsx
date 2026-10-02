@@ -9,7 +9,7 @@ const DOT = 3;
 /** Ink on the page, with no box around it, so it inverts with the theme. */
 export function Logo() {
   return (
-    <svg className="logo" viewBox="0 0 32 32" role="img" aria-label="Breader">
+    <svg className="logo" viewBox="0 0 32 32" role="img" aria-label="Breader Writer">
       <g className="logo-b">
         {DOTS.map(([c, r]) => (
           <rect key={`${c}-${r}`} x={7.5 + c * PITCH} y={4 + r * PITCH} width={DOT} height={DOT} />

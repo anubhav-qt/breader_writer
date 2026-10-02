@@ -64,8 +64,12 @@ below for what exists.
 - **The writer shares Seelie's CLIProxyAPI.** One proxy per machine: Seelie's on the ThinkPad,
   and on this Mac the one Homebrew runs (port 8317). Accounts are signed in once, in Seelie's
   settings; a subscription's limits belong to the account whatever the proxy, so a second proxy
-  would add a second place to sign in and no room. The writer's settings only pick the model and
-  thinking level. While the proxy is down, the AI shows offline.
+  would add a second place to sign in and no room. The writer only picks the model and thinking
+  level. While the proxy is down, the AI shows offline.
+- **The model is picked in the header.** A chip by the account (the model's name and its
+  thinking level) drops down the models the accounts serve, and a thinking control below them,
+  like Seelie's composer picker. Always in sight, one tap away. One pick per account, for every
+  book.
 - **Only allowlisted accounts can play.** Like breader's `SPEECH_EMAILS`: a list of emails, each
   with a confirmed address. Everyone else can see the writer, with a quiet note that it's invite
   only. This keeps the subscriptions personal and inside their limits. A key on its own isn't

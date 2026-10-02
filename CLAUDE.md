@@ -31,17 +31,28 @@ Nothing is built yet. We are settling the design with the owner, one question at
   the books. Doto for the interface, Dongle for reading. See breader's `frontend/src/styles/`.
 - Accounts: the same key and login system as breader.
 - Each book's card has a progress bar for how much of the book has been written.
+- **The book is written scene by scene.** When a scene wraps (the place or time shifts), that
+  scene is written up as finished prose. The book trails the play by a few minutes, and each part
+  gets a whole scene to work with.
+- **Point of view is picked per book** at setup: third person close (the default), first person,
+  or third person omniscient.
+- **The book is one tap away while you play.** The play fills the screen; a quiet mark says a
+  new scene has landed in the book. Same on a phone and a laptop.
+- **Progress is words written against a length goal.** At setup you pick a length (short story,
+  novella or novel). The bar is words written over that goal, and the story paces its arc to end
+  near it, so a full bar means a finished book.
+- **The AI is a hard fork of pi, the way Seelie is in POM** (see below). We fork the generalized
+  harness and change it for our use. Models come from the owner's subscriptions (Google
+  Antigravity first, with ChatGPT Codex and Claude as other options) through CLIProxyAPI.
 
 ### Open (ask the owner one at a time, in roughly this order)
 
-1. How the play and the book relate: what the book's point of view is, when it gets written, and
-   whether you watch it being written.
-2. What "how much is written" measures, so the progress bar has an end.
-3. What you can type while playing (speech, actions, out of character requests, undo).
-4. What a character and a world are made of in setup, and whether the story may add characters.
-5. Which LLM, and who pays for it.
-6. Where stories are stored, and whether writer shares breader's server and database.
-7. Whether a finished book can go to the breader library to be read there.
+1. Who may use the AI: it runs on the owner's own subscriptions.
+2. What you can type while playing (speech, actions, out of character requests, undo).
+3. What a character and a world are made of in setup, and whether the story may add characters.
+4. Where stories are stored, and whether writer shares breader's server and database.
+5. Whether a finished book can go to the breader library to be read there.
+6. The word counts behind short story, novella and novel.
 
 ## Breader, the sibling project
 
@@ -70,6 +81,28 @@ The main checkout is `~/anubhav/breader` on branch `dev` (production). It is pub
 
 Breader's code is dense in places. When we bring a piece over, we rewrite it to the standards
 below rather than copying it as it is.
+
+## POM and Seelie, the model for our AI
+
+POM is the owner's order management system (`~/anubhav/pom`, `github.com/anubhav-qt/pom`; the
+local checkout can be behind, so read `origin/dev`). Seelie is its AI agent, and our AI follows
+the same pattern:
+
+- **pi, hard forked.** `packages/pi-ai` (streaming over four APIs: Gemini, Anthropic Messages,
+  OpenAI Responses, OpenAI Chat Completions) and `packages/pi-agent` (the agent loop, tool calls
+  and their events), forked from pi (`github.com/earendil-works/pi`, MIT) and trimmed to what
+  Seelie needs. The LICENSE files stay with them.
+- **CLIProxyAPI** (`github.com/router-for-me/CLIProxyAPI`) turns the owner's subscriptions
+  (Antigravity, Codex, Claude) into one API. Accounts are signed in from Seelie's settings through
+  its management API (`src/lib/seelie/cliproxy.ts`); the model list and thinking levels come from
+  it too (`src/lib/seelie/catalog.ts`). Settings show each account's 5 hour and weekly limits.
+- **Where it runs.** CLIProxyAPI runs on the ThinkPad beside the app (`infra/compose.yml`, the
+  `cliproxy` service, pinned image). The cloud fallback has no proxy, so Seelie shows offline
+  there instead of failing (`src/lib/seelie/config.ts`). Locally: `npm run cliproxy`
+  (`scripts/cliproxy.mjs`).
+- **Runs survive the tab.** A reply runs detached from the request and is mirrored to Postgres as
+  it goes, so it keeps going when the tab closes and the stream resumes on return
+  (`src/lib/seelie/engine.ts`).
 
 ## How we work
 

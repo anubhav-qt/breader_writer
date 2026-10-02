@@ -25,20 +25,26 @@ function startingDraft(color: string): Draft {
 /** Setting up a new book. What's typed is kept in this browser until the book is started. */
 export function NewBook({ color, onMade, onClose }: Props) {
   const [draft, setDraft] = useState<Draft>(() => startingDraft(color));
+  // Nothing is written until something is typed, so a draft this page can't read is left alone.
+  const [typed, setTyped] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
+    if (!typed) {
+      return;
+    }
     if (isBlank(draft.setup)) {
       clearDraft();
     } else {
       writeDraft(draft);
     }
-  }, [draft]);
+  }, [draft, typed]);
 
   const setSetup = (setup: BookSetup) => {
     setError(null);
+    setTyped(true);
     setDraft((d) => ({ ...d, setup }));
   };
   const povPicked = () => setDraft((d) => ({ ...d, povChosen: true }));

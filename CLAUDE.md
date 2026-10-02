@@ -60,6 +60,11 @@ below for what exists.
 - **The AI is a hard fork of pi, the way Seelie is in POM** (see below). We fork the generalized
   harness and change it for our use. Models come from the owner's subscriptions (Google
   Antigravity first, with ChatGPT Codex and Claude as other options) through CLIProxyAPI.
+- **The writer shares Seelie's CLIProxyAPI.** One proxy per machine: Seelie's on the ThinkPad,
+  and on this Mac the one Homebrew runs (port 8317). Accounts are signed in once, in Seelie's
+  settings; a subscription's limits belong to the account whatever the proxy, so a second proxy
+  would add a second place to sign in and no room. The writer's settings only pick the model and
+  thinking level. While the proxy is down, the AI shows offline.
 - **Only allowlisted accounts can play.** Like breader's `SPEECH_EMAILS`: a list of emails, each
   with a confirmed address. Everyone else can see the writer, with a quiet note that it's invite
   only. This keeps the subscriptions personal and inside their limits. A key on its own isn't
@@ -156,16 +161,18 @@ Each step ends working, committed, and with a short test checklist for the owner
    length, content level. Cards in the library fill with words written over the goal.
 3. **AI plumbing.** Fork pi (`packages/pi-ai`, `packages/pi-agent`) and change it for us: the
    durable story state (with every version kept, see "Changing the past"), the working context
-   rebuilt from it, and constant compaction (see "The AI" below). Run CLIProxyAPI, sign in
-   subscriptions and pick a model from settings, as Seelie does. Set up Nunjucks prompt
-   templates and their tests.
+   rebuilt from it, and constant compaction (see "The AI" below). Reach Seelie's CLIProxyAPI
+   and pick a model and thinking level from settings. Set up Nunjucks prompt templates and
+   their tests.
 4. **Play.** The narrator agent and its tools: turns, the author toggle, hints on tap, undo
    within a scene, scenes ending, the cast growing and new characters joining, relationships
    shifting, and the owner's changes reaching back through the turns and the state.
 5. **The book.** The scene writer, the book view (a copy of breader's reader), the progress bar
    and the EPUB download, and the owner's changes reaching back into written scenes.
 6. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
-   the writer's app, the writer API behind the tunnel, and the nightly backup.
+   the writer's app, the writer API behind the tunnel, and the nightly backup. The writer API
+   must reach POM's `cliproxy` service, management routes included, which only answer their own
+   machine unless told otherwise (`allow-remote`); work out how when we get there.
 
 ### Notes for step 1
 

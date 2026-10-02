@@ -1,0 +1,9 @@
+{
+  "name": "breader-writer-workspace",
+  "private": true,
+  "workspaces": ["frontend", "shared", "server"],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {}
+}

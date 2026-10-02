@@ -1,9 +1,20 @@
 {
   "name": "breader-writer-workspace",
   "private": true,
-  "workspaces": ["frontend", "shared", "server"],
+  "workspaces": [
+    "frontend",
+    "shared",
+    "server"
+  ],
   "engines": {
     "node": ">=24"
   },
-  "scripts": {}
+  "scripts": {
+    "api": "npm run dev -w server",
+    "migrate": "npm run migrate -w server",
+    "db": "docker compose -f infra/compose.dev.yml up -d --wait",
+    "db:down": "docker compose -f infra/compose.dev.yml down",
+    "test": "npm test -w server",
+    "typecheck": "npm run typecheck -w shared -w server"
+  }
 }

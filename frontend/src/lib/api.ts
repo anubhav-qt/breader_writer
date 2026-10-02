@@ -68,8 +68,17 @@ function client(base: Base) {
   return {
     get: <T>(path: string, timeout?: number) => request<T>(base, 'GET', path, undefined, timeout),
     post: <T>(path: string, body: unknown = {}, timeout?: number) => request<T>(base, 'POST', path, body, timeout),
+    put: <T>(path: string, body: unknown, timeout?: number) => request<T>(base, 'PUT', path, body, timeout),
   };
 }
 
 export const writer = client('writer');
 export const breader = client('breader');
+
+/** What to tell the owner when a request failed: the server's own words, or that it's offline. */
+export function failureText(e: unknown): string {
+  if (e instanceof ApiError || e instanceof OfflineError) {
+    return e.message;
+  }
+  return 'Something went wrong. Try again in a moment.';
+}

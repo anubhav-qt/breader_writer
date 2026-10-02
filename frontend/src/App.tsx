@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, MotionConfig } from 'motion/react';
-import type { Access } from '@writer/shared/protocol';
+import type { Access, BookCard } from '@writer/shared/protocol';
 import { Header } from './components/Header';
+import { IconPlus } from './components/icons';
 import { PreviewBar, type AppTheme } from './components/PreviewBar';
 import { Toast, type ToastMessage } from './components/Toast';
 import { fetchBooks, type Book } from './data/books';
+import { pickColor } from './data/colors';
 import { PREVIEW_MODES, previewBooks, previewNote, type PreviewMode } from './data/preview';
 import { AccountMenu } from './features/account/AccountMenu';
 import { LoginDialog } from './features/account/LoginDialog';
 import { Gallery } from './features/gallery/Gallery';
 import { logOut, refreshMe, useAccount, type AccountState } from './lib/account';
 import { OfflineError } from './lib/api';
+import { go, useRoute } from './lib/route';
 import './app.css';
 
 /**
@@ -30,6 +33,10 @@ function writeParam(name: string, value: string, fallback: string) {
   else url.searchParams.set(name, value);
   window.history.replaceState(null, '', url);
 }
+
+// The setup pages load when they're first opened, so the library doesn't wait for them.
+const NewBook = lazy(() => import('./features/setup/NewBook').then((m) => ({ default: m.NewBook })));
+const EditSetup = lazy(() => import('./features/setup/EditSetup').then((m) => ({ default: m.EditSetup })));
 
 /** What Google adds to the address when it sends the owner back. */
 const RETURN_PARAMS = ['login', 'error'];
@@ -71,6 +78,13 @@ function libraryFor(account: AccountState, books: Book[] | null, booksFailed: bo
   return withBooks(books);
 }
 
+/** The books with this one first, as it's the most recent: new, or just changed. */
+function putFirst(books: Book[] | null, card: BookCard): Book[] | null {
+  if (!books) return books;
+  const others = books.filter((b) => b.id !== card.id);
+  return [card, ...others];
+}
+
 /** A quiet note where the books would be: none yet, or why this browser can't write. */
 function Note({ text, children }: { text: string; children?: ReactNode }) {
   return (
@@ -83,6 +97,7 @@ function Note({ text, children }: { text: string; children?: ReactNode }) {
 
 export default function App() {
   const account = useAccount();
+  const route = useRoute();
   const [now] = useState(() => Date.now());
   const [preview, setPreview] = useState<PreviewMode>(() => (devTools ? readParam('preview', PREVIEW_MODES.map((m) => m.id), 'live') : 'live'));
   const [theme, setTheme] = useState<AppTheme>(() => (devTools ? readParam('theme', ['auto', 'light', 'dark'] as const, 'auto') : 'auto'));
@@ -149,17 +164,41 @@ export default function App() {
     await logOut();
     say('Logged out.');
   }, [say]);
-  // Playing comes in a later step; until then a card has nothing to open.
-  const onOpen = useCallback(() => say('Books don’t open yet.'), [say]);
+  const newBook = useCallback(() => go({ page: 'new' }), []);
+  const toLibrary = useCallback(() => go({ page: 'library' }), []);
+  // Playing comes in a later step; until then a card opens what its book was set up with.
+  const onOpen = useCallback((b: Book) => go({ page: 'setup', bookId: b.id }), []);
+  const onMade = useCallback((card: BookCard) => {
+    setBooks((list) => putFirst(list, card));
+    go({ page: 'library' });
+    say(`Made “${card.title}”.`);
+  }, [say]);
+  const onSaved = useCallback((card: BookCard) => {
+    setBooks((list) => putFirst(list, card));
+    go({ page: 'library' });
+    say('Saved.');
+  }, [say]);
 
   const library = libraryFor(account, books, booksFailed, preview, now);
   let count = 0;
-  if (library.show === 'books') count = library.books.length;
+  let onNew: (() => void) | undefined = undefined;
+  if (library.show === 'books') {
+    count = library.books.length;
+    onNew = newBook;
+  }
 
-  return (
-    <MotionConfig reducedMotion="user">
+  // Setting up a book is for accounts that can write; anyone else sees the library and its note.
+  const canWrite = account.me?.access === 'open';
+  let page: ReactNode;
+  if (route.page === 'new' && canWrite) {
+    const given = (books ?? []).map((b) => b.color);
+    page = <NewBook color={pickColor(given)} onMade={onMade} onClose={toLibrary} />;
+  } else if (route.page === 'setup' && canWrite) {
+    page = <EditSetup key={route.bookId} bookId={route.bookId} onSaved={onSaved} onClose={toLibrary} />;
+  } else {
+    page = (
       <div className="lib">
-        <Header count={count} account={<AccountMenu account={account} onLogin={openLogin} onLogOut={onLogOut} />} />
+        <Header count={count} onNew={onNew} account={<AccountMenu account={account} onLogin={openLogin} onLogOut={onLogOut} />} />
         {library.show === 'books' && (
           <Gallery books={library.books} now={now} id="library-mine" labelledBy="tab-mine" onOpen={onOpen} />
         )}
@@ -168,9 +207,20 @@ export default function App() {
             {library.note === 'logged_out' && (
               <button type="button" className="btn btn-primary note-action" onClick={openLogin}>Log in</button>
             )}
+            {library.note === 'empty' && (
+              <button type="button" className="btn btn-primary note-action" onClick={newBook}>
+                <IconPlus /> New book
+              </button>
+            )}
           </Note>
         )}
       </div>
+    );
+  }
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <Suspense fallback={null}>{page}</Suspense>
 
       <AnimatePresence>
         {loginOpen && <LoginDialog key="login" google={account.google} onDone={onLoggedIn} onClose={() => setLoginOpen(false)} />}

@@ -1,0 +1,108 @@
+import { useEffect, useState } from 'react';
+import { AnimatePresence } from 'motion/react';
+import type { BookSetup } from '@writer/shared/book';
+import type { BookCard } from '@writer/shared/protocol';
+import { blankSetup, clearDraft, isBlank, makeBook, missing, readDraft, writeDraft, type Draft } from '../../data/setup';
+import { failureText } from '../../lib/api';
+import { ConfirmDialog } from './ConfirmDialog';
+import { SetupForm, SetupShell } from './SetupPage';
+
+interface Props {
+  /** The colour a new book gets, from the library's pool. */
+  color: string;
+  onMade: (card: BookCard) => void;
+  onClose: () => void;
+}
+
+function startingDraft(color: string): Draft {
+  const saved = readDraft();
+  if (saved) {
+    return saved;
+  }
+  return { setup: blankSetup(color), povChosen: false };
+}
+
+/** Setting up a new book. What's typed is kept in this browser until the book is started. */
+export function NewBook({ color, onMade, onClose }: Props) {
+  const [draft, setDraft] = useState<Draft>(() => startingDraft(color));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
+
+  useEffect(() => {
+    if (isBlank(draft.setup)) {
+      clearDraft();
+    } else {
+      writeDraft(draft);
+    }
+  }, [draft]);
+
+  const setSetup = (setup: BookSetup) => {
+    setError(null);
+    setDraft((d) => ({ ...d, setup }));
+  };
+  const povPicked = () => setDraft((d) => ({ ...d, povChosen: true }));
+
+  const start = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const card = await makeBook(draft.setup);
+      clearDraft();
+      onMade(card);
+    } catch (e) {
+      setError(failureText(e));
+      setBusy(false);
+    }
+  };
+
+  const clear = () => {
+    setClearing(false);
+    clearDraft();
+    setDraft({ setup: blankSetup(color), povChosen: false });
+  };
+
+  const needed = missing(draft.setup);
+  let note = null;
+  if (error) {
+    note = <p className="setup-note is-error" role="alert">{error}</p>;
+  } else if (needed) {
+    note = <p className="setup-note">{needed}</p>;
+  }
+
+  return (
+    <SetupShell onClose={onClose}>
+      <SetupForm
+        heading="New book"
+        setup={draft.setup}
+        onChange={setSetup}
+        suggestPov={!draft.povChosen}
+        onPovPicked={povPicked}
+        actions={
+          <>
+            {note}
+            {!isBlank(draft.setup) && (
+              <button type="button" className="btn btn-ghost" onClick={() => setClearing(true)}>Clear</button>
+            )}
+            <button type="button" className="btn btn-primary setup-go" disabled={needed !== null || busy} onClick={() => void start()}>
+              Start
+            </button>
+          </>
+        }
+      />
+      <AnimatePresence>
+        {clearing && (
+          <ConfirmDialog
+            key="clear"
+            title="Clear this book?"
+            text="Everything typed for it goes, the cast too."
+            go="Clear"
+            stay="Keep it"
+            onGo={clear}
+            onClose={() => setClearing(false)}
+          />
+        )}
+      </AnimatePresence>
+    </SetupShell>
+  );
+}

@@ -1,0 +1,114 @@
+/*
+ * The setup page: one column, top to bottom. Its fields and radio cards are breader's Add a book
+ * dialog's (features/add/add.css); this is only what the page adds around them.
+ */
+.setup-page { height: 100dvh; overflow-y: auto; }
+.setup-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 36px;
+  background: linear-gradient(var(--canvas) 72%, transparent);
+}
+
+.setup {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 12px 24px 120px;
+  display: grid;
+  gap: 48px;
+}
+.setup-waiting { min-height: 50dvh; place-content: center; text-align: center; }
+.setup-heading {
+  margin: 0;
+  font-family: var(--read);
+  font-weight: 700;
+  font-size: 56px;
+  line-height: 0.9;
+  overflow-wrap: anywhere;
+}
+
+.setup-section { display: grid; gap: 14px; }
+.setup-section h2 { margin: 0; font: var(--ui-w-strong) 15px/1 var(--ui); }
+.setup-hint { margin: -6px 0 0; font: var(--ui-w) 12.5px/1.5 var(--ui); color: var(--ink-2); }
+.setup-field { display: grid; gap: 7px; min-width: 0; }
+.setup-field .add-label { margin-top: 0; }
+.setup-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+
+.add-input.setup-title { font-size: 34px; padding: 8px 12px 6px; }
+/* Paragraph fields grow with what's typed, where the browser can. */
+.add-text.setup-text { height: auto; min-height: 88px; max-height: 420px; field-sizing: content; }
+.add-text.setup-text.is-notes { min-height: 120px; }
+
+/* Radio cards without breader's icon column, two to a row. */
+.setup-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.setup-choices .add-choice { grid-template-columns: minmax(0, 1fr) 20px; }
+.setup-suggest { display: block; margin-top: 7px; font: var(--ui-w) 11.5px/1.2 var(--ui); font-style: normal; color: var(--ink); }
+
+/* The cast: a card per character, and one to add someone. */
+.cast { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.cast-card {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 6px;
+  min-height: 112px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  text-align: left;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.cast-card:hover { background: var(--fill); }
+.cast-name { font-family: var(--read); font-weight: 700; font-size: 30px; line-height: 0.95; overflow-wrap: anywhere; }
+.cast-name.is-blank { color: var(--ink-2); }
+.cast-who {
+  font: var(--ui-w) 12px/1.4 var(--ui);
+  color: var(--ink-2);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.cast-you { margin-bottom: 2px; }
+.cast-add {
+  align-content: center;
+  justify-items: center;
+  grid-auto-flow: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  border-style: dashed;
+  border-color: var(--dash);
+  font: var(--ui-w) 13px/1 var(--ui);
+  color: var(--ink-2);
+}
+.cast-add:hover { color: var(--ink); }
+.cast-add svg { width: 16px; height: 16px; }
+
+/* The end of the page: what's missing, then Clear and Start, or Save. */
+.setup-end { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 20px; border-top: 1px solid var(--line); }
+.setup-note { margin: 0 auto 0 0; font: var(--ui-w) 12.5px/1.4 var(--ui); color: var(--ink-2); }
+.setup-note.is-error { color: var(--danger); }
+.setup-go { height: 50px; padding: 0 26px; border-radius: 14px; font-size: 15px; }
+
+/* A character's sheet, over the page. */
+.sheet-feelings { display: grid; gap: 10px; padding: 12px 0 2px; }
+.sheet-feelings .setup-field .add-label { color: var(--ink); }
+.sheet-feelings .add-text.setup-text { min-height: 52px; }
+.sheet-actions { align-items: center; }
+.sheet-remove { margin-right: auto; color: var(--danger); }
+.sheet-remove:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
+
+@media (max-width: 720px) {
+  .setup-bar { height: 64px; padding: 0 16px; }
+  .setup { padding: 4px 16px 96px; gap: 40px; }
+  .setup-heading { font-size: 46px; }
+  .setup-choices { grid-template-columns: minmax(0, 1fr); }
+  .setup-pair { grid-template-columns: minmax(0, 1fr); }
+  .cast { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

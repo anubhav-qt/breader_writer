@@ -21,9 +21,9 @@ the way a breader card fills with colour as you read.
 
 ## Status
 
-Step 1 (skeleton) is done and tested by the owner: the shared package, the server and the
-library page, and running it locally against production breader. Step 2 (setup) is next, starting
-with the owner's design direction for the setup screen. See "The code" below for what exists.
+Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
+settings, world and cast) on its own page, and changing it later. What's left of it is the
+owner's test. See "The code" below for what exists.
 
 ### Decided
 
@@ -143,6 +143,18 @@ Each step ends working, committed, and with a short test checklist for the owner
 - It's one login with breader, so logging out of the writer logs out of breader too (the menu
   says so). It doesn't touch breader's library in the browser.
 
+### Notes for step 2
+
+- Until playing exists (step 4), a card opens its book's setup page, to look over and change.
+  Nothing changes until Save, and leaving with changes asks first.
+- A new book's setup is kept in this browser as it's typed (`writer.draft.v1`), so closing the
+  page loses nothing. Start makes the book and clears it; Clear empties it.
+- Picking Light novel switches the point of view to first person, and back, until the owner picks
+  a point of view themselves.
+- A cast member whose sheet is closed without a name is dropped. The protagonist always stays.
+- The pages have their own addresses (`/writer/new`, `/writer/books/<id>/setup`), so in
+  production whatever serves `/writer` must answer every path under it with `index.html` (step 6).
+
 ### Later versions
 
 - Send a book straight to the breader library (v1 is an EPUB download).
@@ -166,9 +178,13 @@ npm workspaces, as in breader. Node 24 (`.nvmrc`).
 A copy of breader's library page (breader at `2226591`), cut down to the writer's. React 19,
 Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
 
-- `src/App.tsx`: the library. It asks the writer's server who is logged in, then shows the
-  books, or a quiet note in their place: log in, confirm your email, invite only, offline, or no
-  books yet. Cards don't open yet.
+- `src/App.tsx`: the page the address is on. The library asks the writer's server who is logged
+  in, then shows the books, or a quiet note in their place: log in, confirm your email, invite
+  only, offline, or no books yet (with New book). New book is in the header once there are books.
+  A card opens its setup. The setup pages load on first use (`lazy`), and only for an account
+  that can write; anyone else gets the library and its note.
+- `src/lib/route.ts`: the pages by address under `/writer/`: the library, `new`, and
+  `books/<id>/setup`. Moving between them uses the history, so back and links work.
 - `src/lib/api.ts`: two servers. The writer's API (`VITE_API_URL`, default `/writer/api` on the
   app's own address; the dev server proxies it to port 8790) and breader's (`VITE_BREADER_API_URL`,
   default `https://api.breader.site`) for logging in. A writer API that can't be reached throws
@@ -177,8 +193,16 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   `writer.me.v1`. Logging in, signing up, Google, reset links and logging out all go to breader's
   Better Auth; reset and confirm links open breader. While the server is down it's asked again
   every minute, so the writer comes back by itself.
-- `src/data/books.ts`: a book as its card shows it, its length's name from its word goal, and
-  how much is written (words written over the goal, 0 to 1).
+- `src/data/books.ts`: a book as its card shows it, its length's name, and how much is written
+  (words written over the goal, 0 to 1).
+- `src/data/setup.ts`: a setup while it's being made: the choices' names and descriptions,
+  blank sheets, adding and removing characters (removing one drops everyone's feelings about
+  them), what's still missing, the draft kept in this browser, and the server calls.
+- `src/features/setup/`: the setup page. `SetupPage.tsx` is the page (the book, the world, the
+  cast as cards); `NewBook.tsx` starts a book from it and `EditSetup.tsx` changes one.
+  `CharacterSheet.tsx` is a character's sheet over the page, built to open mid story too.
+  `Fields.tsx` holds the text fields and radio cards, which are breader's Add a book dialog's
+  (`features/add/add.css`, kept whole from breader); `setup.css` is only what the page adds.
 - `src/features/gallery/`: breader's cards, bento and shelves, without series, genres, real
   covers, editing or sharing. A card fills with the book's colour as it's written; the two most
   recent get a drawn cover. Below Recent, once there are more than 9, every book again by date.

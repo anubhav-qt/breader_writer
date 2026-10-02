@@ -25,7 +25,8 @@ Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: maki
 settings, world, cast and the relationship graph between them) on its own page, and changing it
 later. What's left of it is the owner's test. Step 3 (AI plumbing) is under way: pi is forked
 (`packages/`), the server reads the models from Seelie's proxy and keeps each account's pick
-of model and thinking level, and the story has its tables and its change log (`server/src/story/`). The owner has a real book set up locally that they mean to play through before
+of model and thinking level, and the story has its tables, its change log, and its working
+context rebuilt from them through Nunjucks templates (`server/src/story/`, `server/src/prompts/`). The owner has a real book set up locally that they mean to play through before
 production, so its data must survive every change (see "Running it locally"). See "The code"
 below for what exists.
 
@@ -359,6 +360,19 @@ A Hono API, port 8790, built like breader's server.
     if they weren't, and adding to the line's history) and the arc. It turns away blank text and
     mentions of anyone not in the cast. The narrator's tools (step 4) call these.
   - `mentions.ts`: in that structured text a person is `<@id>`, named when the context is built.
+  - `read.ts` reads everything a book's story knows in one go (`readStory`), and `view.ts`
+    turns it into what the prompt templates take (`storyView`): names filled in for every
+    mention, scenes by number, the relationships of the people in the scene in full (bond, both
+    sides, what each hides, the history) and everyone else's as their bond, open threads only,
+    and where the story stands against its length. Every scene comes with its summary and its
+    turns not folded yet, word for word, so turns leave the context only once a summary holds them.
+- `src/prompts/`: the prompts, as Nunjucks templates in `templates/` (`render.ts`). A template
+  takes a typed object (a `StoryView`, plus what its role needs) and only lays it out; a missing
+  value fails the render. `partials/story.njk` is the story as it stands (the book, world, cast,
+  relationships, arc, open threads, facts, timeline and earlier scenes), in XML tags, and
+  `partials/scene.njk` a scene with its turns (an author note is marked as one). A call's
+  context is the role's instructions as the system message, then one user message: the story
+  first, as the long context, then the scene, then the task, last.
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -388,8 +402,9 @@ A Hono API, port 8790, built like breader's server.
   is a stand-in for breader's server: a real Better Auth, the version breader pins (1.7.6),
   configured as breader configures it. Tests log in through it and hand its cookie to the
   writer. If breader upgrades Better Auth, upgrade it here too and run the tests. `test/proxy.ts`
-  is a stand-in for CLIProxyAPI, so no test reaches a real model. `test/story.test.ts` covers
-  the change log and the ledgers.
+  is a stand-in for CLIProxyAPI, so no test reaches a real model. `test/stories.ts` makes books
+  with stories in them, through the change log; `test/story.test.ts` covers the log and the
+  ledgers, and `test/context.test.ts` the story's view and its templates.
 
 ### Running it locally
 

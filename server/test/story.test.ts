@@ -1,54 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import type { BookSetup, Character } from '@writer/shared/book';
-import { createBook } from '../src/books/setup.ts';
 import { books, changes, facts, relationships, scenes, turns } from '../src/db/schema.ts';
-import { edit, remove, startChange, takeBack, versionsOf, type Tag } from '../src/story/changes.ts';
+import { edit, remove, startChange, takeBack, versionsOf } from '../src/story/changes.ts';
 import { closeThread, openThread, recordFact, setArc, shiftRelationship } from '../src/story/ledger.ts';
 import { mention } from '../src/story/mentions.ts';
 import { addTurn, endScene, playingScene, setReply, startScene, turnsOf } from '../src/story/scenes.ts';
 import { deps } from './helpers.ts';
+import { aScene, tag } from './stories.ts';
 
 const db = deps.db;
-
-function sheet(name: string): Character {
-  return { id: randomUUID(), name, who: '', personality: '', past: '', notes: '' };
-}
-
-/** A book with Aiko, the protagonist, and Ren and Sora in the cast. Ren and Aiko are tied. */
-async function aBook() {
-  const aiko = sheet('Aiko');
-  const ren = sheet('Ren');
-  const sora = sheet('Sora');
-  const setup: BookSetup = {
-    title: 'The Lantern Road',
-    color: 'teal',
-    length: 'novella',
-    pov: 'third_close',
-    darkness: 'mature',
-    world: { genre: 'Fantasy', tone: '', setting: '', rules: '', notes: '' },
-    protagonist: aiko,
-    cast: [ren, sora],
-    relationships: [{ bond: 'old friends', a: { id: aiko.id, sees: 'a brother', hides: '' }, b: { id: ren.id, sees: '', hides: '' } }],
-  };
-  const card = await createBook(db, `user-${randomUUID()}`, setup);
-  return { bookId: card.id, aiko, ren, sora };
-}
-
-function tag(bookId: string, over: Partial<Tag> = {}): Tag {
-  return { bookId, turnId: null, by: 'agent', what: 'Something happened', ...over };
-}
-
-/** A book with its first scene playing. */
-async function aScene() {
-  const book = await aBook();
-  const scene = await db.transaction(async (tx) => {
-    const change = await startChange(tx, tag(book.bookId, { what: 'Started a scene' }));
-    return startScene(tx, change, { place: 'The ferry', time: 'Dusk', present: [book.aiko.id, book.ren.id] });
-  });
-  return { ...book, scene };
-}
 
 describe('scenes and turns', () => {
   it('numbers scenes, and plays one at a time', async () => {
@@ -131,7 +92,7 @@ describe('the change log', () => {
     });
 
     const lines = await db.select().from(relationships).where(eq(relationships.bookId, bookId));
-    expect(lines).toHaveLength(2);
+    expect(lines).toHaveLength(3);
     const withRen = lines.find((line) => line.aId === [aiko.id, ren.id].sort()[0] && line.bId === [aiko.id, ren.id].sort()[1]);
     expect(withRen?.bond).toBe('old friends, now wary');
     if (aiko.id < ren.id) {
@@ -172,8 +133,8 @@ describe('the change log', () => {
 
     const left = await db.select().from(facts).where(eq(facts.bookId, bookId));
     expect(left).toEqual([earlier]);
-    const [line] = await db.select().from(relationships).where(eq(relationships.bookId, bookId));
-    expect(line.bond).toBe('old friends');
+    const lines = await db.select().from(relationships).where(eq(relationships.bookId, bookId));
+    expect(lines.map((line) => line.bond).sort()).toEqual(['cousins', 'old friends']);
     const [original] = await db.select().from(changes).where(eq(changes.id, change.id));
     expect(original.takenBackBy).toBe(back.id);
     expect(await versionsOf(db, back.id)).toHaveLength(5);

@@ -6,6 +6,7 @@ import { Segmented } from '../../components/Segmented';
 import { contextName, fetchSettings, picksThinking, providerName, saveChoice, thinkingName } from '../../data/models';
 import { failureText } from '../../lib/api';
 import { springs } from '../../lib/springs';
+import '../account/account.css';
 import './models.css';
 
 /** The settings as last heard, or why there are none. */
@@ -60,7 +61,9 @@ function chipText(loaded: Loaded): string {
 
 /**
  * The header's model picker: the model the owner's stories run on, and how hard it thinks, for
- * every book. It drops down the models the accounts signed in to Seelie's proxy serve.
+ * every book. It drops down the models the accounts signed in to Seelie's proxy serve. Built from
+ * what the library has: its ghost button, the account menu's dropdown, and breader's segmented
+ * control.
  */
 export function ModelPicker() {
   const [open, setOpen] = useState(false);
@@ -133,28 +136,23 @@ export function ModelPicker() {
     void choose(settings, { model: settings.using.model, thinking });
   };
 
-  let chipClass = 'pick-btn';
-  if (loaded.state !== 'ready' || !loaded.settings.models) {
-    chipClass += ' is-quiet';
-  }
-
   return (
-    <div className="pick" ref={root}>
+    <div ref={root}>
       <button
         type="button"
-        className={chipClass}
+        className="btn btn-ghost pick-btn"
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={`The story’s model: ${chipText(loaded)}`}
         onClick={() => setOpen((was) => !was)}
       >
-        <span className="pick-text">{chipText(loaded)}</span>
-        <IconChevron className="pick-chevron" />
+        <span>{chipText(loaded)}</span>
+        <IconChevron />
       </button>
       <AnimatePresence>
         {open && (
           <motion.div
-            className="pick-menu"
+            className="acct-menu pick-menu"
             initial={{ opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
@@ -184,12 +182,12 @@ interface MenuProps {
 
 function Menu({ loaded, message, onRetry, onModel, onThinking }: MenuProps) {
   if (loaded.state === 'waiting') {
-    return <p className="pick-note">Asking for the models…</p>;
+    return <div className="acct-verify">Asking for the models…</div>;
   }
   if (loaded.state === 'failed') {
     return (
-      <div className="pick-out">
-        <p className="pick-note">The writer can’t reach its server right now. It comes back by itself.</p>
+      <div className="acct-verify">
+        <span>The writer can’t reach its server right now. It comes back by itself.</span>
         <button type="button" className="login-link" onClick={onRetry}>Try again</button>
       </div>
     );
@@ -197,14 +195,14 @@ function Menu({ loaded, message, onRetry, onModel, onThinking }: MenuProps) {
   const { settings } = loaded;
   if (!settings.models) {
     return (
-      <div className="pick-out">
-        <p className="pick-note">The AI is offline: Seelie’s proxy can’t be reached. It comes back by itself.</p>
+      <div className="acct-verify">
+        <span>The AI is offline: Seelie’s proxy can’t be reached. It comes back by itself.</span>
         <button type="button" className="login-link" onClick={onRetry}>Try again</button>
       </div>
     );
   }
   if (settings.models.length === 0) {
-    return <p className="pick-note">No models yet. Sign an account in from Seelie’s settings.</p>;
+    return <div className="acct-verify">No models yet. Sign an account in from Seelie’s settings.</div>;
   }
 
   const current = modelIn(settings, settings.using.model);
@@ -231,25 +229,23 @@ function Menu({ loaded, message, onRetry, onModel, onThinking }: MenuProps) {
           onChange={(thinking) => onThinking(settings, thinking)}
         />
       )}
-      {!picksThinking(current) && <p className="pick-note">It thinks at its own pace.</p>}
-      {message && <p className="pick-note pick-message" role="status">{message}</p>}
-      <p className="pick-note">For every book. Accounts are signed in at Seelie.</p>
+      {!picksThinking(current) && <div className="acct-verify">It thinks at its own pace.</div>}
+      {message && <p className="acct-message" role="status">{message}</p>}
+      <div className="acct-sep" />
+      <div className="acct-verify">For every book. Accounts are signed in at Seelie.</div>
     </>
   );
 }
 
+/** A model, as one of the account menu's items, with what serves it and its context below. */
 function ModelRow({ model, picked, onPick }: { model: ModelInfo; picked: boolean; onPick: () => void }) {
-  let className = 'pick-row';
-  if (picked) {
-    className += ' is-on';
-  }
   return (
-    <button type="button" role="radio" aria-checked={picked} className={className} onClick={onPick}>
-      <span className="pick-row-text">
-        <b>{model.name}</b>
-        <span>{providerName(model.provider)} · {contextName(model.contextWindow)} context</span>
+    <button type="button" role="radio" aria-checked={picked} className="acct-item pick-row" onClick={onPick}>
+      <span>
+        {model.name}
+        <small>{providerName(model.provider)} · {contextName(model.contextWindow)} context</small>
       </span>
-      {picked && <IconCheck className="pick-check" />}
+      {picked && <IconCheck />}
     </button>
   );
 }

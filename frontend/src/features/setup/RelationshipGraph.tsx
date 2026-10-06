@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { motion } from 'motion/react';
 import { RELATIONSHIP_LIMIT, pairKey, type Character, type Relationship } from '@writer/shared/book';
-import { sidesInCastOrder } from '../../data/setup';
+import { sidesInCastOrder } from '@writer/shared/setup';
 import { springs } from '../../lib/springs';
 import { layOut, type Box, type Dot, type Point } from './graphLayout';
 

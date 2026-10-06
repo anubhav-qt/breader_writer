@@ -1,7 +1,7 @@
 import type { Character, Relationship, Side } from '@writer/shared/book';
 import { IconTrash } from '../../components/icons';
 import { Modal } from '../../components/Modal';
-import { sidesInCastOrder } from '../../data/setup';
+import { sidesInCastOrder } from '@writer/shared/setup';
 import { Field } from './Fields';
 
 interface Props {

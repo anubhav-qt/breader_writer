@@ -4,19 +4,14 @@ import { CAST_LIMIT, everyone, type BookSetup, type Character, type Length, type
 import { IconClose, IconPlus } from '../../components/icons';
 import { Logo } from '../../components/Logo';
 import {
-  DARKNESS,
-  DEFAULT_POV,
-  LENGTHS,
-  LIGHT_NOVEL_POV,
-  POVS,
-  blankCharacter,
   blankRelationship,
   findRelationship,
   withCharacter,
   withoutCharacter,
   withoutRelationship,
   withRelationship,
-} from '../../data/setup';
+} from '@writer/shared/setup';
+import { DARKNESS, DEFAULT_POV, LENGTHS, LIGHT_NOVEL_POV, POVS, blankCharacter } from '../../data/setup';
 import { CharacterSheet } from './CharacterSheet';
 import { Choices, Field } from './Fields';
 import { RelationshipGraph } from './RelationshipGraph';

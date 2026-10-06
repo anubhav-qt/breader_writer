@@ -408,6 +408,9 @@ their code, changed where we need, not rewritten to ours.
   characters with one id, and a relationship with oneself, with someone not in the cast, or a
   second one between the same two. `pairKey` is a pair's key either way round; `inOrder` puts a
   relationship's smaller id first, as it's stored.
+- `src/setup.ts`: changing a setup: a character's sheet, removing someone (and their
+  relationships), and tying, changing and untying relationships. The setup page changes a setup
+  through it, and so do Procreator's suggested changes, on the page and on the server alike.
 
 ### `frontend/` (`@writer/frontend`)
 
@@ -432,9 +435,9 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
 - `src/data/books.ts`: a book as its card shows it, its length's name, and how much is written
   (words written over the goal, 0 to 1).
 - `src/data/setup.ts`: a setup while it's being made: the choices' names and descriptions,
-  blank sheets, adding and removing characters (removing one removes their relationships),
-  tying, changing and untying relationships, what's still missing, the draft kept in this
-  browser (and turning an old draft's feelings into relationships), and the server calls.
+  blank sheets, what's still missing, the draft kept in this browser (and turning an old draft's
+  feelings into relationships), and the server calls. Changing the cast and the graph is
+  shared's (`shared/src/setup.ts`).
 - `src/features/setup/`: the setup page. `SetupPage.tsx` is the page (the book, the world, the
   cast as cards, the relationships); `NewBook.tsx` starts a book from it and `EditSetup.tsx`
   changes one. `CharacterSheet.tsx` is a character's sheet over the page, and

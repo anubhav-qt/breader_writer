@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./book": "./src/book.ts",
-    "./protocol": "./src/protocol.ts"
+    "./protocol": "./src/protocol.ts",
+    "./setup": "./src/setup.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

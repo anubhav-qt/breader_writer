@@ -667,10 +667,16 @@ writer reads that login. Only the writer's own tables are local.
    and a wrong one gets this machine shut out of the management API for 30 minutes; see "Notes
    for step 4").
 3. `npm run db`, `npm run migrate`, then `npm run api` (port 8790) and `npm run web` (5174).
-4. Open `https://local.breader.site:5174/writer/`. The certificate is self-signed
-   (`@vitejs/plugin-basic-ssl`), so the browser warns once; HTTPS is needed because breader's
-   cookie is Secure. The in-app browser of the desktop app refuses it, so check there with
-   `curl -k --resolve local.breader.site:5174:127.0.0.1` instead.
+4. Open `https://local.breader.site:5174/writer/`. HTTPS is needed because breader's cookie is
+   Secure. With mkcert, once (`brew install mkcert`, `mkcert -install`, then `npm run certs`,
+   which writes the gitignored `.certs/`), every browser here trusts the certificate. Without
+   it, the server makes a self-signed one (`@vitejs/plugin-basic-ssl`), which a browser warns
+   about once and the desktop app's own browser refuses.
+5. The desktop app's browser loads `https://localhost:5174/writer/` but blocks every script on
+   `local.breader.site` (`ERR_BLOCKED_BY_CLIENT`), so it never sees a breader login. Check the
+   UI there against a stand-in for the writer's API: a small Node server on port 8790 (with the
+   real `api` stopped) that answers `/v1/me` as an invited writer, `/v1/books`, `/v1/settings`
+   and whatever is being checked, started from a `launch.json` entry that isn't committed.
 
 **The owner's local book is real.** Before a migration that changes what's stored, dump the
 `writer` schema into `.backups/` (gitignored, since it holds book text), try the migration on a

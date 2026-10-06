@@ -16,6 +16,7 @@
     "api": "npm run dev -w server",
     "migrate": "npm run migrate -w server",
     "dev:env": "node scripts/dev-env.mjs",
+    "certs": "mkdir -p .certs && mkcert -cert-file .certs/local.pem -key-file .certs/local-key.pem local.breader.site localhost 127.0.0.1",
     "db": "docker compose -f infra/compose.dev.yml up -d --wait",
     "db:down": "docker compose -f infra/compose.dev.yml down",
     "test": "npm test -w server",

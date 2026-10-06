@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./book": "./src/book.ts",
     "./protocol": "./src/protocol.ts",
-    "./setup": "./src/setup.ts"
+    "./setup": "./src/setup.ts",
+    "./suggestions": "./src/suggestions.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

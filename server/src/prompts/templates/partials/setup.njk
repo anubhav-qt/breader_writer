@@ -1,0 +1,50 @@
+{#-
+  The setup page as it stands, for Procreator's help with setup: every field, the blank ones
+  marked, so it sees what's left to fill. People go by their ref (a name, "Unnamed 1" while they
+  have none). Takes a SetupView (suggestions/view.ts).
+-#}
+{% macro either(text) %}{% if text %}{{ text }}{% else %}(blank){% endif %}{% endmacro %}
+
+{% macro setup(s) %}
+<book>
+Title: {{ either(s.book.title) }}
+Length: {{ s.book.length }}
+Style: {{ s.book.style }}
+Point of view: {{ s.book.pov }}
+How dark: {{ s.book.darkness }}
+</book>
+
+<world>
+Genre: {{ either(s.world.genre) }}
+Tone: {{ either(s.world.tone) }}
+Setting: {{ either(s.world.setting) }}
+Rules that matter: {{ either(s.world.rules) }}
+Notes: {{ either(s.world.notes) }}
+</world>
+
+<cast>
+{% for p in s.people %}
+<person ref="{{ p.ref }}"{% if p.protagonist %} played_by="the owner"{% endif %}>
+Name: {{ either(p.name) }}
+Who they are: {{ either(p.who) }}
+Personality: {{ either(p.personality) }}
+Past: {{ either(p.past) }}
+Notes: {{ either(p.notes) }}
+</person>
+{% endfor %}
+</cast>
+
+<lines>
+{% for l in s.lines %}
+<line between="{{ l.a }} and {{ l.b }}">
+What they are to each other: {{ either(l.bond) }}
+{% for side in l.sides %}
+How {{ side.ref }} sees {{ side.other }}: {{ either(side.sees) }}
+What {{ side.ref }} hides from {{ side.other }}: {{ either(side.hides) }}
+{% endfor %}
+</line>
+{% else %}
+No one is tied yet.
+{% endfor %}
+</lines>
+{% endmacro %}

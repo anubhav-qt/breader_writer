@@ -28,14 +28,25 @@ export type Pov = z.infer<typeof Pov>;
 export const Darkness = z.enum(['gentle', 'mature', 'unflinching']);
 export type Darkness = z.infer<typeof Darkness>;
 
+/** The most characters a title holds. */
+export const TITLE_LIMIT = 120;
+/** The most characters a name holds. */
+export const NAME_LIMIT = 80;
+/** The most characters a short field holds, like a genre. */
+export const SHORT_LIMIT = 200;
+/** The most characters a longer field holds, like a character's past. */
+export const LONG_LIMIT = 4000;
+/** The most characters a notes box holds. */
+export const NOTES_LIMIT = 20000;
+
 /** A short field on a sheet, like a genre. Blank is fine: the AI fills blanks. */
-const Short = z.string().trim().max(200);
+const Short = z.string().trim().max(SHORT_LIMIT);
 /** A longer field, like a character's past. */
-const Long = z.string().trim().max(4000);
+const Long = z.string().trim().max(LONG_LIMIT);
 /** A free notes box. */
-const Notes = z.string().trim().max(20000);
+const Notes = z.string().trim().max(NOTES_LIMIT);
 /** A character's id. Lowercase, so two ids compare in JavaScript the way Postgres orders them. */
-const Id = z.uuid().toLowerCase();
+export const Id = z.uuid().toLowerCase();
 
 /** The world, a few fields plus notes. All optional. */
 export const World = z.object({
@@ -55,7 +66,7 @@ export type World = z.infer<typeof World>;
  */
 export const Character = z.object({
   id: Id,
-  name: z.string().trim().min(1, 'Every character needs a name.').max(80),
+  name: z.string().trim().min(1, 'Every character needs a name.').max(NAME_LIMIT),
   /** Who they are. */
   who: Long,
   personality: Long,
@@ -92,7 +103,7 @@ export type Relationship = z.infer<typeof Relationship>;
 export const RELATIONSHIP_LIMIT = 300;
 
 const SetupFields = z.object({
-  title: z.string().trim().min(1, 'The book needs a title.').max(120),
+  title: z.string().trim().min(1, 'The book needs a title.').max(TITLE_LIMIT),
   /** A palette key from the app's book colours (frontend/src/data/colors.ts). */
   color: z.string().min(1).max(32),
   length: Length,
@@ -128,12 +139,18 @@ export function inOrder(relationship: Relationship): Relationship {
   return { ...relationship, a: relationship.b, b: relationship.a };
 }
 
+/** What checkPeople needs of a setup: its people and the lines between them. */
+interface People {
+  protagonist: Character;
+  cast: Character[];
+  relationships: Relationship[];
+}
+
 /**
- * What a book is set up with: POST /v1/books, and GET and PUT /v1/books/:id/setup. No two
- * characters share an id, and a relationship is between two different people in the cast, with
- * one line at most between any two.
+ * No two characters share an id, and a relationship is between two different people in the cast,
+ * with one line at most between any two.
  */
-export const BookSetup = SetupFields.superRefine((setup, ctx) => {
+export function checkPeople(setup: People, ctx: z.RefinementCtx) {
   const names = new Map<string, string>();
   for (const character of everyone(setup)) {
     if (names.has(character.id)) {
@@ -156,5 +173,8 @@ export const BookSetup = SetupFields.superRefine((setup, ctx) => {
     }
     pairs.add(key);
   }
-});
+}
+
+/** What a book is set up with: POST /v1/books, and GET and PUT /v1/books/:id/setup. */
+export const BookSetup = SetupFields.superRefine(checkPeople);
 export type BookSetup = z.infer<typeof BookSetup>;

@@ -67,10 +67,11 @@ export function RelationshipSheet({ relationship, people, protagonistId, onChang
           value={relationship.bond}
           placeholder="Sisters, old rivals, married, a debt"
           autoFocus={isBlank(relationship)}
+          field={{ kind: 'bond', a: relationship.a.id, b: relationship.b.id }}
           onChange={(bond) => onChange({ ...relationship, bond })}
         />
-        <SideFields side={first} name={firstName} otherName={secondName} onChange={setSide} />
-        <SideFields side={second} name={secondName} otherName={firstName} onChange={setSide} />
+        <SideFields side={first} name={firstName} otherId={second.id} otherName={secondName} onChange={setSide} />
+        <SideFields side={second} name={secondName} otherId={first.id} otherName={firstName} onChange={setSide} />
         <p className="add-found">Only the tie is needed. The story fills in the rest.</p>
         <div className="add-actions sheet-actions">
           <button type="button" className="btn btn-ghost sheet-remove" onClick={onUntie}>
@@ -86,11 +87,12 @@ export function RelationshipSheet({ relationship, people, protagonistId, onChang
 interface SideProps {
   side: Side;
   name: string;
+  otherId: string;
   otherName: string;
   onChange: (side: Side) => void;
 }
 
-function SideFields({ side, name, otherName, onChange }: SideProps) {
+function SideFields({ side, name, otherId, otherName, onChange }: SideProps) {
   return (
     <div className="tie-side">
       <Field
@@ -98,6 +100,7 @@ function SideFields({ side, name, otherName, onChange }: SideProps) {
         size="long"
         value={side.sees}
         placeholder="What they think and feel about them"
+        field={{ kind: 'side', id: side.id, other: otherId, field: 'sees' }}
         onChange={(sees) => onChange({ ...side, sees })}
       />
       <Field
@@ -105,6 +108,7 @@ function SideFields({ side, name, otherName, onChange }: SideProps) {
         size="long"
         value={side.hides}
         placeholder="Secrets, debts, what they would never say"
+        field={{ kind: 'side', id: side.id, other: otherId, field: 'hides' }}
         onChange={(hides) => onChange({ ...side, hides })}
       />
     </div>

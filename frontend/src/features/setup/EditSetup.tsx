@@ -95,6 +95,7 @@ export function EditSetup({ bookId, onSaved, onClose }: Props) {
         onChange={change}
         suggestPov={false}
         onPovPicked={() => {}}
+        bookId={bookId}
         actions={
           <>
             {note}

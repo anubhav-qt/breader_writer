@@ -1,18 +1,16 @@
 import { runAgentLoop, type AgentContext, type AgentEvent, type AgentLoopConfig, type AgentMessage, type AgentTool } from '@writer/pi-agent';
 import {
   estimateContextTokens,
-  estimateMessageTokens,
   streamSimple,
   toToolDeclaration,
   type AssistantMessage,
   type Message,
   type StopReason,
   type SystemMessage,
-  type ThinkingLevel,
   type UserMessage,
 } from '@writer/pi-ai';
 import type { Catalog } from '../ai/catalog.ts';
-import { ModelError, recordCall, textOf, type CallTag, type Role, type Sent } from '../ai/call.ts';
+import { counted, ModelError, recordCall, textOf, thinkingOf, type CallTag, type Role, type Sent } from '../ai/call.ts';
 import type { InUse } from '../ai/settings.ts';
 import type { Db } from '../db/client.ts';
 import type { Scene } from '../story/scenes.ts';
@@ -78,23 +76,6 @@ export async function sessionContext(db: Db, scene: Scene, segment: Segment, too
  */
 export function sessionTokens(messages: Message[]): number {
   return estimateContextTokens(messages).tokens;
-}
-
-/** The tokens in what's about to be sent, as the writer counts them. */
-function counted(messages: AgentMessage[]): number {
-  let tokens = 0;
-  for (const message of messages) {
-    tokens += estimateMessageTokens(message as Message);
-  }
-  return tokens;
-}
-
-function thinkingOf(inUse: InUse): ThinkingLevel | undefined {
-  const level = inUse.choice.thinking;
-  if (level === 'off') {
-    return undefined;
-  }
-  return level;
 }
 
 /** Keeps a run as it goes: each message in the session, and each call in calls. */

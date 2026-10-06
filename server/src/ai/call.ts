@@ -1,4 +1,5 @@
-import type { AssistantMessage } from '@writer/pi-ai';
+import type { AgentMessage } from '@writer/pi-agent';
+import { estimateMessageTokens, type AssistantMessage, type Message, type ThinkingLevel } from '@writer/pi-ai';
 import type { Db } from '../db/client.ts';
 import { calls } from '../db/schema.ts';
 import type { InUse } from './settings.ts';
@@ -9,8 +10,8 @@ import type { InUse } from './settings.ts';
  * included), so the budget and the cache can be seen.
  */
 
-/** What the model is asked to do. */
-export type Role = 'narrator' | 'author' | 'hints' | 'fold';
+/** What the model is asked to do. setup is the help with setup: suggestions and the Suggestions chat. */
+export type Role = 'narrator' | 'author' | 'hints' | 'fold' | 'setup';
 
 /** A model call that came back with no answer: the proxy down, an account out of its limits. */
 export class ModelError extends Error {}
@@ -29,6 +30,24 @@ export interface CallTag {
 export interface Sent {
   startedAt: Date;
   estimate: number;
+}
+
+/** The tokens in what's about to be sent, as the writer counts them. */
+export function counted(messages: AgentMessage[]): number {
+  let tokens = 0;
+  for (const message of messages) {
+    tokens += estimateMessageTokens(message as Message);
+  }
+  return tokens;
+}
+
+/** How hard the model is asked to think: the account's level, or nothing when it's off. */
+export function thinkingOf(inUse: InUse): ThinkingLevel | undefined {
+  const level = inUse.choice.thinking;
+  if (level === 'off') {
+    return undefined;
+  }
+  return level;
 }
 
 /** Records a call and what came back. */

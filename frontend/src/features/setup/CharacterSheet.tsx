@@ -1,4 +1,5 @@
-import type { Character } from '@writer/shared/book';
+import { NAME_LIMIT, type Character } from '@writer/shared/book';
+import type { FieldRef, SheetField } from '@writer/shared/suggestions';
 import { IconTrash } from '../../components/icons';
 import { Modal } from '../../components/Modal';
 import { Field } from './Fields';
@@ -12,16 +13,17 @@ interface Props {
   onClose: () => void;
 }
 
-type Line = 'name' | 'who' | 'personality' | 'past' | 'notes';
-
 /**
  * A character's sheet, over the page. Changes apply as they're typed. The same sheet opens mid
  * story, to read or change someone (see CLAUDE.md). How they relate to the others is in the
  * relationship graph, not here.
  */
 export function CharacterSheet({ character, plays, onChange, onRemove, onClose }: Props) {
-  const set = (line: Line, value: string) => {
+  const set = (line: SheetField, value: string) => {
     onChange({ ...character, [line]: value });
+  };
+  const fieldOf = (line: SheetField): FieldRef => {
+    return { kind: 'character', id: character.id, field: line };
   };
 
   let title = character.name.trim();
@@ -34,11 +36,11 @@ export function CharacterSheet({ character, plays, onChange, onRemove, onClose }
   return (
     <Modal title={title} onClose={onClose} width={520}>
       <div className="add sheet">
-        <Field label="Name" value={character.name} max={80} autoFocus={!character.name} onChange={(v) => set('name', v)} />
-        <Field label="Who they are" size="long" value={character.who} placeholder="Their place in the world: work, age, family" onChange={(v) => set('who', v)} />
-        <Field label="Personality" size="long" value={character.personality} placeholder="How they act, what they want, what they fear" onChange={(v) => set('personality', v)} />
-        <Field label="Past" size="long" value={character.past} placeholder="What happened to them before the story starts" onChange={(v) => set('past', v)} />
-        <Field label="Notes" size="notes" value={character.notes} placeholder="Anything else: looks, habits, how they talk" onChange={(v) => set('notes', v)} />
+        <Field label="Name" value={character.name} max={NAME_LIMIT} field={fieldOf('name')} autoFocus={!character.name} onChange={(v) => set('name', v)} />
+        <Field label="Who they are" size="long" value={character.who} placeholder="Their place in the world: work, age, family" field={fieldOf('who')} onChange={(v) => set('who', v)} />
+        <Field label="Personality" size="long" value={character.personality} placeholder="How they act, what they want, what they fear" field={fieldOf('personality')} onChange={(v) => set('personality', v)} />
+        <Field label="Past" size="long" value={character.past} placeholder="What happened to them before the story starts" field={fieldOf('past')} onChange={(v) => set('past', v)} />
+        <Field label="Notes" size="notes" value={character.notes} placeholder="Anything else: looks, habits, how they talk" field={fieldOf('notes')} onChange={(v) => set('notes', v)} />
         <p className="add-found">Only the name is needed. The story fills in the rest.</p>
         <div className="add-actions sheet-actions">
           {!plays && (

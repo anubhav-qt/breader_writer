@@ -1,0 +1,22 @@
+{#-
+  The ask for a field's suggestion (suggestions/field.ts): the page as it stands, which is the long
+  context, so it comes first; then the field clicked into and what's written in it; then the ask,
+  last. Takes a SetupView (page), a FieldView (field) and how much to suggest (length).
+-#}
+{% from "partials/setup.njk" import setup %}
+{{ setup(page) }}
+
+<field>
+Where: {{ field.where }}
+What it holds: {{ field.holds }}
+</field>
+
+<written>
+{% if field.text %}
+{{ field.text }}
+{% else %}
+(nothing yet)
+{% endif %}
+</written>
+
+Suggest what comes next in this field: {{ length }}. Answer with only the words to add.

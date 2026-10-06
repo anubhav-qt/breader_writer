@@ -160,3 +160,27 @@
   .setup-pair { grid-template-columns: minmax(0, 1fr); }
   .cast { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/*
+ * Procreator's faint text (useGhost): a mirror of the field laid over it, the same box and font,
+ * showing nothing of the field's own text but the suggestion after it. Only the faint text takes
+ * a tap; everything else reaches the field below.
+ */
+.ghost-wrap { position: relative; display: grid; min-width: 0; }
+.setup-field .ghost-mirror {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  resize: none;
+  border-color: transparent;
+  background: transparent;
+  color: transparent;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.setup-field .ghost-mirror.add-input { white-space: pre; }
+.ghost-text { color: var(--ink-2); pointer-events: auto; cursor: text; }

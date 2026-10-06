@@ -370,7 +370,7 @@ export const calls = writer.table(
     bookId: uuid('book_id').references(() => books.id, { onDelete: 'cascade' }),
     sceneId: uuid('scene_id').references(() => scenes.id),
     turnId: uuid('turn_id').references(() => turns.id),
-    /** narrator, author, hints or fold. */
+    /** narrator, author, hints, fold or setup. */
     role: text('role').notNull(),
     model: text('model').notNull(),
     thinking: text('thinking').notNull(),

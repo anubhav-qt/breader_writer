@@ -33,8 +33,10 @@ end against the real model the same day (see "Notes for step 3"). Nothing plays 
 (step 6), so what the owner can try of it is the model picker. Step 4 (settings) is built: in
 the model picker, the owner signs the proxy's AI accounts in and out. What's left of it is the
 owner's test, which needs the proxy's management key in `server/.env` (only the owner has it).
-Every call now asks each provider for its longest cache (see "Notes for step 3"). Next is setup
-help (step 5). The owner has a real book set up locally that they mean to play
+Every call now asks each provider for its longest cache (see "Notes for step 3"). Step 5 (setup
+help) is under way: Procreator's faint text in setup's fields is built and was checked in the
+desktop app's browser against a stand-in API (see "Notes for step 5"); the Suggestions chat is
+next. The owner has a real book set up locally that they mean to play
 through before production, so its data must survive every change (see "Running it locally").
 See "The code" below for what exists.
 
@@ -372,6 +374,31 @@ Each step ends working, committed, and with a short test checklist for the owner
   doubles the class (`.add-input.login-input`), so it wins whichever loads first. A rule copied
   from breader that overrides another file's may need the same.
 
+### Notes for step 5
+
+- A suggestion runs on the account's own model and thinking level, like everything else, so it
+  can take a while. Nothing shows while it's on its way, and nothing shows when Procreator can't
+  help (offline, or no answer): the field is just a field.
+- It's asked for 0.4 seconds after a field is clicked into, so tabbing past a field asks
+  nothing, and only once 3 things on the page are filled in (`SUGGEST_AFTER`, a default the
+  owner hasn't picked).
+- Typing or leaving the field clears the faint text, and the page stops waiting for it. Moving
+  the caret off the end only hides it, and switching windows keeps it. Escape clears it without
+  closing the sheet it's on.
+- Taking it types it in (`execCommand('insertText')`), so undo takes it back out. A mouse click
+  on the faint text doesn't take it (Tab and the arrow are right there, and a click near a
+  paragraph's end shouldn't take one by accident); a tap does.
+- The instructions are the same for every call, then the page as it stands, the field last. The
+  cache is asked to last long, keyed by the book, or by the account while the book isn't made.
+  Each call is recorded as `setup`.
+- When the page stops waiting, the server stops the model call (the request's signal). Locally
+  Vite's proxy doesn't pass that on, so there the call runs to the end.
+- A half-width line field (genre, tone) cuts a long suggestion off at its right edge. A paragraph
+  field grows to fit its faint text, as far as it may grow; past that, later lines are cut off.
+- Found while checking it: a sheet's first field (a character's name, a line's bond) asks for
+  the focus, but the dialog (`components/Modal.tsx`, from step 1) takes it just after, so the
+  field never keeps it.
+
 ### Later versions
 
 - Send a book straight to the breader library (v1 is an EPUB download).
@@ -407,10 +434,18 @@ their code, changed where we need, not rewritten to ours.
   character's id, so people can be tied before the book is saved. `BookSetup` turns away two
   characters with one id, and a relationship with oneself, with someone not in the cast, or a
   second one between the same two. `pairKey` is a pair's key either way round; `inOrder` puts a
-  relationship's smaller id first, as it's stored.
+  relationship's smaller id first, as it's stored. How much each field holds is here too
+  (`TITLE_LIMIT`, `NAME_LIMIT`, `SHORT_LIMIT`, `LONG_LIMIT`, `NOTES_LIMIT`), and the cast's
+  checks (`checkPeople`) are shared with a setup still being filled in.
 - `src/setup.ts`: changing a setup: a character's sheet, removing someone (and their
   relationships), and tying, changing and untying relationships. The setup page changes a setup
   through it, and so do Procreator's suggested changes, on the page and on the server alike.
+- `src/suggestions.ts`: setup help (step 5). A setup as the page holds it while it's being
+  filled in (`DraftSetup`: the title and names may still be blank), a field of it (`FieldRef`:
+  the title, a field of the world or of someone's sheet, a line's bond, or one side of a line),
+  what's in a field (`fieldText`) and how much it holds (`fieldLimit`), the ask and the answer
+  (`FieldAsk`, `FieldSuggestion`), and when suggestions start (`filledIn`, against
+  `SUGGEST_AFTER`).
 
 ### `frontend/` (`@writer/frontend`)
 
@@ -427,7 +462,7 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
 - `src/lib/api.ts`: two servers. The writer's API (`VITE_API_URL`, default `/writer/api` on the
   app's own address; the dev server proxies it to port 8790) and breader's (`VITE_BREADER_API_URL`,
   default `https://api.breader.site`) for logging in. A writer API that can't be reached throws
-  `OfflineError`.
+  `OfflineError`. A request can be given up on (`signal`).
 - `src/lib/account.ts`: the account, its access and whether it's the owner, from `/v1/me`,
   remembered under `writer.me.v1`. Logging in, signing up, Google, reset links and logging out
   all go to breader's Better Auth; reset and confirm links open breader. While the server is
@@ -447,6 +482,11 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   of it is built to open mid story too.
   `Fields.tsx` holds the text fields and radio cards, which are breader's Add a book dialog's
   (`features/add/add.css`, kept whole from breader); `setup.css` is only what the page adds.
+  `useGhost.ts` is Procreator's faint text in a field (see "Notes for step 5"): a `Field` told
+  which field of the setup it is (`field`) asks for it through `src/data/suggestions.ts`, with
+  the page as it stands from `HelpContext`, which `SetupForm` puts around the page and its
+  sheets. A field can't colour part of its own text, so the faint text is drawn in a copy of
+  the field laid over it.
 - `src/features/models/ModelPicker.tsx` and `src/data/models.ts`: the header's model picker,
   for an account that can write. The chip says the model and its thinking level; it drops down
   the models (`GET /v1/settings`, asked again on each opening) and the thinking levels the
@@ -562,6 +602,7 @@ A Hono API, port 8790, built like breader's server.
     Threads pages, memory, the pages of places the scene's place names, the whole scene before
     word for word, the index (every page but the characters', by kind), and where the story
     stands against its length. Pages and notes show people as links; the rest by plain name.
+    `settingsView` is a book's settings as the prompts say them, for setup help too.
 - `src/procreator/`: Procreator at work in a scene's session.
   - `brief.ts`: its instructions (`instructionsFor`) and a segment's head (`headFor`: the brief,
     and after a compaction the scene so far).
@@ -589,16 +630,27 @@ A Hono API, port 8790, built like breader's server.
   - `converse.ts`: the way in for play (`converse`): opens the session if it hasn't been (with
     earlier scenes wrapped up first), compacts it if it's past its limit (and goes on as it was
     if that fails), then sends the move. `addNote` adds the owner's mid scene change as a note.
-- `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with the
-  tokens the writer counted before sending and what the model says it used, cache reads
-  included. A call that comes back with no answer is a `ModelError`.
+- `src/suggestions/`: setup help. `view.ts` lays out the page as it stands (`setupView`:
+  everyone by name, the nameless numbered, two of one name told apart, `refsOf`) and the field
+  asked about (`fieldView`: where it is, what's in it, how much it holds). `field.ts` makes a
+  field's suggestion (`suggestField`): one call on the account's model and thinking level.
+  `ghost.ts` turns the answer into the faint text (`ghostFrom`): fences, labels and quotes
+  around it come off, it's joined to the field's text with a space where one is needed, a
+  repeat of that text is gone on from, a line field keeps to one line, and it's cut at a word's
+  end to what the field holds.
+- `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with what it
+  was for (narrator, author, hints, fold, or setup for setup help), the tokens the writer
+  counted before sending (`counted`) and what the model says it used, cache reads included. A
+  call that comes back with no answer is a `ModelError`.
 - `src/prompts/`: the prompts, as Nunjucks templates in `templates/` (`render.ts`). A template
   takes a typed object and only lays it out; a missing value fails the render.
   `procreator/system.njk` is Procreator's instructions; `procreator/head.njk` the brief, in XML
   tags, with the scene so far after a compaction; `procreator/read.njk` a page as `read_page`
   gives it (`partials/page.njk`); `partials/scene.njk` turns word for word (an author note is
   marked as one); `procreator/compact.njk` and `procreator/wrap.njk` the folds' requests, which
-  come last, after the session. Written to the Gemini 3 guides (October 2026).
+  come last, after the session. `suggestions/field-system.njk` and `suggestions/field.njk` are a
+  field's suggestion: the instructions with examples, then the page (`partials/setup.njk`) and
+  the field last. Written to the Gemini 3 guides (October 2026).
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -619,7 +671,9 @@ A Hono API, port 8790, built like breader's server.
   out and gives those left), `POST /v1/accounts/sign-in` (starts one: the page to sign in on,
   and its state), and `GET`, `POST` and `DELETE /v1/accounts/sign-in/:state` (how it stands, the
   address it ended on, and stopping it). Without a proxy or its key they say so, and a key the
-  proxy turns away is told apart from the proxy being down.
+  proxy turns away is told apart from the proxy being down. `POST /v1/suggestions/field`
+  (Procreator's faint text for a field, from the page as it stands), `open` only: a 503 while
+  the AI is offline, a 502 when the model doesn't answer, and a 400 for a field not on the page.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
@@ -647,8 +701,9 @@ A Hono API, port 8790, built like breader's server.
   in them, through the change log; `test/story.test.ts` covers scenes, turns and the log,
   `test/pages.test.ts` links, pages, memory and search, `test/brief.test.ts` the brief and its
   templates, `test/session.test.ts` sessions (the prefix each call keeps, what each provider is
-  asked of its cache, tools, notes, undo), compaction and the wrap-up, and
-  `test/accounts.test.ts` the AI accounts.
+  asked of its cache, tools, notes, undo), compaction and the wrap-up,
+  `test/accounts.test.ts` the AI accounts, and `test/suggestions.test.ts` setup help (the faint
+  text made from an answer, the page's names, and the route).
 
 ### Running it locally
 

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { CAST_LIMIT, everyone, type BookSetup, type Character, type Length, type Pov, type Relationship, type World } from '@writer/shared/book';
+import { CAST_LIMIT, TITLE_LIMIT, everyone, type BookSetup, type Character, type Length, type Pov, type Relationship, type World } from '@writer/shared/book';
 import { IconClose, IconPlus } from '../../components/icons';
 import { Logo } from '../../components/Logo';
 import {
@@ -16,6 +16,7 @@ import { CharacterSheet } from './CharacterSheet';
 import { Choices, Field } from './Fields';
 import { RelationshipGraph } from './RelationshipGraph';
 import { RelationshipSheet } from './RelationshipSheet';
+import { HelpContext, type SetupHelp } from './useGhost';
 import '../add/add.css';
 import './setup.css';
 
@@ -43,6 +44,8 @@ interface FormProps {
   onPovPicked: () => void;
   /** Start or Save, and what's still missing. */
   actions: ReactNode;
+  /** The book, once it's made. */
+  bookId: string | null;
 }
 
 /**
@@ -50,7 +53,7 @@ interface FormProps {
  * relationships as a graph, and the actions at the end. A card opens the character's sheet over
  * the page, and a line in the graph opens the relationship's.
  */
-export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, actions }: FormProps) {
+export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, actions, bookId }: FormProps) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [openPair, setOpenPair] = useState<[string, string] | null>(null);
 
@@ -111,78 +114,82 @@ export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, a
   if (setup.length === 'light_novel') {
     povNotes = { [LIGHT_NOVEL_POV]: 'Light novels usually are' };
   }
+  // Every field on the page and its sheets can ask Procreator about itself, from the page as it stands.
+  const help: SetupHelp = { setup, bookId };
 
   return (
-    <main className="setup">
-      <h1 className="setup-heading">{heading}</h1>
+    <HelpContext value={help}>
+      <main className="setup">
+        <h1 className="setup-heading">{heading}</h1>
 
-      <section className="setup-section" aria-labelledby="setup-book">
-        <h2 id="setup-book">The book</h2>
-        <Field label="Title" value={setup.title} max={120} className="setup-title" placeholder="What it’s called" onChange={(title) => onChange({ ...setup, title })} />
-        <Choices label="Length" choices={LENGTHS} value={setup.length} onPick={pickLength} />
-        <Choices label="Point of view" choices={POVS} value={setup.pov} notes={povNotes} onPick={pickPov} />
-        <Choices label="How dark it goes" choices={DARKNESS} value={setup.darkness} onPick={(darkness) => onChange({ ...setup, darkness })} />
-      </section>
+        <section className="setup-section" aria-labelledby="setup-book">
+          <h2 id="setup-book">The book</h2>
+          <Field label="Title" value={setup.title} max={TITLE_LIMIT} field={{ kind: 'title' }} className="setup-title" placeholder="What it’s called" onChange={(title) => onChange({ ...setup, title })} />
+          <Choices label="Length" choices={LENGTHS} value={setup.length} onPick={pickLength} />
+          <Choices label="Point of view" choices={POVS} value={setup.pov} notes={povNotes} onPick={pickPov} />
+          <Choices label="How dark it goes" choices={DARKNESS} value={setup.darkness} onPick={(darkness) => onChange({ ...setup, darkness })} />
+        </section>
 
-      <section className="setup-section" aria-labelledby="setup-world">
-        <h2 id="setup-world">The world</h2>
-        <p className="setup-hint">All of it is optional. The story fills in whatever you leave blank.</p>
-        <div className="setup-pair">
-          <Field label="Genre" value={setup.world.genre} placeholder="Fantasy, mystery, romance" onChange={(v) => setWorld('genre', v)} />
-          <Field label="Tone" value={setup.world.tone} placeholder="Cosy, grim, funny" onChange={(v) => setWorld('tone', v)} />
-        </div>
-        <Field label="Setting" size="long" value={setup.world.setting} placeholder="When and where" onChange={(v) => setWorld('setting', v)} />
-        <Field label="Rules that matter" size="long" value={setup.world.rules} placeholder="Magic, technology, power" onChange={(v) => setWorld('rules', v)} />
-        <Field label="Notes" size="notes" value={setup.world.notes} placeholder="Anything else about the world" onChange={(v) => setWorld('notes', v)} />
-      </section>
+        <section className="setup-section" aria-labelledby="setup-world">
+          <h2 id="setup-world">The world</h2>
+          <p className="setup-hint">All of it is optional. The story fills in whatever you leave blank.</p>
+          <div className="setup-pair">
+            <Field label="Genre" value={setup.world.genre} placeholder="Fantasy, mystery, romance" field={{ kind: 'world', field: 'genre' }} onChange={(v) => setWorld('genre', v)} />
+            <Field label="Tone" value={setup.world.tone} placeholder="Cosy, grim, funny" field={{ kind: 'world', field: 'tone' }} onChange={(v) => setWorld('tone', v)} />
+          </div>
+          <Field label="Setting" size="long" value={setup.world.setting} placeholder="When and where" field={{ kind: 'world', field: 'setting' }} onChange={(v) => setWorld('setting', v)} />
+          <Field label="Rules that matter" size="long" value={setup.world.rules} placeholder="Magic, technology, power" field={{ kind: 'world', field: 'rules' }} onChange={(v) => setWorld('rules', v)} />
+          <Field label="Notes" size="notes" value={setup.world.notes} placeholder="Anything else about the world" field={{ kind: 'world', field: 'notes' }} onChange={(v) => setWorld('notes', v)} />
+        </section>
 
-      <section className="setup-section" aria-labelledby="setup-cast">
-        <h2 id="setup-cast">The cast</h2>
-        <p className="setup-hint">You play the first. Only names are needed: the story fills in the rest.</p>
-        <div className="cast">
-          <CastCard character={setup.protagonist} plays onOpen={() => setOpenId(setup.protagonist.id)} />
-          {setup.cast.map((character) => (
-            <CastCard key={character.id} character={character} plays={false} onOpen={() => setOpenId(character.id)} />
-          ))}
-          {setup.cast.length < CAST_LIMIT && (
-            <button type="button" className="cast-card cast-add" onClick={addCharacter}>
-              <IconPlus /> Add someone
-            </button>
+        <section className="setup-section" aria-labelledby="setup-cast">
+          <h2 id="setup-cast">The cast</h2>
+          <p className="setup-hint">You play the first. Only names are needed: the story fills in the rest.</p>
+          <div className="cast">
+            <CastCard character={setup.protagonist} plays onOpen={() => setOpenId(setup.protagonist.id)} />
+            {setup.cast.map((character) => (
+              <CastCard key={character.id} character={character} plays={false} onOpen={() => setOpenId(character.id)} />
+            ))}
+            {setup.cast.length < CAST_LIMIT && (
+              <button type="button" className="cast-card cast-add" onClick={addCharacter}>
+                <IconPlus /> Add someone
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className="setup-section" aria-labelledby="setup-relationships">
+          <h2 id="setup-relationships">Relationships</h2>
+          <RelationshipGraph people={people} protagonistId={setup.protagonist.id} relationships={setup.relationships} onOpen={openRelationship} />
+        </section>
+
+        <div className="setup-end">{actions}</div>
+
+        <AnimatePresence>
+          {open && (
+            <CharacterSheet
+              key={open.id}
+              character={open}
+              plays={open.id === setup.protagonist.id}
+              onChange={(character) => onChange(withCharacter(setup, character))}
+              onRemove={() => removeCharacter(open.id)}
+              onClose={closeSheet}
+            />
           )}
-        </div>
-      </section>
-
-      <section className="setup-section" aria-labelledby="setup-relationships">
-        <h2 id="setup-relationships">Relationships</h2>
-        <RelationshipGraph people={people} protagonistId={setup.protagonist.id} relationships={setup.relationships} onOpen={openRelationship} />
-      </section>
-
-      <div className="setup-end">{actions}</div>
-
-      <AnimatePresence>
-        {open && (
-          <CharacterSheet
-            key={open.id}
-            character={open}
-            plays={open.id === setup.protagonist.id}
-            onChange={(character) => onChange(withCharacter(setup, character))}
-            onRemove={() => removeCharacter(open.id)}
-            onClose={closeSheet}
-          />
-        )}
-        {openLine && (
-          <RelationshipSheet
-            key={`${openLine.a.id} ${openLine.b.id}`}
-            relationship={openLine}
-            people={people}
-            protagonistId={setup.protagonist.id}
-            onChange={(relationship) => onChange(withRelationship(setup, relationship))}
-            onUntie={() => untie(openLine.a.id, openLine.b.id)}
-            onClose={() => setOpenPair(null)}
-          />
-        )}
-      </AnimatePresence>
-    </main>
+          {openLine && (
+            <RelationshipSheet
+              key={`${openLine.a.id} ${openLine.b.id}`}
+              relationship={openLine}
+              people={people}
+              protagonistId={setup.protagonist.id}
+              onChange={(relationship) => onChange(withRelationship(setup, relationship))}
+              onUntie={() => untie(openLine.a.id, openLine.b.id)}
+              onClose={() => setOpenPair(null)}
+            />
+          )}
+        </AnimatePresence>
+      </main>
+    </HelpContext>
   );
 }
 

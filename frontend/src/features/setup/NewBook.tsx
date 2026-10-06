@@ -84,6 +84,7 @@ export function NewBook({ color, onMade, onClose }: Props) {
         onChange={setSetup}
         suggestPov={!draft.povChosen}
         onPovPicked={povPicked}
+        bookId={null}
         actions={
           <>
             {note}

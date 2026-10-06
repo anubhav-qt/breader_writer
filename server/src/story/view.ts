@@ -14,13 +14,17 @@ import type { Scene, Turn, Voice } from './scenes.ts';
  * templates only lay it out.
  */
 
-export interface BookView {
-  title: string;
+/** A book's settings, as the prompts give them. */
+export interface SettingsView {
   /** Its length and goal ("a novella of about 30,000 words"). */
   length: string;
   style: string;
   pov: string;
   darkness: string;
+}
+
+export interface BookView extends SettingsView {
+  title: string;
   /** Where the story stands against its length. */
   pacing: string;
 }
@@ -205,20 +209,23 @@ function pacingOf(book: BookRow, number: number): string {
   return `Scene ${number} of about ${about}: ${part}. ${written}`;
 }
 
-function bookView(book: BookRow, number: number): BookView {
-  const length = book.length as Length;
+/** A book's settings, as the prompts give them: its length and style, point of view and how dark it goes. */
+export function settingsView(length: Length, wordGoal: number, pov: Pov, darkness: Darkness): SettingsView {
   let style = CONVENTIONAL;
   if (length === 'light_novel') {
     style = LIGHT_NOVEL;
   }
   return {
-    title: book.title,
-    length: `${LENGTH_NAMES[length]} of about ${words(book.wordGoal)} words`,
+    length: `${LENGTH_NAMES[length]} of about ${words(wordGoal)} words`,
     style,
-    pov: POV_NAMES[book.pov as Pov],
-    darkness: DARKNESS_NAMES[book.darkness as Darkness],
-    pacing: pacingOf(book, number),
+    pov: POV_NAMES[pov],
+    darkness: DARKNESS_NAMES[darkness],
   };
+}
+
+function bookView(book: BookRow, number: number): BookView {
+  const settings = settingsView(book.length as Length, book.wordGoal, book.pov as Pov, book.darkness as Darkness);
+  return { title: book.title, ...settings, pacing: pacingOf(book, number) };
 }
 
 /** Someone in full, as the brief and read_page show them. */

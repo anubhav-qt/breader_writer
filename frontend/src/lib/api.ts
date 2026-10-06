@@ -35,7 +35,11 @@ export class OfflineError extends Error {
   }
 }
 
-async function request<T>(base: Base, method: string, path: string, body?: unknown, timeout = TIMEOUT): Promise<T> {
+/**
+ * One request. It gives up after `timeout`, or when `signal` says nobody wants the answer any
+ * more; the server sees the request go and stops its work too.
+ */
+async function request<T>(base: Base, method: string, path: string, body?: unknown, timeout = TIMEOUT, signal?: AbortSignal): Promise<T> {
   if (navigator.onLine === false) throw new OfflineError(base);
   const init: RequestInit = { method, credentials: 'include' };
   if (body !== undefined) {
@@ -45,6 +49,10 @@ async function request<T>(base: Base, method: string, path: string, body?: unkno
 
   const ctrl = new AbortController();
   const timer = window.setTimeout(() => ctrl.abort(), timeout);
+  const stop = () => ctrl.abort();
+  if (signal) {
+    signal.addEventListener('abort', stop);
+  }
   let res: Response;
   try {
     res = await fetch(BASES[base] + path, { ...init, signal: ctrl.signal });
@@ -52,6 +60,9 @@ async function request<T>(base: Base, method: string, path: string, body?: unkno
     throw new OfflineError(base);
   } finally {
     window.clearTimeout(timer);
+    if (signal) {
+      signal.removeEventListener('abort', stop);
+    }
   }
 
   const data = await res.json().catch(() => null);
@@ -67,7 +78,7 @@ async function request<T>(base: Base, method: string, path: string, body?: unkno
 function client(base: Base) {
   return {
     get: <T>(path: string, timeout?: number) => request<T>(base, 'GET', path, undefined, timeout),
-    post: <T>(path: string, body: unknown = {}, timeout?: number) => request<T>(base, 'POST', path, body, timeout),
+    post: <T>(path: string, body: unknown = {}, timeout?: number, signal?: AbortSignal) => request<T>(base, 'POST', path, body, timeout, signal),
     put: <T>(path: string, body: unknown, timeout?: number) => request<T>(base, 'PUT', path, body, timeout),
     delete: <T>(path: string, timeout?: number) => request<T>(base, 'DELETE', path, undefined, timeout),
   };

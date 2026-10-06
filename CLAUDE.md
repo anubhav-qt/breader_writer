@@ -34,9 +34,10 @@ end against the real model the same day (see "Notes for step 3"). Nothing plays 
 the model picker, the owner signs the proxy's AI accounts in and out. What's left of it is the
 owner's test, which needs the proxy's management key in `server/.env` (only the owner has it).
 Every call now asks each provider for its longest cache (see "Notes for step 3"). Step 5 (setup
-help) is under way: Procreator's faint text in setup's fields is built and was checked in the
-desktop app's browser against a stand-in API (see "Notes for step 5"); the Suggestions chat is
-next. The owner has a real book set up locally that they mean to play
+help) is under way: Procreator's faint text in setup's fields is built, was checked in the
+desktop app's browser against a stand-in API, and was tried against the real model (see "Notes
+for step 5"); what's left of it is a real run in a browser logged in to breader. The
+Suggestions chat is next. The owner has a real book set up locally that they mean to play
 through before production, so its data must survive every change (see "Running it locally").
 See "The code" below for what exists.
 
@@ -399,6 +400,18 @@ Each step ends working, committed, and with a short test checklist for the owner
 - Found while checking it: a sheet's first field (a character's name, a line's bond) asks for
   the focus, but the dialog (`components/Modal.tsx`, from step 1) takes it just after, so the
   field never keeps it.
+- Tried against the real model (2026-10-06): Gemini 3.8 Flash through the owner's Antigravity,
+  at the model's own thinking (no management key yet), through the server's own code with no
+  login, since the desktop app's browser can't load `local.breader.site`. Twelve fields of a
+  sample page, recorded in a scratch database. To watch:
+  - The suggestions were good: they fit the page and its spelling, kept to their field (a name,
+    a few words of tone, a bond), went on from a half-written field without repeating it, and
+    what someone hides fit what the page said they owe.
+  - Each took 7 to 16 seconds, nearly all of it thinking: 400 to 1,400 tokens out for 10 to 60
+    words shown. About 960 tokens go in, under Gemini's 4,096 token minimum, so nothing is
+    cached.
+  - One answer used an em dash (see "Open", 4).
+  - Giving up stopped the call within half a second.
 
 ### Later versions
 
@@ -555,7 +568,8 @@ A Hono API, port 8790, built like breader's server.
     once after `forget`, when an account was signed in or out): which of pi's APIs speaks to
     each, by its id, and the thinking levels each takes. Models that draw pictures are left out.
     Without the management key, nothing is known about them, so they show no thinking levels and
-    pi sends none, and the model thinks at its own default. The default is Gemini 3.8 Flash
+    pi sends none, and the model thinks at its own default; nor is it known which draw pictures,
+    so those show in the picker too. The default is Gemini 3.8 Flash
     (`gemini-3.8-flash-high` as Antigravity names it), thinking high.
   - `settings.ts` decides the model an account's story runs on (`modelInUse`): its choice while
     an account serves it, else the default, else the first; its thinking moves to the nearest

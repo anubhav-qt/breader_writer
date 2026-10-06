@@ -9,7 +9,8 @@ import type { Proxy } from '../src/ai/proxy.ts';
  * through. It answers from what a test hands it (text, tool calls, a thought signature, what it
  * read and what of that came from the cache; the accounts signed in) and turns away the wrong
  * key the way the proxy does. It keeps what each call was sent, so a test can read the prompt,
- * and the sign-ins started, so a test can see them through.
+ * and the sign-ins started, so a test can see them through. Claude's and OpenAI's streaming
+ * routes answer with text only: they're there to show what each is asked of its cache.
  */
 
 export const API_KEY = 'test-api-key';
@@ -95,10 +96,37 @@ export interface GeminiRequest {
   generationConfig?: { thinkingConfig?: { thinkingLevel?: string } };
 }
 
+/** A part of Claude's request that can carry a cache marker: a block of text, or a tool. */
+export interface Marked {
+  type?: string;
+  text?: string;
+  cache_control?: { type: string; ttl?: string };
+}
+
+/** The parts of Claude's request (Anthropic Messages) the tests read. */
+export interface ClaudeRequest {
+  model: string;
+  system?: Marked[];
+  tools?: Marked[];
+  messages: { role: string; content: string | Marked[] }[];
+}
+
+/** The parts of OpenAI's request (Responses) the tests read. */
+export interface ResponsesRequest {
+  model: string;
+  prompt_cache_key?: string;
+  prompt_cache_retention?: string;
+}
+
 export interface FakeProxy {
   url: string;
   served: Served;
+  /** The calls to Gemini's API. */
   asked: Asked[];
+  /** The calls to Claude's API. */
+  askedClaude: ClaudeRequest[];
+  /** The calls to OpenAI's API. */
+  askedOpenAI: ResponsesRequest[];
   /** The sign-ins started, by state. */
   signIns: Map<string, PendingSignIn>;
   close: () => Promise<void>;
@@ -285,17 +313,23 @@ function streamed(model: string, reply: Reply): string {
   return `data: ${JSON.stringify(event)}\n\n`;
 }
 
+/** The next reply in line. The last one answers every call after it. */
+function nextReply(served: Served): Reply {
+  const replies = served.replies ?? [];
+  if (replies.length > 1) {
+    return replies.shift() as Reply;
+  }
+  if (replies.length === 1) {
+    return replies[0];
+  }
+  return { text: '' };
+}
+
 /** Answers a model call, taking the next reply in line. */
 async function reply(served: Served, asked: Asked[], model: string, req: IncomingMessage, res: ServerResponse) {
   const body = JSON.parse(await bodyOf(req)) as GeminiRequest;
   asked.push({ model, body });
-  const replies = served.replies ?? [];
-  let next: Reply = { text: '' };
-  if (replies.length > 1) {
-    next = replies.shift() as Reply;
-  } else if (replies.length === 1) {
-    next = replies[0];
-  }
+  const next = nextReply(served);
   if (next.status) {
     res.writeHead(next.status, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: { code: next.status, message: 'The model is busy.', status: 'UNAVAILABLE' } }));
@@ -305,19 +339,114 @@ async function reply(served: Served, asked: Asked[], model: string, req: Incomin
   res.end(streamed(model, next));
 }
 
+/** An event in a stream, named by its type the way Claude's and OpenAI's APIs name them. */
+function sse(event: { type: string }): string {
+  return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
+/** Claude's streamed reply: the message, its one block of text, and what it used. */
+function streamedClaude(model: string, reply: Reply): string {
+  const read = reply.read ?? 1200;
+  const cached = reply.cached ?? 0;
+  const usage = {
+    input_tokens: read - cached,
+    output_tokens: 1,
+    cache_read_input_tokens: cached,
+    cache_creation_input_tokens: 0,
+  };
+  const message = { id: 'msg_1', type: 'message', role: 'assistant', model, content: [], stop_reason: null, usage };
+  const events = [
+    { type: 'message_start', message },
+    { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: reply.text ?? '' } },
+    { type: 'content_block_stop', index: 0 },
+    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 80 } },
+    { type: 'message_stop' },
+  ];
+  return events.map(sse).join('');
+}
+
+/** OpenAI's streamed reply (Responses): the response, its one message, and what it used. */
+function streamedOpenAI(model: string, reply: Reply): string {
+  const text = reply.text ?? '';
+  const read = reply.read ?? 1200;
+  const usage = {
+    input_tokens: read,
+    input_tokens_details: { cached_tokens: reply.cached ?? 0 },
+    output_tokens: 80,
+    output_tokens_details: { reasoning_tokens: 0 },
+    total_tokens: read + 80,
+  };
+  const content = [{ type: 'output_text', text, annotations: [] }];
+  const started = { type: 'message', id: 'msg_1', role: 'assistant', status: 'in_progress', content: [] };
+  const done = { ...started, status: 'completed', content };
+  const events = [
+    { type: 'response.created', response: { id: 'resp_1', model, status: 'in_progress', output: [] } },
+    { type: 'response.output_item.added', output_index: 0, item: started },
+    { type: 'response.output_text.delta', output_index: 0, content_index: 0, item_id: 'msg_1', delta: text },
+    { type: 'response.output_item.done', output_index: 0, item: done },
+    { type: 'response.completed', response: { id: 'resp_1', model, status: 'completed', output: [done], usage } },
+  ];
+  return events.map(sse).join('');
+}
+
+/** Answers a call to Claude's API, taking the next reply in line. */
+async function replyAsClaude(proxy: FakeProxy, req: IncomingMessage, res: ServerResponse) {
+  const body = JSON.parse(await bodyOf(req)) as ClaudeRequest;
+  proxy.askedClaude.push(body);
+  res.writeHead(200, { 'content-type': 'text/event-stream' });
+  res.end(streamedClaude(body.model, nextReply(proxy.served)));
+}
+
+/** Answers a call to OpenAI's API, taking the next reply in line. */
+async function replyAsOpenAI(proxy: FakeProxy, req: IncomingMessage, res: ServerResponse) {
+  const body = JSON.parse(await bodyOf(req)) as ResponsesRequest;
+  proxy.askedOpenAI.push(body);
+  res.writeHead(200, { 'content-type': 'text/event-stream' });
+  res.end(streamedOpenAI(body.model, nextReply(proxy.served)));
+}
+
+function refuse(res: ServerResponse) {
+  res.writeHead(401, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Invalid API key' }));
+}
+
 export async function fakeProxy(served: Served): Promise<FakeProxy> {
   // Its address and close are filled in once it listens.
-  const proxy: FakeProxy = { url: '', served, asked: [], signIns: new Map(), close: async () => {} };
+  const proxy: FakeProxy = {
+    url: '',
+    served,
+    asked: [],
+    askedClaude: [],
+    askedOpenAI: [],
+    signIns: new Map(),
+    close: async () => {},
+  };
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://proxy');
     const call = url.pathname.match(/^\/v1beta\/models\/([^/:]+):streamGenerateContent$/);
     if (call) {
       if (req.headers['x-goog-api-key'] !== API_KEY) {
-        res.writeHead(401, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid API key' }));
+        refuse(res);
         return;
       }
       void reply(served, proxy.asked, decodeURIComponent(call[1]), req, res);
+      return;
+    }
+    if (url.pathname === '/v1/messages') {
+      if (req.headers['x-api-key'] !== API_KEY) {
+        refuse(res);
+        return;
+      }
+      void replyAsClaude(proxy, req, res);
+      return;
+    }
+    if (url.pathname === '/v1/responses') {
+      if (keyOf(req.headers.authorization) !== API_KEY) {
+        refuse(res);
+        return;
+      }
+      void replyAsOpenAI(proxy, req, res);
       return;
     }
     void answer(proxy, req, url).then(({ status, body }) => {

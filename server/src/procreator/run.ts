@@ -159,6 +159,9 @@ export async function exchange(ai: Procreator, scene: Scene, segment: Segment, a
     apiKey: ai.catalog.proxy.apiKey,
     // Keeps a session's calls on one cache where the provider keys its cache by session.
     sessionId: scene.id,
+    // The owner often takes longer than five minutes over a move, so the cache is asked to last:
+    // an hour on Claude (a write costs a little more, every read far less). Gemini caches by itself.
+    cacheRetention: 'long',
     // One write at a time, in the order asked, so changes land as Procreator meant them.
     toolExecution: 'sequential',
     convertToLlm: (messages) => messages as Message[],

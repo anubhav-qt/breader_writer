@@ -13,7 +13,7 @@ import { findPage } from '../src/story/pages.ts';
 import { addTurn, setReply, type Scene, type Turn } from '../src/story/scenes.ts';
 import { addMessage, currentSegment, cutSession, type Numbered, type Segment } from '../src/story/session.ts';
 import { deps } from './helpers.ts';
-import { antigravity, catalogOf, fakeProxy, promptOf, textsOf, toolsOf, type FakeProxy, type Reply, type Served } from './proxy.ts';
+import { antigravity, catalogOf, fakeProxy, promptOf, textsOf, toolsOf, type FakeProxy, type Marked, type Reply, type Served } from './proxy.ts';
 import { aScene, end, nextScene } from './stories.ts';
 
 const db = deps.db;
@@ -36,6 +36,17 @@ async function procreatorWith(replies: Reply[], userId: string, served: Served =
   }
   const ai: Procreator = { db, catalog, inUse, userId };
   return { proxy, ai };
+}
+
+/** Procreator as procreatorWith makes it, on another model the proxy serves. */
+async function procreatorOn(model: string, replies: Reply[], userId: string, served: Served = antigravity()) {
+  const { proxy, ai } = await procreatorWith(replies, userId, served);
+  const inUse = await modelInUse(ai.catalog, { model, thinking: 'high' });
+  if (inUse?.model.id !== model) {
+    throw new Error(`The fake proxy doesn’t serve ${model}.`);
+  }
+  const on: Procreator = { ...ai, inUse };
+  return { proxy, ai: on };
 }
 
 /** What the proxy serves, with the default model's window and longest answer this small. */
@@ -114,6 +125,34 @@ describe('a scene’s session', () => {
     const recorded = await db.select().from(calls).where(eq(calls.sceneId, scene.id)).orderBy(asc(calls.startedAt));
     expect(recorded.map((call) => call.cacheRead)).toEqual([0, 2000]);
     expect(recorded[1].input).toBe(400);
+  });
+
+  it('asks Claude to keep the session cached for an hour, up to the newest message', async () => {
+    const { userId, scene } = await aScene();
+    const { proxy, ai } = await procreatorOn('claude-sonnet-4-6', [{ text: 'Ren waves back.' }], userId);
+    const { answer } = await play(ai, scene, 'I wave at Ren.');
+    expect(answer.text).toBe('Ren waves back.');
+
+    const [asked] = proxy.askedClaude;
+    const hour = { type: 'ephemeral', ttl: '1h' };
+    expect(asked.system?.at(-1)?.cache_control).toEqual(hour);
+    expect(asked.tools?.at(-1)?.cache_control).toEqual(hour);
+    const newest = asked.messages.at(-1)?.content as Marked[];
+    expect(newest.at(-1)).toMatchObject({ text: 'I wave at Ren.', cache_control: hour });
+  });
+
+  it('keys OpenAI’s cache by the scene, and asks it to last', async () => {
+    const { userId, scene } = await aScene();
+    const served = antigravity();
+    served.models.push({ id: 'gpt-5.5', owned_by: 'codex' });
+    const { proxy, ai } = await procreatorOn('gpt-5.5', [{ text: 'Ren waves back.' }], userId, served);
+    const { answer } = await play(ai, scene, 'I wave at Ren.');
+    expect(answer.text).toBe('Ren waves back.');
+
+    const [asked] = proxy.askedOpenAI;
+    expect(asked.prompt_cache_key).toBe(scene.id);
+    // The real proxy drops this on its way to Codex, whose backend keeps the cache its own way.
+    expect(asked.prompt_cache_retention).toBe('24h');
   });
 
   it('runs the tools Procreator calls, each a change at its turn, and sends their results back', async () => {

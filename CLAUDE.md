@@ -33,7 +33,8 @@ end against the real model the same day (see "Notes for step 3"). Nothing plays 
 (step 6), so what the owner can try of it is the model picker. Step 4 (settings) is built: in
 the model picker, the owner signs the proxy's AI accounts in and out. What's left of it is the
 owner's test, which needs the proxy's management key in `server/.env` (only the owner has it).
-Next is setup help (step 5). The owner has a real book set up locally that they mean to play
+Every call now asks each provider for its longest cache (see "Notes for step 3"). Next is setup
+help (step 5). The owner has a real book set up locally that they mean to play
 through before production, so its data must survive every change (see "Running it locally").
 See "The code" below for what exists.
 
@@ -295,11 +296,25 @@ Each step ends working, committed, and with a short test checklist for the owner
   summed the scene up well, keeping what each hides. To watch:
   - The wrap-up saved one thing per call (13 calls for two moves), though Gemini can make
     several calls at once. Fine for quality, slow on a long scene.
-  - Cache reads came back 0 on every call, even past Gemini's 4,096 token minimum: Antigravity
-    may not cache, or the proxy may not pass the count on.
+  - Cache reads came back 0 on every call, even past Gemini's 4,096 token minimum. It isn't the
+    proxy or the writer (see the caching note below): Antigravity's backend reported none.
   - Without `CLIPROXY_MANAGEMENT_KEY` the catalog knows no thinking levels and takes the window
     as 128k, so compaction would start at 96k instead of 400k. The key comes from the owner.
   - Its prose uses em dashes (see "Open").
+- Caching, checked against CLIProxyAPI 8.0.5's source (2026-10-06). Every exchange asks for the
+  long cache (`cacheRetention: 'long'`) under the scene's id (`sessionId`), since the owner
+  often takes longer than five minutes over a move:
+  - Claude: pi marks the instructions, the last tool and the newest message to stay cached for
+    an hour. With a Claude sign-in, the proxy places the marks itself, the way Claude Code does,
+    and makes them an hour too, within Claude's limit of four.
+  - Codex: the cache is keyed by the scene (`prompt_cache_key`), which the proxy also sends as
+    the session. The proxy drops the 24 hour retention on the way, so Codex keeps the cache as
+    long as it keeps it.
+  - Gemini (Antigravity): nothing to ask; a prefix it has seen is cached by itself. The proxy
+    passes its usage on whole, cached tokens included, and keys the session by the first
+    message (the head), which stays the same through a segment. Antigravity has reported no
+    cached tokens so far: either its backend doesn't cache these calls or it doesn't say. Keep
+    the start steady anyway, in case it does.
 
 ### Notes for step 4
 
@@ -530,7 +545,8 @@ A Hono API, port 8790, built like breader's server.
     declarations, the head, the segment's messages) plus one message, through pi's agent loop,
     tools run one at a time, with no cap on calls or time (a stuck run is stopped by hand,
     through its signal). Every message is kept as it ends and every call
-    recorded, so the next call sends exactly this one's start and the cache holds.
+    recorded, so the next call sends exactly this one's start and the cache holds. It asks for
+    the long cache, under the scene's id (see the caching note in "Notes for step 3").
     `sessionTokens` is pi's estimate: the tokens the model last said it read, plus what came
     after.
   - `folds.ts`: our compaction. `compactAt` is 400k, or the window less the longest answer when
@@ -595,13 +611,16 @@ A Hono API, port 8790, built like breader's server.
   writer. If breader upgrades Better Auth, upgrade it here too and run the tests. `test/proxy.ts`
   is a stand-in for CLIProxyAPI, so no test reaches a real model: it answers Gemini's streaming
   route with the replies a test hands it (text, tool calls, a thought signature, the tokens
-  read and cached) and keeps what each call was sent. It also answers the management routes the
+  read and cached) and keeps what each call was sent. Claude's and OpenAI's streaming routes
+  answer with text only, to show what each is asked of its cache (`askedClaude`,
+  `askedOpenAI`). It also answers the management routes the
   accounts use (the accounts, signing out, and sign-ins, kept in `signIns`); signing out the
   last account of a kind drops that kind's models. `test/stories.ts` makes books with stories
   in them, through the change log; `test/story.test.ts` covers scenes, turns and the log,
   `test/pages.test.ts` links, pages, memory and search, `test/brief.test.ts` the brief and its
-  templates, `test/session.test.ts` sessions (the prefix each call keeps, tools, notes, undo),
-  compaction and the wrap-up, and `test/accounts.test.ts` the AI accounts.
+  templates, `test/session.test.ts` sessions (the prefix each call keeps, what each provider is
+  asked of its cache, tools, notes, undo), compaction and the wrap-up, and
+  `test/accounts.test.ts` the AI accounts.
 
 ### Running it locally
 
@@ -687,7 +706,8 @@ Procreator.
 - **Cache wherever possible** (the owner's words). A cached prefix costs a fraction of a fresh
   one and changes nothing in the answer, so it's the one way to save tokens that fits quality
   first. Keep every session's and actor's chat start the same from call to call, and ask each
-  provider for its cache where it has to be asked.
+  provider for its cache where it has to be asked: for as long as it keeps one, and keyed by
+  the session where it takes a key (see the caching note in "Notes for step 3").
 
 ### Procreator's memory
 

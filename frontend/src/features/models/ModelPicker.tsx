@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ThinkingLevel, type ModelChoice, type ModelInfo, type Settings } from '@writer/shared/protocol';
 import { IconCheck, IconChevron } from '../../components/icons';
@@ -7,6 +7,9 @@ import { contextName, fetchSettings, picksThinking, providerName, saveChoice, th
 import { failureText } from '../../lib/api';
 import { springs } from '../../lib/springs';
 import '../account/account.css';
+import '../add/add.css';
+import { AccountsSection } from './Accounts';
+import { useAccounts, type Accounts } from './useAccounts';
 import './models.css';
 
 /** The settings as last heard, or why there are none. */
@@ -60,31 +63,33 @@ function chipText(loaded: Loaded): string {
 }
 
 /**
- * The header's model picker: the model the owner's stories run on, and how hard it thinks, for
- * every book. It drops down the models the accounts signed in to Procreator's proxy serve. Built from
- * what the library has: its ghost button, the account menu's dropdown, and breader's segmented
- * control.
+ * The header's model picker: the model the account's stories run on, and how hard it thinks, for
+ * every book. It drops down the models the accounts signed in to Procreator's proxy serve, and
+ * for the owner, those accounts, to sign in and out. Built from what the library has: its ghost
+ * button, the account menu's dropdown, and breader's segmented control.
  */
-export function ModelPicker() {
+export function ModelPicker({ owner }: { owner: boolean }) {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState<Loaded>({ state: 'waiting' });
   const [message, setMessage] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const settings = await fetchSettings();
       setLoaded({ state: 'ready', settings });
     } catch {
       setLoaded({ state: 'failed' });
     }
-  };
+  }, []);
+
+  const accounts = useAccounts(owner, open, load);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
-  // Opening it asks again, so a model just signed in at Procreator shows up.
+  // Opening it asks again, so a model just signed in shows up.
   useEffect(() => {
     if (!open) {
       setMessage(null);
@@ -107,7 +112,7 @@ export function ModelPicker() {
       window.removeEventListener('pointerdown', away);
       window.removeEventListener('keydown', esc);
     };
-  }, [open]);
+  }, [open, load]);
 
   /** Shows the choice at once, then keeps what the server answers, or goes back if it says no. */
   const choose = async (settings: Settings, choice: ModelChoice) => {
@@ -161,6 +166,8 @@ export function ModelPicker() {
             <Menu
               loaded={loaded}
               message={message}
+              owner={owner}
+              accounts={accounts}
               onRetry={() => void load()}
               onModel={pickModel}
               onThinking={pickThinking}
@@ -175,12 +182,14 @@ export function ModelPicker() {
 interface MenuProps {
   loaded: Loaded;
   message: string | null;
+  owner: boolean;
+  accounts: Accounts;
   onRetry: () => void;
   onModel: (settings: Settings, model: ModelInfo) => void;
   onThinking: (settings: Settings, thinking: ThinkingLevel) => void;
 }
 
-function Menu({ loaded, message, onRetry, onModel, onThinking }: MenuProps) {
+function Menu({ loaded, message, owner, accounts, onRetry, onModel, onThinking }: MenuProps) {
   if (loaded.state === 'waiting') {
     return <div className="acct-verify">Asking for the models…</div>;
   }
@@ -201,8 +210,24 @@ function Menu({ loaded, message, onRetry, onModel, onThinking }: MenuProps) {
       </div>
     );
   }
+  // The owner signs the accounts in and out below the models. While the proxy is offline there's
+  // nothing to sign in to, so they wait with the models.
+  let accountsPart: ReactNode = null;
+  if (owner) {
+    accountsPart = (
+      <>
+        <div className="acct-sep" />
+        <AccountsSection accounts={accounts} />
+      </>
+    );
+  }
   if (settings.models.length === 0) {
-    return <div className="acct-verify">No models yet. Sign an account in from Procreator’s settings.</div>;
+    return (
+      <>
+        <div className="acct-verify">No models yet: no AI account is signed in.</div>
+        {accountsPart}
+      </>
+    );
   }
 
   const current = modelIn(settings, settings.using.model);
@@ -232,7 +257,8 @@ function Menu({ loaded, message, onRetry, onModel, onThinking }: MenuProps) {
       {!picksThinking(current) && <div className="acct-verify">It thinks at its own pace.</div>}
       {message && <p className="acct-message" role="status">{message}</p>}
       <div className="acct-sep" />
-      <div className="acct-verify">For every book. Accounts are signed in at Procreator.</div>
+      <div className="acct-verify">For every book.</div>
+      {accountsPart}
     </>
   );
 }

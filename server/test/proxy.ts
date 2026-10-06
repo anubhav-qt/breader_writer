@@ -4,10 +4,12 @@ import { Catalog } from '../src/ai/catalog.ts';
 import type { Proxy } from '../src/ai/proxy.ts';
 
 /*
- * A stand-in for CLIProxyAPI: the two routes the writer reads, and Gemini's streaming route for a
- * model's reply, answering from what a test hands it (text, tool calls, a thought signature, what
- * it read and what of that came from the cache) and turning away the wrong key the way the proxy
- * does. It keeps what each call was sent, so a test can read the prompt.
+ * A stand-in for CLIProxyAPI: the models it lists and what it knows about them, Gemini's
+ * streaming route for a model's reply, and the management routes the owner's accounts go
+ * through. It answers from what a test hands it (text, tool calls, a thought signature, what it
+ * read and what of that came from the cache; the accounts signed in) and turns away the wrong
+ * key the way the proxy does. It keeps what each call was sent, so a test can read the prompt,
+ * and the sign-ins started, so a test can see them through.
  */
 
 export const API_KEY = 'test-api-key';
@@ -36,6 +38,29 @@ export interface Reply {
   cached?: number;
 }
 
+/** An account signed in to the proxy, as its management API lists it. */
+export interface Credential {
+  name: string;
+  provider: string;
+  email?: string;
+  label?: string;
+  status?: string;
+  status_message?: string;
+  disabled?: boolean;
+  unavailable?: boolean;
+}
+
+/** A sign-in the proxy has started, and how it stands. A test moves it along. */
+export interface PendingSignIn {
+  provider: string;
+  /** Whether it was asked to listen for the callback on its own machine. */
+  webui: boolean;
+  status: 'wait' | 'ok' | 'error';
+  error?: string;
+  /** What the callback route was handed, once it was. */
+  callback?: Record<string, unknown>;
+}
+
 export interface Served {
   /** What /v1/models lists. */
   models: { id: string; owned_by: string }[];
@@ -43,6 +68,8 @@ export interface Served {
   definitions: Record<string, unknown[]>;
   /** What the models answer, in turn. The last one answers every call after it. */
   replies?: Reply[];
+  /** The accounts signed in. */
+  credentials?: Credential[];
 }
 
 /** A call to a model: which one, and the request Gemini's API was sent. */
@@ -72,6 +99,8 @@ export interface FakeProxy {
   url: string;
   served: Served;
   asked: Asked[];
+  /** The sign-ins started, by state. */
+  signIns: Map<string, PendingSignIn>;
   close: () => Promise<void>;
 }
 
@@ -114,20 +143,105 @@ function keyOf(header: string | undefined): string {
   return header.replace(/^Bearer /, '');
 }
 
-function answer(served: Served, path: string, key: string): { status: number; body: unknown } {
-  if (path === '/v1/models') {
+interface Answer {
+  status: number;
+  body: unknown;
+}
+
+const MANAGEMENT = '/v8/management';
+
+/** Starts a sign-in, the way the proxy hands out its provider's sign-in page. */
+function startSignIn(signIns: Map<string, PendingSignIn>, url: URL): Answer {
+  const provider = url.searchParams.get('provider') ?? '';
+  const state = `state-${signIns.size + 1}`;
+  const webui = url.searchParams.get('is_webui') === 'true';
+  signIns.set(state, { provider, webui, status: 'wait' });
+  const page = `https://sign-in.example/${provider}?state=${state}`;
+  return { status: 200, body: { status: 'ok', url: page, state } };
+}
+
+function signInStatus(signIns: Map<string, PendingSignIn>, url: URL): Answer {
+  const signIn = signIns.get(url.searchParams.get('state') ?? '');
+  if (!signIn) {
+    return { status: 200, body: { status: 'error', error: 'unknown or expired state' } };
+  }
+  if (signIn.status === 'error') {
+    return { status: 200, body: { status: 'error', error: signIn.error } };
+  }
+  return { status: 200, body: { status: signIn.status } };
+}
+
+function takeCallback(signIns: Map<string, PendingSignIn>, sent: Record<string, unknown>): Answer {
+  const signIn = signIns.get(String(sent.state ?? ''));
+  if (!signIn) {
+    return { status: 404, body: { status: 'error', error: 'unknown or expired state' } };
+  }
+  signIn.callback = sent;
+  return { status: 200, body: { status: 'ok' } };
+}
+
+/** Signs an account out. Once no account of its kind is left, that kind's models go too. */
+function signOut(served: Served, url: URL): Answer {
+  const name = url.searchParams.get('name') ?? '';
+  const before = served.credentials ?? [];
+  const leaving = before.find((credential) => credential.name === name);
+  if (!leaving) {
+    return { status: 404, body: { error: 'file not found' } };
+  }
+  const after = before.filter((credential) => credential !== leaving);
+  served.credentials = after;
+  const kindLeft = after.some((credential) => credential.provider === leaving.provider);
+  if (!kindLeft) {
+    served.models = served.models.filter((model) => model.owned_by !== leaving.provider);
+  }
+  return { status: 200, body: { status: 'ok' } };
+}
+
+/** The management routes the writer uses. The callback takes no key, as the proxy's doesn't. */
+async function manage(proxy: FakeProxy, req: IncomingMessage, url: URL, key: string): Promise<Answer> {
+  const path = url.pathname.slice(MANAGEMENT.length);
+  const method = req.method ?? 'GET';
+  if (path === '/oauth/callback' && method === 'POST') {
+    const sent = JSON.parse(await bodyOf(req)) as Record<string, unknown>;
+    return takeCallback(proxy.signIns, sent);
+  }
+  if (key !== MANAGEMENT_KEY) {
+    return { status: 401, body: { error: 'invalid management key' } };
+  }
+  const definitions = path.match(/^\/routing\/model-definitions\/([^/]+)$/);
+  if (definitions) {
+    const provider = decodeURIComponent(definitions[1]);
+    return { status: 200, body: { models: proxy.served.definitions[provider] ?? [] } };
+  }
+  if (path === '/credentials' && method === 'GET') {
+    return { status: 200, body: { files: proxy.served.credentials ?? [] } };
+  }
+  if (path === '/credentials' && method === 'DELETE') {
+    return signOut(proxy.served, url);
+  }
+  if (path === '/oauth/auth-url' && method === 'GET') {
+    return startSignIn(proxy.signIns, url);
+  }
+  if (path === '/oauth/status' && method === 'GET') {
+    return signInStatus(proxy.signIns, url);
+  }
+  if (path === '/oauth/session' && method === 'DELETE') {
+    const cancelled = proxy.signIns.delete(url.searchParams.get('state') ?? '');
+    return { status: 200, body: { status: 'ok', cancelled } };
+  }
+  return { status: 404, body: { error: 'not found' } };
+}
+
+async function answer(proxy: FakeProxy, req: IncomingMessage, url: URL): Promise<Answer> {
+  const key = keyOf(req.headers.authorization);
+  if (url.pathname === '/v1/models') {
     if (key !== API_KEY) {
       return { status: 401, body: { error: 'Invalid API key' } };
     }
-    return { status: 200, body: { object: 'list', data: served.models } };
+    return { status: 200, body: { object: 'list', data: proxy.served.models } };
   }
-  const definitions = path.match(/^\/v8\/management\/routing\/model-definitions\/([^/]+)$/);
-  if (definitions) {
-    if (key !== MANAGEMENT_KEY) {
-      return { status: 401, body: { error: 'invalid management key' } };
-    }
-    const provider = decodeURIComponent(definitions[1]);
-    return { status: 200, body: { models: served.definitions[provider] ?? [] } };
+  if (url.pathname.startsWith(MANAGEMENT + '/')) {
+    return manage(proxy, req, url, key);
   }
   return { status: 404, body: { error: 'not found' } };
 }
@@ -192,31 +306,30 @@ async function reply(served: Served, asked: Asked[], model: string, req: Incomin
 }
 
 export async function fakeProxy(served: Served): Promise<FakeProxy> {
-  const asked: Asked[] = [];
+  // Its address and close are filled in once it listens.
+  const proxy: FakeProxy = { url: '', served, asked: [], signIns: new Map(), close: async () => {} };
   const server: Server = createServer((req, res) => {
-    const path = new URL(req.url ?? '/', 'http://proxy').pathname;
-    const call = path.match(/^\/v1beta\/models\/([^/:]+):streamGenerateContent$/);
+    const url = new URL(req.url ?? '/', 'http://proxy');
+    const call = url.pathname.match(/^\/v1beta\/models\/([^/:]+):streamGenerateContent$/);
     if (call) {
       if (req.headers['x-goog-api-key'] !== API_KEY) {
         res.writeHead(401, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid API key' }));
         return;
       }
-      void reply(served, asked, decodeURIComponent(call[1]), req, res);
+      void reply(served, proxy.asked, decodeURIComponent(call[1]), req, res);
       return;
     }
-    const { status, body } = answer(served, path, keyOf(req.headers.authorization));
-    res.writeHead(status, { 'content-type': 'application/json' });
-    res.end(JSON.stringify(body));
+    void answer(proxy, req, url).then(({ status, body }) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+    });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
-  return {
-    url: `http://127.0.0.1:${port}`,
-    served,
-    asked,
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
-  };
+  proxy.url = `http://127.0.0.1:${port}`;
+  proxy.close = () => new Promise<void>((resolve) => server.close(() => resolve()));
+  return proxy;
 }
 
 /** A fresh catalog of the fake proxy's models, with the management key or without. */

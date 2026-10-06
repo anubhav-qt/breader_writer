@@ -199,7 +199,7 @@ export default function App() {
   } else {
     let picker: ReactNode = null;
     if (canWrite) {
-      picker = <ModelPicker />;
+      picker = <ModelPicker owner={account.me?.owner === true} />;
     }
     page = (
       <div className="lib">

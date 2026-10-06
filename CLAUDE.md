@@ -30,10 +30,12 @@ model and thinking level. Procreator's memory was redesigned after the owner's r
 database, the reference and memory Procreator keeps with its tools, the change log, and our own
 compaction (`server/src/story/`, `server/src/procreator/`, `server/src/prompts/`). It ran end to
 end against the real model the same day (see "Notes for step 3"). Nothing plays a story yet
-(step 6), so what the owner can try of it is the model picker. Next is settings (step 4). The
-owner has a real
-book set up locally that they mean to play through before production, so its data must survive
-every change (see "Running it locally"). See "The code" below for what exists.
+(step 6), so what the owner can try of it is the model picker. Step 4 (settings) is built: in
+the model picker, the owner signs the proxy's AI accounts in and out. What's left of it is the
+owner's test, which needs the proxy's management key in `server/.env` (only the owner has it).
+Next is setup help (step 5). The owner has a real book set up locally that they mean to play
+through before production, so its data must survive every change (see "Running it locally").
+See "The code" below for what exists.
 
 ### Decided
 
@@ -79,9 +81,11 @@ every change (see "Running it locally"). See "The code" below for what exists.
 - **The model is picked in the header.** A chip by the account (the model's name and its
   thinking level) drops down the models the accounts serve, and a thinking control below them.
   Always in sight, one tap away. One pick per account, for every book.
-- **Settings is where AI accounts are signed in.** The owner signs the shared accounts in and
-  out there (the free chapter's Antigravity first); only the owner sees them. Later it's where
-  every writer brings their own AI. Its look is asked before it's built.
+- **Settings live in the model picker.** Below the models and "For every book.", only the owner
+  sees "AI accounts": every account signed in to the proxy (its kind, its email, and why it
+  can't serve if it can't), each with Sign out and a confirm in place, then "Sign in:
+  Antigravity, ChatGPT, Claude". The owner is whoever's email is in `OWNER_EMAILS`. Other
+  writers see only the models. Later it's where every writer brings their own AI.
 - **Anyone can write, with their own AI.** A writer brings their own: an API key (BYOK), or a
   sign-in with a subscription they already have (Claude Code, Codex, Antigravity and the like).
   Everyone's first chapter is free, on the owner's own Antigravity account (the one signed in to
@@ -178,8 +182,8 @@ every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Open (ask the owner one at a time, in roughly this order)
 
-1. Design direction for each new screen (settings, setup's suggestions, play, cast sheets),
-   asked when we reach it. The library and the book view start as copies of breader's pages;
+1. Design direction for each new screen (setup's suggestions, play, cast sheets), asked when
+   we reach it. The library and the book view start as copies of breader's pages;
    where the owner writes, the writer goes past breader (see "Writing gets a feel of its own").
 2. Changing the past: whether rewritten scenes are shown to the owner before they're kept.
    Asked when we reach it (step 7).
@@ -207,8 +211,9 @@ Each step ends working, committed, and with a short test checklist for the owner
    AI" below): the durable story state with every version kept, a session per scene that opens
    with a brief built from it, the reference and memory Procreator keeps with its tools, and our
    own compaction. Nunjucks prompt templates and their tests.
-4. **Settings.** Where the owner signs CLIProxyAPI's accounts in and out (Antigravity first),
-   through its management API, and sees which are signed in. Only the owner sees them.
+4. **Settings.** In the model picker, where the owner signs CLIProxyAPI's accounts in and out
+   (Antigravity first), through its management API, and sees which are signed in. Only the
+   owner sees them.
 5. **Setup help.** Procreator's suggestion in whichever setup field is clicked into (faint text,
    taken with Tab or the right arrow key), and the Suggestions chat, which makes the agreed
    changes itself once the owner approves them.
@@ -290,6 +295,28 @@ Each step ends working, committed, and with a short test checklist for the owner
 
 ### Notes for step 4
 
+- The proxy here is CLIProxyAPI 8.0.5 (Homebrew, port 8317). The writer uses its v8 management
+  API, under `/v8/management`. Sources: `github.com/router-for-me/CLIProxyAPI`,
+  `docs/management-api-v8.md` and `internal/api/handlers/management/`.
+  - `GET /credentials` lists the accounts (`files`, each with `name`, `provider`, `email`,
+    `label`, `status`, `status_message`, `disabled` and `unavailable`), and
+    `DELETE /credentials?name=<file>` signs one out.
+  - `GET /oauth/auth-url?provider=antigravity|codex|claude&is_webui=true` starts a sign-in
+    (`url`, `state`), and `GET /oauth/status?state=` answers `wait`, `ok`, or `error` with a
+    reason. `POST /oauth/callback` (`state`, `redirect_url`, no key needed) hands the proxy the
+    address the sign-in ended on, and `DELETE /oauth/session?state=` stops waiting.
+- `is_webui=true` has the proxy listen for the provider's callback on its own machine
+  (Antigravity on 51121, Codex 1455, Claude 54545), and it waits 5 minutes. With the browser on
+  that machine too, the sign-in finishes by itself. Anywhere else (production) the last page
+  can't load, so the owner pastes its address into the box under the sign-in.
+- Five wrong management keys in a row ban the caller's address for 30 minutes, local callers
+  included (a ban answers 403, a wrong key 401). The catalog spends one try per kind of account
+  each time it reads the models (once a minute at most, and at once after a sign-in or out), so
+  a wrong key gets there within minutes. Only the owner has the key.
+- Signing in opens the provider's page in a new tab, opened in the click handler (so the browser
+  allows it) with no opener, then sent to the page once the server answers. The picker asks
+  after the sign-in every 2 seconds; that lives in the picker, not its menu, so it goes on while
+  the menu is closed.
 - The login dialog's fields showed Dongle at 22px instead of the interface font, from step 1 on.
   Breader's App imports its Add a book dialog (and `add.css`) before the account menu; the writer
   dropped that dialog, so the account menu's `account.css` loads first, and add.css's field
@@ -323,7 +350,9 @@ their code, changed where we need, not rewritten to ours.
 ### `shared/` (`@writer/shared`)
 
 - `src/protocol.ts`: the zod shapes the server and the app exchange (`Me`, `Access`,
-  `BookCard`, `BookList`). Change a shape here and both sides get the type error.
+  `BookCard`, `BookList`, `Settings`, and the AI accounts and their sign-ins: `AiAccount`,
+  `SignIn`, `SignInStatus`, `SignInAddress`). Change a shape here and both sides get the type
+  error.
 - `src/book.ts`: what a book is set up with (`BookSetup`): its length (and each length's word
   goal), point of view, darkness (the content level), its world, its characters' sheets and the
   relationships between them (a bond and two sides, `Relationship`). The app makes each
@@ -348,10 +377,10 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   app's own address; the dev server proxies it to port 8790) and breader's (`VITE_BREADER_API_URL`,
   default `https://api.breader.site`) for logging in. A writer API that can't be reached throws
   `OfflineError`.
-- `src/lib/account.ts`: the account and its access from `/v1/me`, remembered under
-  `writer.me.v1`. Logging in, signing up, Google, reset links and logging out all go to breader's
-  Better Auth; reset and confirm links open breader. While the server is down it's asked again
-  every minute, so the writer comes back by itself.
+- `src/lib/account.ts`: the account, its access and whether it's the owner, from `/v1/me`,
+  remembered under `writer.me.v1`. Logging in, signing up, Google, reset links and logging out
+  all go to breader's Better Auth; reset and confirm links open breader. While the server is
+  down it's asked again every minute, so the writer comes back by itself.
 - `src/data/books.ts`: a book as its card shows it, its length's name, and how much is written
   (words written over the goal, 0 to 1).
 - `src/data/setup.ts`: a setup while it's being made: the choices' names and descriptions,
@@ -371,9 +400,15 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   for an account that can write. The chip says the model and its thinking level; it drops down
   the models (`GET /v1/settings`, asked again on each opening) and the thinking levels the
   model takes. It's built from what's there: the library's ghost button, the account menu's
-  dropdown and items (`account.css`), and breader's segmented control (`components/Segmented.tsx`,
-  copied from breader's reader settings); `models.css` only adds what those lack. A pick shows at once and is saved (`PUT /v1/settings`), and goes back if the
-  server says no. Moving to another model keeps the thinking level, or the nearest it takes.
+  dropdown and items (`account.css`), breader's segmented control (`components/Segmented.tsx`,
+  copied from breader's reader settings), and the Add a book dialog's field and buttons
+  (`add.css`); `models.css` only adds what those lack. A pick shows at once and is saved
+  (`PUT /v1/settings`), and goes back if the server says no. Moving to another model keeps the
+  thinking level, or the nearest it takes. For the owner the menu goes on to the AI accounts
+  (`Accounts.tsx`, with the server calls in `src/data/accounts.ts`). `useAccounts.ts` keeps them
+  in the picker rather than its menu, so a sign-in goes on being asked after while the menu is
+  closed. What opens at the menu's end (a sign-out's confirm, a sign-in's wait) scrolls itself
+  into view.
 - `src/features/gallery/`: breader's cards, bento and shelves, without series, genres, real
   covers, editing or sharing. A card fills with the book's colour as it's written; the two most
   recent get a drawn cover. Below Recent, once there are more than 9, every book again by date.
@@ -392,8 +427,10 @@ A Hono API, port 8790, built like breader's server.
 - `src/env.ts`: every setting, validated with zod. `DATABASE_URL` is the writer's tables;
   `BREADER_DATABASE_URL` is where breader's logins are (unset in production, where it's the same
   Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
-  the invite list. `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are the
-  CLIProxyAPI the models come through; no URL means the AI is offline.
+  the invite list, and `OWNER_EMAILS` who signs the AI accounts in and out (each a writer too).
+  `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are the CLIProxyAPI the
+  models come through; no URL means the AI is offline, and no management key means no thinking
+  levels and no accounts to manage.
 - `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`: `books` (owner's
   breader user id, title, colour, length, word goal, words written, point of view, darkness),
   `worlds` (one per book), `characters` (role `protagonist` or `cast`, in order; the key is the
@@ -413,15 +450,21 @@ A Hono API, port 8790, built like breader's server.
   characters who stay and removes only those who left, since later steps hang the story off
   them. Relationships are written whole on each save, and read back in pair order.
 - `src/ai/`: the models.
-  - `proxy.ts` reads CLIProxyAPI: the models its accounts serve (`/v1/models`, with
-    the API key), and what it knows about them (the management API's model definitions, with the
-    management key, read only). Answers are checked with zod; a proxy that can't be reached or
-    says no is a `ProxyError`.
-  - `catalog.ts` turns those into pi models (`Catalog`, read again once a minute at most): which
-    of pi's APIs speaks to each, by its id, and the thinking levels each takes. Models that draw
-    pictures are left out. Without the management key, nothing is known about them, so they
-    show no thinking levels and pi sends none, and the model thinks at its own default. The
-    default is Gemini 3.8 Flash (`gemini-3.8-flash-high` as Antigravity names it), thinking high.
+  - `proxy.ts` speaks to CLIProxyAPI: the models its accounts serve (`/v1/models`, with the API
+    key), and its management API (`manage`, under `/v8/management`, with the management key):
+    what it knows about the models, and the accounts. Answers are checked with zod; a proxy that
+    can't be reached or says no is a `ProxyError`, with its own words for why (`reason`) when it
+    gave them.
+  - `accounts.ts`: the AI accounts signed in to the proxy. Listing them (and why one can't
+    serve), signing one out, and signing one in: `startSignIn` (with `is_webui`, so the proxy
+    takes the callback itself), `signInStatus`, `finishSignIn` with the address the sign-in
+    ended on (once `addressProblem` has checked it's this sign-in's), and `cancelSignIn`.
+  - `catalog.ts` turns those into pi models (`Catalog`, read again once a minute at most, and at
+    once after `forget`, when an account was signed in or out): which of pi's APIs speaks to
+    each, by its id, and the thinking levels each takes. Models that draw pictures are left out.
+    Without the management key, nothing is known about them, so they show no thinking levels and
+    pi sends none, and the model thinks at its own default. The default is Gemini 3.8 Flash
+    (`gemini-3.8-flash-high` as Antigravity names it), thinking high.
   - `settings.ts` decides the model an account's story runs on (`modelInUse`): its choice while
     an account serves it, else the default, else the first; its thinking moves to the nearest
     level the model takes.
@@ -513,11 +556,18 @@ A Hono API, port 8790, built like breader's server.
 - `src/lib/access.ts`: `accessFor` decides `logged_out`, `unconfirmed`, `invite_only` or
   `open`; `requireWriter` guards routes that need `open`. An unconfirmed address is told so
   before the list is checked, so nobody learns whether an email they don't own is invited.
-- `src/routes/`: `GET /health`; `GET /v1/me` (the account and its access, for anyone);
+  `isOwner` is a writer whose email is in `OWNER_EMAILS`; `requireOwner` guards the accounts.
+- `src/routes/`: `GET /health`; `GET /v1/me` (the account, its access and whether it's the
+  owner, for anyone);
   `GET /v1/books` (the account's books, most recent first), `POST /v1/books` (make one from its
   setup), and `GET` and `PUT /v1/books/:id/setup` (what it was set up with), all `open` only.
   Another account's book is a 404, the same as no book. `GET` and `PUT /v1/settings` (the model
   in use and every model to pick from, or `models: null` while the AI is offline), `open` only.
+  The AI accounts, the owner's only: `GET /v1/accounts`, `DELETE /v1/accounts/:id` (signs one
+  out and gives those left), `POST /v1/accounts/sign-in` (starts one: the page to sign in on,
+  and its state), and `GET`, `POST` and `DELETE /v1/accounts/sign-in/:state` (how it stands, the
+  address it ended on, and stopping it). Without a proxy or its key they say so, and a key the
+  proxy turns away is told apart from the proxy being down.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
@@ -537,11 +587,13 @@ A Hono API, port 8790, built like breader's server.
   writer. If breader upgrades Better Auth, upgrade it here too and run the tests. `test/proxy.ts`
   is a stand-in for CLIProxyAPI, so no test reaches a real model: it answers Gemini's streaming
   route with the replies a test hands it (text, tool calls, a thought signature, the tokens
-  read and cached) and keeps what each call was sent. `test/stories.ts` makes books with stories
+  read and cached) and keeps what each call was sent. It also answers the management routes the
+  accounts use (the accounts, signing out, and sign-ins, kept in `signIns`); signing out the
+  last account of a kind drops that kind's models. `test/stories.ts` makes books with stories
   in them, through the change log; `test/story.test.ts` covers scenes, turns and the log,
   `test/pages.test.ts` links, pages, memory and search, `test/brief.test.ts` the brief and its
-  templates, and `test/session.test.ts` sessions (the prefix each call keeps, tools, notes,
-  undo), compaction and the wrap-up.
+  templates, `test/session.test.ts` sessions (the prefix each call keeps, tools, notes, undo),
+  compaction and the wrap-up, and `test/accounts.test.ts` the AI accounts.
 
 ### Running it locally
 
@@ -553,9 +605,12 @@ writer reads that login. Only the writer's own tables are local.
 2. `npm run dev:env` (`scripts/dev-env.mjs`) writes `server/.env` from breader's `infra/.env`:
    `SESSION_SECRET`, `COOKIE_SECURE`, and `PRIMARY_URL` and `PRIMARY_SSL` as
    `BREADER_DATABASE_URL` and `BREADER_DATABASE_SSL`. From the CLIProxyAPI Homebrew runs here
-   (`/opt/homebrew/etc/cliproxyapi.conf`) it takes `CLIPROXY_URL` and `CLIPROXY_API_KEY`. It prints none of them and keeps the rest of `server/.env`. The invited
-   emails go in `WRITER_EMAILS` there, and the proxy's management key in
-   `CLIPROXY_MANAGEMENT_KEY` (its config only keeps a hash of it, so it comes from the owner).
+   (`/opt/homebrew/etc/cliproxyapi.conf`) it takes `CLIPROXY_URL` and `CLIPROXY_API_KEY`. It
+   prints none of them and keeps the rest of `server/.env`. The invited emails go in
+   `WRITER_EMAILS` there, the owner's in `OWNER_EMAILS` too, and the proxy's management key in
+   `CLIPROXY_MANAGEMENT_KEY` (its config only keeps a hash of it, so it comes from the owner,
+   and a wrong one gets this machine shut out of the management API for 30 minutes; see "Notes
+   for step 4").
 3. `npm run db`, `npm run migrate`, then `npm run api` (port 8790) and `npm run web` (5174).
 4. Open `https://local.breader.site:5174/writer/`. The certificate is self-signed
    (`@vitejs/plugin-basic-ssl`), so the browser warns once; HTTPS is needed because breader's

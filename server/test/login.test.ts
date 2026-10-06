@@ -61,7 +61,7 @@ describe('a breader login', () => {
     const [user] = await deps.breader.select().from(users).where(eq(users.email, email));
     await deps.breader.update(authSessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(authSessions.userId, user.id));
     const r = await call(writer(), 'GET', '/v1/me', cookie);
-    expect(r.body).toEqual({ account: null, access: 'logged_out' });
+    expect(r.body).toEqual({ account: null, access: 'logged_out', owner: false });
   });
 
   it('is never written to by the writer', async () => {

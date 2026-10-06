@@ -100,7 +100,7 @@ export async function sendVerification() {
 /** Ends the login. It's breader's login too, so this logs out of breader as well. */
 export async function logOut() {
   await auth('/sign-out', {});
-  remember({ account: null, access: 'logged_out' });
+  remember({ account: null, access: 'logged_out', owner: false });
 }
 
 const MESSAGES: Record<string, string> = {

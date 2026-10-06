@@ -23,6 +23,19 @@
 .pick-row small { font: var(--ui-w) 11.5px/1.2 var(--ui); color: var(--ink-2); }
 .pick-row svg { flex: none; width: 16px; height: 16px; }
 
+/* The owner's AI accounts: each with Sign out beside it, then the ways to sign one in. */
+.pick-accounts { display: grid; gap: 10px; }
+.pick-account { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pick-account > span { min-width: 0; display: grid; gap: 5px; font: var(--ui-w) 14px/1.2 var(--ui); }
+.pick-account small { font: var(--ui-w) 11.5px/1.3 var(--ui); color: var(--ink-2); overflow-wrap: anywhere; }
+.pick-account .login-link { flex: none; }
+.pick-signin { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font: var(--ui-w) 12.5px/1.2 var(--ui); color: var(--ink-2); }
+
+/* A sign-in under way, with room for the address it ended on. */
+.pick-wait { display: grid; gap: 8px; }
+.pick-wait p { margin: 0; font: var(--ui-w) 12.5px/1.45 var(--ui); color: var(--ink-2); }
+.pick-wait .add-actions { margin-top: 2px; }
+
 /* Phones: the button keeps to the model's name. */
 @media (max-width: 480px) {
   .pick-btn { max-width: 150px; }

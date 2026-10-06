@@ -212,6 +212,11 @@ export class Catalog {
     return this.loading;
   }
 
+  /** Lets go of what it read, so the next ask reads the proxy again: an account was signed in or out. */
+  forget() {
+    this.loaded = null;
+  }
+
   /** Every model, as settings show them, the default first. Throws a ProxyError while the proxy is down. */
   async infos(): Promise<ModelInfo[]> {
     const loaded = await this.current();

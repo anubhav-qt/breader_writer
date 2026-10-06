@@ -39,6 +39,11 @@ const Env = z.object({
    * SPEECH_EMAILS. Everyone else sees that the writer is invite only.
    */
   WRITER_EMAILS: list.transform((emails) => emails.map((e) => e.toLowerCase())).default([]),
+  /**
+   * Who signs the proxy's AI accounts in and out, in settings: the owner, by email. Each must be
+   * in WRITER_EMAILS too. No one else sees the accounts.
+   */
+  OWNER_EMAILS: list.transform((emails) => emails.map((e) => e.toLowerCase())).default([]),
 
   /**
    * The CLIProxyAPI the models come through (see CLAUDE.md): its address, like
@@ -48,8 +53,9 @@ const Env = z.object({
   /** The key its model endpoints take (one of its `api-keys`). */
   CLIPROXY_API_KEY: z.string().default(''),
   /**
-   * Its management API's key, read only, for what it knows about each model (its name, context
-   * and thinking levels). Without it the models still work, without thinking levels.
+   * Its management API's key: for what it knows about each model (its name, context and thinking
+   * levels), and for the owner to sign accounts in and out from settings. Without it the models
+   * still work, without thinking levels, and settings can't manage the accounts.
    */
   CLIPROXY_MANAGEMENT_KEY: z.string().default(''),
 });

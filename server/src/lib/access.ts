@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 import type { Access } from '@writer/shared/protocol';
 import type { AppEnv, Deps } from '../context.ts';
+import type { Env } from '../env.ts';
 import { ApiError } from './errors.ts';
 import { readLogin, type Login } from './login.ts';
 
@@ -26,6 +27,21 @@ export function accessFor(login: Login | null, allowed: string[]): Access {
   return 'open';
 }
 
+/**
+ * Whether an account signs the proxy's AI accounts in and out: a writer whose email is in
+ * OWNER_EMAILS. Everyone's stories run on those accounts, so they're the owner's alone.
+ */
+export function isOwner(login: Login | null, env: Pick<Env, 'WRITER_EMAILS' | 'OWNER_EMAILS'>): boolean {
+  if (!login) {
+    return false;
+  }
+  if (accessFor(login, env.WRITER_EMAILS) !== 'open') {
+    return false;
+  }
+  const email = login.email.toLowerCase();
+  return env.OWNER_EMAILS.includes(email);
+}
+
 const CLOSED: Record<'unconfirmed' | 'invite_only', string> = {
   unconfirmed: 'Confirm your email first, with the link breader sent you.',
   invite_only: 'The writer is invite only for now.',
@@ -43,6 +59,16 @@ export function requireWriter(deps: Deps): MiddlewareHandler<AppEnv> {
       throw new ApiError(403, access, CLOSED[access]);
     }
     c.set('login', login);
+    await next();
+  };
+}
+
+/** Lets a request through only for the owner. Goes after requireWriter, which reads the login. */
+export function requireOwner(deps: Deps): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    if (!isOwner(c.var.login, deps.env)) {
+      throw new ApiError(403, 'not_owner', 'Only the owner signs the AI accounts in and out.');
+    }
     await next();
   };
 }

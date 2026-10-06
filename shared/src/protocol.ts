@@ -28,6 +28,8 @@ export type Access = z.infer<typeof Access>;
 export const Me = z.object({
   account: Account.nullable(),
   access: Access,
+  /** Whether this account signs the AI accounts in and out (the server's OWNER_EMAILS). */
+  owner: z.boolean().default(false),
 });
 export type Me = z.infer<typeof Me>;
 
@@ -86,3 +88,55 @@ export const Settings = z.object({
   models: z.array(ModelInfo).nullable(),
 });
 export type Settings = z.infer<typeof Settings>;
+
+/** The kinds of AI account the owner signs in from settings. */
+export const Provider = z.enum(['antigravity', 'codex', 'claude']);
+export type Provider = z.infer<typeof Provider>;
+
+/** An AI account signed in to the proxy, as settings show it to the owner. */
+export const AiAccount = z.object({
+  /** The proxy's name for it, to sign it out by. */
+  id: z.string(),
+  /** Its kind: antigravity, codex, claude, or another the proxy knows. */
+  provider: z.string(),
+  /** Who it's signed in as: its email, or the proxy's label for it. */
+  name: z.string(),
+  /** Why it can't serve right now (turned off, out of quota), or null while it can. */
+  problem: z.string().nullable(),
+});
+export type AiAccount = z.infer<typeof AiAccount>;
+
+/** GET /v1/accounts, for the owner. */
+export const AiAccounts = z.object({
+  accounts: z.array(AiAccount),
+});
+export type AiAccounts = z.infer<typeof AiAccounts>;
+
+/** POST /v1/accounts/sign-in: the kind of account to sign in. */
+export const StartSignIn = z.object({
+  provider: Provider,
+});
+export type StartSignIn = z.infer<typeof StartSignIn>;
+
+/** What POST /v1/accounts/sign-in answers: the page to sign in on, and the sign-in to ask after. */
+export const SignIn = z.object({
+  url: z.string(),
+  state: z.string(),
+});
+export type SignIn = z.infer<typeof SignIn>;
+
+/** GET /v1/accounts/sign-in/:state: still waiting, signed in, or failed and why. */
+export const SignInStatus = z.object({
+  status: z.enum(['wait', 'ok', 'error']),
+  error: z.string().nullable(),
+});
+export type SignInStatus = z.infer<typeof SignInStatus>;
+
+/**
+ * POST /v1/accounts/sign-in/:state: the address the sign-in page ended on, for when the browser
+ * isn't on the proxy's machine and that page couldn't load.
+ */
+export const SignInAddress = z.object({
+  address: z.string().trim().min(1).max(4000),
+});
+export type SignInAddress = z.infer<typeof SignInAddress>;

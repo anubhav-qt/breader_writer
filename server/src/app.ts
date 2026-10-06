@@ -5,6 +5,7 @@ import type { AppEnv, Deps } from './context.ts';
 import { ApiError, onError } from './lib/errors.ts';
 import { sameOriginWrites } from './lib/http.ts';
 import { log } from './log.ts';
+import { accountRoutes } from './routes/accounts.ts';
 import { bookRoutes } from './routes/books.ts';
 import { healthRoutes } from './routes/health.ts';
 import { meRoutes } from './routes/me.ts';
@@ -56,6 +57,7 @@ export function makeApp(deps: Deps) {
   app.route('/v1', meRoutes(deps));
   app.route('/v1', bookRoutes(deps));
   app.route('/v1', settingsRoutes(deps));
+  app.route('/v1', accountRoutes(deps));
 
   app.notFound((c) => c.json({ code: 'not_found', message: 'No such endpoint.' }, 404));
   app.onError(onError);

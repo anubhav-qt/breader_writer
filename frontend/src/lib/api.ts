@@ -69,6 +69,7 @@ function client(base: Base) {
     get: <T>(path: string, timeout?: number) => request<T>(base, 'GET', path, undefined, timeout),
     post: <T>(path: string, body: unknown = {}, timeout?: number) => request<T>(base, 'POST', path, body, timeout),
     put: <T>(path: string, body: unknown, timeout?: number) => request<T>(base, 'PUT', path, body, timeout),
+    delete: <T>(path: string, timeout?: number) => request<T>(base, 'DELETE', path, undefined, timeout),
   };
 }
 

@@ -101,7 +101,7 @@ See "The code" below for what exists.
 - **You can play more than the main character.** Above the box is a toggle, "Main character and
   author only", on by default: you play the protagonist and write author notes. Turned off,
   Procreator asks you each time another character is about to act whether you want to play them
-  this time.
+  this time, and if you don't, their actor does (see "Every cast member has an actor").
 - **Author notes come from a toggle on the box.** One tap switches it from "as <protagonist>" to
   "as the author" ("skip to the next morning", "make the storm worse"). The story follows the
   note without the character saying it, and the book never mentions it.
@@ -119,6 +119,13 @@ See "The code" below for what exists.
   Characters who matter most end up with rich, complex pages; walk-ons stay small. The owner can
   open and edit any cast member's sheet or page at any time, and the edit reaches back through
   everything already played and written (see "Changing the past").
+- **Every cast member has an actor.** Procreator directs and writes every word of the prose: it
+  runs the world, the plot and the pacing. Each cast member but the protagonist (the owner plays
+  them) is played by an actor of their own, who only answers what their character does, says and
+  thinks right now. Procreator can send an actor back ("she wouldn't give in yet") without
+  telling them the plot. So a character only knows what they lived, voices stay distinct,
+  characters push back instead of indulging the player, and their history shapes who they
+  become. How it works is in "Actors" below.
 - **A change can reach back to the start.** When the owner changes something later, every
   earlier place that says otherwise can be brought in line: the state, the summaries, the turns
   and the written book.
@@ -217,10 +224,11 @@ Each step ends working, committed, and with a short test checklist for the owner
 5. **Setup help.** Procreator's suggestion in whichever setup field is clicked into (faint text,
    taken with Tab or the right arrow key), and the Suggestions chat, which makes the agreed
    changes itself once the owner approves them.
-6. **Play.** Procreator narrating, and its play tools: turns, the author toggle, playing other
-   characters (the "Main character and author only" toggle), hints on tap, undo within a scene,
-   scenes ending (and their wrap-up), the cast growing and new characters joining, relationships
-   shifting, and the owner's changes reaching back through the turns and the state.
+6. **Play.** Procreator narrating, the cast's actors, and the play tools: turns, the author
+   toggle, playing other characters (the "Main character and author only" toggle), hints on
+   tap, undo within a scene, scenes ending (and their wrap-up), the cast growing and new
+   characters joining, relationships shifting, and the owner's changes reaching back through
+   the turns and the state.
 7. **The book.** The scene writer, the book view (a copy of breader's reader), the progress bar
    and the EPUB download, and the owner's changes reaching back into written scenes.
 8. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
@@ -676,6 +684,10 @@ Procreator.
   notes. Don't add a limit to save tokens or money. One stays only where something would break
   without it: search shows a dozen matches at a time (the rest are a search away), and
   compaction keeps a session inside the model's window.
+- **Cache wherever possible** (the owner's words). A cached prefix costs a fraction of a fresh
+  one and changes nothing in the answer, so it's the one way to save tokens that fits quality
+  first. Keep every session's and actor's chat start the same from call to call, and ask each
+  provider for its cache where it has to be asked.
 
 ### Procreator's memory
 
@@ -737,6 +749,31 @@ from it.
 - **Measure it.** Every call is recorded with the tokens counted before sending and what the
   model says it used, cache reads included.
 
+### Actors
+
+Decided 2026-10-06 (see "Every cast member has an actor"), built with play (step 6).
+
+- **Procreator directs; actors play.** Procreator runs the world, the plot and the pacing, and
+  writes every word of the prose. When a cast member is about to act, it asks their actor, who
+  answers only what that character does, says and thinks right now. Procreator can send an
+  answer back ("she wouldn't give in yet") without telling the actor the plot.
+- **Each actor has a chat of its own, across scenes.** It holds only their side of the story:
+  - their sheet;
+  - for each of their relationships, how they see the other and what they hide (never what's
+    hidden from them);
+  - every scene they were in, as they saw it.
+
+  Never the Plan, the Threads or anyone else's pages.
+- **The database stays the memory.** An actor's chat is a working copy, as a scene's session
+  is: undo, renames and "always so" rebuild it from the turns.
+- **Compaction works the same for each actor**, past 400k: what the folded turns established is
+  saved to their page first, and the summary becomes their own memory, in their own voice.
+- **Who has one:** every cast member but the protagonist, who is the owner. Walk-ons get none; an
+  actor's chat starts when someone joins the cast. With "Main character and author only" off,
+  Procreator asks the owner first, and the actor plays whoever the owner doesn't.
+- **The costs, accepted:** at least 3 calls in a row per move, the Antigravity quota goes
+  faster, and more has to stay in sync.
+
 ### State
 
 - **One source of truth:** the database. Procreator changes state only through tools; it never
@@ -794,7 +831,7 @@ from it.
 ### Procreator's jobs
 
 - **Narrator:** plays the world around whoever the owner plays, turn by turn, in the scene's
-  session, and keeps the memory.
+  session, directs the cast's actors (see "Actors"), and keeps the memory.
 - **Folds:** the wrap-up at each scene's end, and compaction when a session grows too long.
 - **Author:** writes each finished scene into the book, in the book's point of view, style and
   content level, from the scene's turns and the state.

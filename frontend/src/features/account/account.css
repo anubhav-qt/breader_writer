@@ -1,6 +1,7 @@
 /* Log in dialog */
 .login { display: grid; gap: 10px; }
-.login-input { font: var(--ui-w) 15px/1.2 var(--ui); padding: 11px 12px; }
+/* Over add.css's field (.add-input), whichever of the two stylesheets loads first. */
+.add-input.login-input { font: var(--ui-w) 15px/1.2 var(--ui); padding: 11px 12px; }
 .login-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 4px; }
 .login-row .add-label { margin-top: 0; }
 .login-link {

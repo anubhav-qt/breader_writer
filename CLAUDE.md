@@ -288,6 +288,15 @@ Each step ends working, committed, and with a short test checklist for the owner
     as 128k, so compaction would start at 96k instead of 400k. The key comes from the owner.
   - Its prose uses em dashes (see "Open").
 
+### Notes for step 4
+
+- The login dialog's fields showed Dongle at 22px instead of the interface font, from step 1 on.
+  Breader's App imports its Add a book dialog (and `add.css`) before the account menu; the writer
+  dropped that dialog, so the account menu's `account.css` loads first, and add.css's field
+  (`.add-input`) came later and beat `.login-input`, which is just as specific. account.css now
+  doubles the class (`.add-input.login-input`), so it wins whichever loads first. A rule copied
+  from breader that overrides another file's may need the same.
+
 ### Later versions
 
 - Send a book straight to the breader library (v1 is an EPUB download).

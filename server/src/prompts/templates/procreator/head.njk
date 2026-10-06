@@ -131,11 +131,11 @@ Between people not both in the scene, in short:
 
 {{ page(p) -}}
 {% endfor %}
-{% if closing %}
+{% if lastScene %}
 
-<last_scene_ending scene="{{ closing.number }}">
-{{ turns(closing.turns, protagonist) -}}
-</last_scene_ending>
+<last_scene number="{{ lastScene.number }}">
+{{ turns(lastScene.turns, protagonist) -}}
+</last_scene>
 {% endif %}
 
 <reference_index>

@@ -120,8 +120,8 @@ export interface TurnView {
   reply: string;
 }
 
-/** How the scene before ended, word for word. */
-export interface ClosingView {
+/** The scene before, word for word. */
+export interface LastSceneView {
   number: number;
   turns: TurnView[];
 }
@@ -155,7 +155,7 @@ export interface BriefView {
   distant: BondView[];
   /** The pages of places the scene's place names. */
   places: PageView[];
-  closing: ClosingView | null;
+  lastScene: LastSceneView | null;
   /** Every page but the characters', which the cast covers. */
   index: IndexEntry[];
   scene: SceneView;
@@ -309,10 +309,10 @@ function turnView(turn: Turn): TurnView {
 }
 
 /**
- * The brief for a scene's session, from the story as it stands. `closing` is the scene before's
- * last turns, word for word, for picking the story up where it left off.
+ * The brief for a scene's session, from the story as it stands. `lastScene` is the scene before's
+ * standing turns, word for word, for picking the story up where it left off.
  */
-export function briefView(story: Story, scene: Scene, closing: Turn[]): BriefView {
+export function briefView(story: Story, scene: Scene, lastScene: Turn[]): BriefView {
   const names = namesOf(story.characters);
   const numbers = new Map<string, number>();
   for (const each of story.scenes) {
@@ -346,9 +346,9 @@ export function briefView(story: Story, scene: Scene, closing: Turn[]): BriefVie
   }
 
   const earlier = story.scenes.filter((each) => each.number < scene.number);
-  let closingView: ClosingView | null = null;
-  if (closing.length > 0) {
-    closingView = { number: scene.number - 1, turns: closing.map(turnView) };
+  let lastSceneView: LastSceneView | null = null;
+  if (lastScene.length > 0) {
+    lastSceneView = { number: scene.number - 1, turns: lastScene.map(turnView) };
   }
   const protagonist = story.characters.find((character) => character.role === 'protagonist');
 
@@ -371,7 +371,7 @@ export function briefView(story: Story, scene: Scene, closing: Turn[]): BriefVie
     close,
     distant,
     places: placesIn(story, scene, names),
-    closing: closingView,
+    lastScene: lastSceneView,
     index: indexOf(story.pages),
     scene: {
       number: scene.number,

@@ -1,13 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { books, characters } from '../src/db/schema.ts';
+import { books, characters, turns } from '../src/db/schema.ts';
 import { headFor, instructionsFor } from '../src/procreator/brief.ts';
 import { render } from '../src/prompts/render.ts';
-import { lastTurns, readStory } from '../src/story/read.ts';
-import type { Scene, Turn } from '../src/story/scenes.ts';
+import { readStory } from '../src/story/read.ts';
+import { addTurn, setReply, turnsOf, type Scene, type Turn } from '../src/story/scenes.ts';
 import { briefView, characterView, pageView, type BriefView } from '../src/story/view.ts';
 import { deps } from './helpers.ts';
-import { aBook, aPlayedStory, nextScene } from './stories.ts';
+import { aBook, aPlayedStory, end, nextScene } from './stories.ts';
 
 const db = deps.db;
 
@@ -15,11 +15,11 @@ const db = deps.db;
 async function briefOf(scene: Scene): Promise<BriefView> {
   const story = await readStory(db, scene.bookId);
   const before = story.scenes.find((each) => each.number === scene.number - 1);
-  let closing: Turn[] = [];
+  let lastScene: Turn[] = [];
   if (before) {
-    closing = await lastTurns(db, before.id, 3);
+    lastScene = await turnsOf(db, before.id);
   }
-  return briefView(story, scene, closing);
+  return briefView(story, scene, lastScene);
 }
 
 describe('the brief', () => {
@@ -84,13 +84,23 @@ describe('the brief', () => {
     ]);
   });
 
-  it('picks the story up from how the scene before ended, word for word', async () => {
-    const { second, opening } = await aPlayedStory();
+  it('picks the story up from the whole scene before, word for word, without its taken back turns', async () => {
+    const { bookId, aiko } = await aBook();
+    const first = await nextScene(bookId, 'The ferry', [aiko.id]);
+    const moves = ['I untie the boat.', 'I push off.', 'I sing.', 'I row.'];
+    for (const move of moves) {
+      const turn = await addTurn(db, first, 'character', move);
+      await setReply(db, turn, `After: ${move}`);
+    }
+    const [, , sung] = await turnsOf(db, first.id);
+    await db.update(turns).set({ undone: true }).where(eq(turns.id, sung.id));
+    await end(bookId, first);
+    const second = await nextScene(bookId, 'The far bank', [aiko.id]);
+
     const brief = await briefOf(second);
-    expect(brief.closing).toEqual({
-      number: 1,
-      turns: [{ number: opening.number, voice: 'character', input: 'I light the first lamp.', reply: 'The wick catches. Ren is at the door.' }],
-    });
+    expect(brief.lastScene?.number).toBe(1);
+    expect(brief.lastScene?.turns.map((turn) => turn.input)).toEqual(['I untie the boat.', 'I push off.', 'I row.']);
+    expect(brief.lastScene?.turns[2]).toEqual({ number: 4, voice: 'character', input: 'I row.', reply: 'After: I row.' });
   });
 
   it('works out where the story stands against its length', async () => {
@@ -114,7 +124,7 @@ describe('the brief in a session', () => {
   it('lays the brief out in the order the model reads it, each section with what it holds', async () => {
     const { second } = await aPlayedStory();
     const text = await headFor(db, second, '');
-    const order = ['<book>', '<world>', '<story_so_far>', '<plan>', '<threads>', '<memory>', '<cast>', '<relationships>', '<last_scene_ending', '<reference_index>', '<this_scene'];
+    const order = ['<book>', '<world>', '<story_so_far>', '<plan>', '<threads>', '<memory>', '<cast>', '<relationships>', '<last_scene ', '<reference_index>', '<this_scene'];
     const at = order.map((tag) => text.indexOf(tag));
     expect(at.every((index) => index >= 0)).toBe(true);
     expect([...at].sort((one, other) => one - other)).toEqual(at);
@@ -135,7 +145,7 @@ describe('the brief in a session', () => {
     expect(text).toContain('How they got here:\n- Scene 1: Aiko forgives Ren for leaving.');
     expect(text).toMatch(/Between people not both in the scene, in short:\n- (Sora and Ren|Ren and Sora): cousins/);
     expect(text).toContain(
-      '<last_scene_ending scene="1">\n<turn number="1">\n<move by="Aiko">I light the first lamp.</move>\n<reply>The wick catches. Ren is at the door.</reply>\n</turn>\n</last_scene_ending>',
+      '<last_scene number="1">\n<turn number="1">\n<move by="Aiko">I light the first lamp.</move>\n<reply>The wick catches. Ren is at the door.</reply>\n</turn>\n</last_scene>',
     );
     expect(text).toContain('- The Lamp House (place): Where the city’s lamps are kept.\n- Plan (story): Where the story is heading.');
     expect(text.endsWith('<this_scene number="2">\nWhere: The ferry\nWhen: Dusk\nPresent: Aiko, Ren\n</this_scene>')).toBe(true);
@@ -152,7 +162,7 @@ describe('the brief in a session', () => {
     expect(text).toContain('<memory>\nNothing yet.\n</memory>');
     expect(text).toContain('<reference_index>\nNo pages yet but the cast\'s.\n</reference_index>');
     expect(text).toContain('<character name="Ren">The ferryman’s son</character>');
-    expect(text).not.toContain('<last_scene_ending');
+    expect(text).not.toContain('<last_scene');
     expect(text).not.toContain('<scene_so_far>');
   });
 

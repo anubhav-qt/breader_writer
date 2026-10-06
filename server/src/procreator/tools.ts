@@ -5,12 +5,12 @@ import { log } from '../log.ts';
 import { render } from '../prompts/render.ts';
 import { castByName, namesOf } from '../story/cast.ts';
 import { StoryError, type Writer } from '../story/changes.ts';
-import { forget, MAX_NOTES, NOTE_CHARS, remember } from '../story/memory.ts';
+import { forget, remember } from '../story/memory.ts';
 import { unlinked, type Cast } from '../story/mentions.ts';
 import { editPage, findPage, PAGE_KINDS, writePage, type Outcome, type PageKind } from '../story/pages.ts';
 import { shiftOnce, type SideShift } from '../story/relationships.ts';
 import type { Scene } from '../story/scenes.ts';
-import { searchStory } from '../story/search.ts';
+import { searchStory, type Recall } from '../story/search.ts';
 import { characterView, pageView } from '../story/view.ts';
 
 /*
@@ -154,33 +154,52 @@ function editPageTool(context: ToolContext): AgentTool<typeof EditPage> {
 
 const Search = Type.Object({
   words: Type.String({ description: "A few words as they'd be written: a name, a phrase, a line someone said." }),
+  from: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      description: 'Leave it out to see the first places. When a search says there are more, the number it says to go on from.',
+    }),
+  ),
 });
+
+/** Says what a search found, and how to see the rest. */
+function recallText(recall: Recall): string {
+  if (recall.total === 0) {
+    return 'Nothing has those words. Try fewer, or other words for the same thing.';
+  }
+  if (recall.matches.length === 0) {
+    return `The places that have those words go up to ${recall.total}, so there are none from ${recall.from} on.`;
+  }
+  const lines = recall.matches.map((match) => `${match.where}: ${match.text}`);
+  const last = recall.from + recall.matches.length - 1;
+  if (last < recall.total) {
+    lines.push(
+      `Those are places ${recall.from} to ${last} of ${recall.total}. For the next ones, search again with from ${last + 1}, or narrow it down with more of the words.`,
+    );
+  } else if (recall.from > 1) {
+    lines.push(`Those are places ${recall.from} to ${last} of ${recall.total}, the last of them.`);
+  }
+  return lines.join('\n');
+}
 
 function searchTool(context: ToolContext): AgentTool<typeof Search> {
   return {
     name: 'search',
     label: 'Search',
     description:
-      'Finds exact words in the reference, the scene summaries and every turn played, and gives each place they come with the text around them. Use it when a summary isn\'t enough: what exactly was said or promised, or when something first came up.',
+      "Finds exact words in the reference, the scene summaries and every turn played, and gives each place they come with the paragraph they're in, a dozen places at a time. Use it when a summary isn't enough: what exactly was said or promised, or when something first came up.",
     parameters: Search,
     execute: (_id, params) =>
       guarded('search', async () => {
-        const recall = await searchStory(context.db, context.scene.bookId, params.words);
-        if (recall.matches.length === 0) {
-          return 'Nothing has those words. Try fewer, or other words for the same thing.';
-        }
-        const lines = recall.matches.map((match) => `${match.where}: ${match.text}`);
-        if (recall.more > 0) {
-          lines.push(`${recall.more} more places have them too. Use more of the words to narrow it down.`);
-        }
-        return lines.join('\n');
+        const recall = await searchStory(context.db, context.scene.bookId, params.words, params.from ?? 1);
+        return recallText(recall);
       }),
   };
 }
 
 const Remember = Type.Object({
   note: Type.String({
-    description: `One line that stands on its own, at most ${NOTE_CHARS} characters, with everyone in the cast written as [[Name]].`,
+    description: 'One line that stands on its own, with everyone in the cast written as [[Name]].',
   }),
 });
 
@@ -188,7 +207,8 @@ function rememberTool(context: ToolContext): AgentTool<typeof Remember> {
   return {
     name: 'remember',
     label: 'Remember',
-    description: `Keeps a note in your memory, which every brief holds whole: what the owner likes or doesn't, something they asked for that still holds, or a lesson about writing this book. What happens in the story goes in the reference instead. Your memory holds up to ${MAX_NOTES} notes.`,
+    description:
+      "Keeps a note in your memory, which every brief holds whole: what the owner likes or doesn't, something they asked for that still holds, or a lesson about writing this book. What happens in the story goes in the reference instead.",
     parameters: Remember,
     execute: (_id, params) =>
       guarded('remember', async () => {

@@ -15,7 +15,6 @@ import type { Catalog } from '../ai/catalog.ts';
 import { ModelError, recordCall, textOf, type CallTag, type Role, type Sent } from '../ai/call.ts';
 import type { InUse } from '../ai/settings.ts';
 import type { Db } from '../db/client.ts';
-import { log } from '../log.ts';
 import type { Scene } from '../story/scenes.ts';
 import { addMessage, segmentMessages, type MessageKind, type Segment } from '../story/session.ts';
 import { instructionsFor } from './brief.ts';
@@ -54,11 +53,6 @@ export interface Answer {
   /** stop when it finished, length when it ran out of room, toolUse when it was stopped mid work. */
   stopReason: StopReason;
 }
-
-/** A long answer is fine, a stuck one isn't. */
-const TIMEOUT_MS = 5 * 60_000;
-/** The most calls one message can take: an answer and its tool calls, round after round. */
-const MAX_CALLS = 24;
 
 /** The session as the model is sent it: the instructions and tools, the segment's head, then its messages. */
 export async function sessionContext(db: Db, scene: Scene, segment: Segment, tools: AgentTool[]): Promise<AgentContext> {
@@ -105,8 +99,6 @@ function thinkingOf(inUse: InUse): ThinkingLevel | undefined {
 
 /** Keeps a run as it goes: each message in the session, and each call in calls. */
 class Keeper {
-  /** Model calls so far. */
-  calls = 0;
   /** Procreator's latest message. */
   last: AssistantMessage | null = null;
   private sent: Sent | null = null;
@@ -135,7 +127,6 @@ class Keeper {
     }
     await addMessage(this.ai.db, this.scene, this.ask.kind, this.ask.turnId, message);
     if (message.role === 'assistant') {
-      this.calls += 1;
       this.last = message;
       await this.record(message);
     }
@@ -160,25 +151,19 @@ export async function exchange(ai: Procreator, scene: Scene, segment: Segment, a
   const context = await sessionContext(ai.db, scene, segment, tools);
   const prompt: UserMessage = { role: 'user', content: ask.text, timestamp: Date.now() };
   const keeper = new Keeper(ai, scene, ask);
+  // No cap on calls or time: Procreator takes as many rounds as the work needs, since the owner
+  // wants the best writing over the cheapest. A run that's stuck is stopped by hand, through the signal.
   const config: AgentLoopConfig = {
     model: ai.inUse.model,
     reasoning: thinkingOf(ai.inUse),
     apiKey: ai.catalog.proxy.apiKey,
     // Keeps a session's calls on one cache where the provider keys its cache by session.
     sessionId: scene.id,
-    timeoutMs: TIMEOUT_MS,
     // One write at a time, in the order asked, so changes land as Procreator meant them.
     toolExecution: 'sequential',
     convertToLlm: (messages) => messages as Message[],
     prepareRequest: (request) => {
       keeper.sending(request.context.messages);
-    },
-    finishTurn: () => {
-      if (keeper.calls >= MAX_CALLS) {
-        log.warn({ sceneId: scene.id, calls: keeper.calls }, 'Procreator was stopped after too many calls for one message');
-        return { action: 'end' };
-      }
-      return undefined;
     },
   };
   await runAgentLoop([prompt], context, config, (event) => keeper.keep(event), ai.signal, streamSimple);

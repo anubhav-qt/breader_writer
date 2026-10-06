@@ -2,9 +2,9 @@ import { desc, eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { changes, characters, notes, pages } from '../src/db/schema.ts';
 import { takeBack, versionsOf } from '../src/story/changes.ts';
-import { forget, MAX_NOTES, NOTE_CHARS, notesOf, remember } from '../src/story/memory.ts';
+import { forget, notesOf, remember } from '../src/story/memory.ts';
 import { Cast, linked, unlinked } from '../src/story/mentions.ts';
-import { editPage, findPage, PAGE_CHARS, writePage, type PageWrite } from '../src/story/pages.ts';
+import { editPage, findPage, writePage, type PageWrite } from '../src/story/pages.ts';
 import { searchStory } from '../src/story/search.ts';
 import { deps } from './helpers.ts';
 import { aBook, aPlayedStory, writer } from './stories.ts';
@@ -90,13 +90,20 @@ describe('pages', () => {
     await expect(write(bookId, place('[[Keep]]', 'Something.'))).rejects.toThrow('Write the title without brackets.');
     await expect(write(bookId, place('The Keep', '   '))).rejects.toThrow('The page is empty.');
     await expect(write(bookId, place('The Keep', 'Something.', ''))).rejects.toThrow('Say in one line what the page holds');
-    await expect(write(bookId, place('The Keep', 'x'.repeat(PAGE_CHARS + 1)))).rejects.toThrow('Split it into pages on narrower subjects.');
     await expect(write(bookId, place('The Keep', 'Held by [[Tobin]].'))).rejects.toThrow('No one in the cast is called Tobin.');
     await expect(write(bookId, { title: 'Tobin', kind: 'character', about: '', body: 'A stranger.' })).rejects.toThrow(
       'No one in the cast is called Tobin. A character page is for someone in the cast',
     );
     await expect(write(bookId, place('Ren', 'A town.'))).rejects.toThrow('Ren is in the cast, so the page called Ren is theirs');
     expect(await db.select().from(pages).where(eq(pages.bookId, bookId))).toEqual([]);
+  });
+
+  it('keeps a page however long it is', async () => {
+    const { bookId } = await aBook();
+    const history = 'The Keep fell, and rose again. '.repeat(5000).trim();
+    const written = await write(bookId, place('The Keep', history, `A fortress ${'very '.repeat(60)}old.`));
+    expect(written.outcome).toBe('made');
+    expect(written.page.body).toBe(history);
   });
 
   it('gives someone in the cast their page under their name, with nothing of the owner’s sheet in it', async () => {
@@ -179,16 +186,16 @@ describe('memory', () => {
     expect(await notesOf(db, bookId)).toHaveLength(1);
   });
 
-  it('turns away a note that is empty, too long, or past what memory holds', async () => {
+  it('turns away an empty note, and keeps notes of any length, however many there are', async () => {
     const { bookId } = await aBook();
     await expect(db.transaction((tx) => remember(tx, writer(bookId), ' '))).rejects.toThrow('The note is empty.');
-    await expect(db.transaction((tx) => remember(tx, writer(bookId), 'x'.repeat(NOTE_CHARS + 1)))).rejects.toThrow(
-      `A note is at most ${NOTE_CHARS} characters`,
-    );
-    for (let i = 0; i < MAX_NOTES; i += 1) {
+    for (let i = 0; i < 100; i += 1) {
       await db.insert(notes).values({ bookId, text: `Note ${i}` });
     }
-    await expect(db.transaction((tx) => remember(tx, writer(bookId), 'One more.'))).rejects.toThrow('Your memory is full');
+    const long = `The owner wants ${'slow, '.repeat(400)}quiet scenes.`;
+    const kept = await db.transaction((tx) => remember(tx, writer(bookId), long));
+    expect(kept.note.text).toBe(long);
+    expect(await notesOf(db, bookId)).toHaveLength(101);
   });
 
   it('forgets a note of the book’s, as a change that can be taken back', async () => {
@@ -220,7 +227,7 @@ describe('search', () => {
     expect(rope.matches[2].text).toBe('I ask Ren who cut the rope.');
 
     const owes = await searchStory(db, bookId, '[[Ren]] owes');
-    expect(owes.matches).toEqual([{ where: 'The Lamp House, a page', text: 'The Lamp House Where the city’s lamps are kept. A narrow house of oil and wicks. [[Ren]] owes its keeper money.' }]);
+    expect(owes.matches).toEqual([{ where: 'The Lamp House, a page', text: 'A narrow house of oil and wicks. [[Ren]] owes its keeper money.' }]);
 
     const lamp = await searchStory(db, bookId, 'first lamp');
     expect(lamp.matches.map((match) => match.where)).toEqual(['Scene 1, its summary', 'Scene 1, turn 1, the owner\'s move']);
@@ -230,14 +237,28 @@ describe('search', () => {
     expect((await searchStory(db, bookId, 'deep\n   water')).matches[0].where).toBe('Aiko\'s page');
   });
 
-  it('gives a dozen matches and says how many more there are', async () => {
+  it('gives the paragraph the words are in, or the whole text when they run across paragraphs', async () => {
+    const { bookId } = await aBook();
+    await write(bookId, place('The Keep', 'Built on the old ford.\n\nIts gate faces\nthe river.\n\nNobody lives there now.'));
+    const gate = await searchStory(db, bookId, 'gate faces the');
+    expect(gate.matches[0].text).toBe('Its gate faces the river.');
+    const across = await searchStory(db, bookId, 'river. Nobody');
+    expect(across.matches[0].text).toBe('The Keep A place. Built on the old ford. Its gate faces the river. Nobody lives there now.');
+  });
+
+  it('shows a dozen matches at a time, and the rest from where it says', async () => {
     const { bookId } = await aBook();
     for (let i = 0; i < 15; i += 1) {
       await write(bookId, place(`Room ${i}`, 'A cold room.'));
     }
-    const recall = await searchStory(db, bookId, 'cold room');
-    expect(recall.matches).toHaveLength(12);
-    expect(recall.more).toBe(3);
+    const first = await searchStory(db, bookId, 'cold room');
+    expect(first.matches).toHaveLength(12);
+    expect(first).toMatchObject({ from: 1, total: 15 });
+    const rest = await searchStory(db, bookId, 'cold room', 13);
+    expect(rest.matches).toHaveLength(3);
+    expect(rest).toMatchObject({ from: 13, total: 15 });
+    expect(rest.matches[0]).not.toEqual(first.matches[11]);
+    expect((await searchStory(db, bookId, 'cold room', 16)).matches).toEqual([]);
     await expect(searchStory(db, bookId, ' ')).rejects.toThrow('Say what words to look for.');
   });
 });

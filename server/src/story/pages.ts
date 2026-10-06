@@ -25,11 +25,6 @@ export const PLAN = 'Plan';
 export const THREADS = 'Threads';
 export const TIMELINE = 'Timeline';
 
-export const TITLE_CHARS = 80;
-export const ABOUT_CHARS = 160;
-/** A page about one subject fits in this. Past it, the subject wants splitting. */
-export const PAGE_CHARS = 24_000;
-
 export type Page = typeof pages.$inferSelect;
 
 /** A page written whole. */
@@ -73,9 +68,6 @@ function cleanTitle(title: string): string {
   if (!spaced) {
     throw new StoryError('The page needs a title.');
   }
-  if (spaced.length > TITLE_CHARS) {
-    throw new StoryError(`A title is at most ${TITLE_CHARS} characters. Give the page a shorter one.`);
-  }
   if (/[[\]]/.test(spaced)) {
     throw new StoryError('Write the title without brackets. A link, [[Name]], is for naming someone inside a page.');
   }
@@ -87,9 +79,6 @@ function cleanAbout(about: string, required: boolean): string {
   if (!line && required) {
     throw new StoryError('Say in one line what the page holds, for the index.');
   }
-  if (line.length > ABOUT_CHARS) {
-    throw new StoryError(`The line for the index is at most ${ABOUT_CHARS} characters. Say it shorter.`);
-  }
   return line;
 }
 
@@ -98,11 +87,6 @@ function cleanBody(body: string, cast: CharacterRow[]): string {
   const trimmed = body.trim();
   if (!trimmed) {
     throw new StoryError('The page is empty. Write what it holds.');
-  }
-  if (trimmed.length > PAGE_CHARS) {
-    throw new StoryError(
-      `A page is at most ${PAGE_CHARS} characters, and this is ${trimmed.length}. Split it into pages on narrower subjects.`,
-    );
   }
   return unlinked(trimmed, new Cast(cast));
 }

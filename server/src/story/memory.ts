@@ -9,11 +9,8 @@ import { unlinked } from './mentions.ts';
  * Procreator's memory: its notes to itself about the work, kept across scenes. What the owner likes
  * and doesn't, what they've asked for that still holds, what Procreator has learned about writing
  * this book. What happens in the story belongs in the reference instead. Every brief holds all of
- * it, so it's kept short. Each note made or forgotten is a change, like any other.
+ * it. Each note made or forgotten is a change, like any other.
  */
-
-export const MAX_NOTES = 40;
-export const NOTE_CHARS = 300;
 
 export type Note = typeof notes.$inferSelect;
 
@@ -28,9 +25,6 @@ async function cleanNote(tx: Tx, bookId: string, text: string): Promise<string> 
   if (!line) {
     throw new StoryError('The note is empty. Say what to remember.');
   }
-  if (line.length > NOTE_CHARS) {
-    throw new StoryError(`A note is at most ${NOTE_CHARS} characters, and this is ${line.length}. Say it shorter, or make it two notes.`);
-  }
   const cast = await castByName(tx, bookId);
   return unlinked(line, cast);
 }
@@ -42,11 +36,6 @@ export async function remember(tx: Tx, writer: Writer, text: string): Promise<{ 
   const same = existing.find((note) => note.text.toLowerCase() === kept.toLowerCase());
   if (same) {
     return { note: same, made: false };
-  }
-  if (existing.length >= MAX_NOTES) {
-    throw new StoryError(
-      `Your memory is full: it holds ${MAX_NOTES} notes. Forget one that no longer holds, or fold two into one, first.`,
-    );
   }
   const change = await startChange(tx, { ...writer, what: 'Remembered a note' });
   const note = await make(tx, change, notes, { bookId: writer.bookId, text: kept });

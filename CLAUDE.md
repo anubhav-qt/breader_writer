@@ -406,14 +406,16 @@ A Hono API, port 8790, built like breader's server.
     replaces a page whole, `editPage` changes text found on it exactly once, or adds to its end
     (and makes a character's page the first time). A write starts its change only when it
     changes something, so the same write sent twice leaves one trace; it turns away blank text,
-    unknown links, a title that takes a cast member's name, and pages past 24,000 characters.
-    Plan, Threads and Timeline are story pages by those titles.
-  - `memory.ts`: Procreator's notes, at most 40, each one line of at most 300 characters. The
-    same note twice (in any case) is kept once. Remembering and forgetting are changes.
+    unknown links and a title that takes a cast member's name. A page is as long as its subject
+    needs. Plan, Threads and Timeline are story pages by those titles.
+  - `memory.ts`: Procreator's notes, each kept on one line, as many as it keeps. The same note
+    twice (in any case) is kept once. Remembering and forgetting are changes.
   - `relationships.ts`: shifting a relationship (tying the two first if they weren't, and adding
     to the line's history); `shiftOnce` does nothing when the shift is in place already.
   - `search.ts`: exact words in the pages (as Procreator reads them), the scene summaries and
-    every standing turn, in any case and across line breaks, a dozen at a time.
+    every standing turn, in any case and across line breaks, each match as the paragraph it's
+    in. It shows a dozen at a time and the next dozen are a search away (`from`), so every match
+    can be reached without a common name pouring hundreds into the session.
   - `session.ts`: a scene's session as it's kept: segments (`startSegment`, `currentSegment`),
     each a head and the messages from its `fromSeq` on, and messages (`addMessage`) of kind
     `play`, `note` or `fold`; a segment sends its standing play and notes (`segmentMessages`).
@@ -423,8 +425,8 @@ A Hono API, port 8790, built like breader's server.
     turns it into what the templates take (`briefView`): the people in the scene in full (sheet
     and page) and everyone else in a line, the relationships among those present in full with
     their history and everyone else's as their bond, every earlier scene's summary, the Plan and
-    Threads pages, memory, the pages of places the scene's place names, the last three turns of
-    the scene before, the index (every page but the characters', by kind), and where the story
+    Threads pages, memory, the pages of places the scene's place names, the whole scene before
+    word for word, the index (every page but the characters', by kind), and where the story
     stands against its length. Pages and notes show people as links; the rest by plain name.
 - `src/procreator/`: Procreator at work in a scene's session.
   - `brief.ts`: its instructions (`instructionsFor`) and a segment's head (`headFor`: the brief,
@@ -435,7 +437,8 @@ A Hono API, port 8790, built like breader's server.
     model as they are; any other failure is logged and the model is told it's the writer's.
   - `run.ts`: one exchange (`exchange`): the session sent as it stands (instructions and tool
     declarations, the head, the segment's messages) plus one message, through pi's agent loop,
-    tools run one at a time, at most 24 calls. Every message is kept as it ends and every call
+    tools run one at a time, with no cap on calls or time (a stuck run is stopped by hand,
+    through its signal). Every message is kept as it ends and every call
     recorded, so the next call sends exactly this one's start and the cache holds.
     `sessionTokens` is pi's estimate: the tokens the model last said it read, plus what came
     after.
@@ -573,6 +576,11 @@ Procreator.
   anywhere else (see below).
 - **Default model: Gemini 3.8 Flash, thinking high.** Its window is 1.05M tokens. The model and
   thinking level can be changed from settings.
+- **Quality first: no limits on Procreator's work** (the owner's call). It takes as many calls
+  as the work needs, with no cap on calls or time, and nothing caps its pages, its memory or its
+  notes. Don't add a limit to save tokens or money. One stays only where something would break
+  without it: search shows a dozen matches at a time (the rest are a search away), and
+  compaction keeps a session inside the model's window.
 
 ### Procreator's memory
 
@@ -598,8 +606,7 @@ from it.
   - the cast: the people in the scene in full (the owner's sheet and Procreator's page), everyone
     else in a line; the relationships among the people in the scene in full, everyone else's as
     their bond;
-  - the page of the scene's place, if it has one, and the last scene's closing turns word for
-    word;
+  - the page of the scene's place, if it has one, and the whole scene before, word for word;
   - the index of the reference: every page's title and what it holds.
 - **The reference** is the story's canon in depth, written by Procreator: a page for each
   character, place, group, thing and part of the world, and the story's own pages (Plan,
@@ -611,7 +618,7 @@ from it.
   who enters mid scene arrives with their page.
 - **Memory** is Procreator's notes to itself about the work, not the story: what the owner likes
   and doesn't, what they've asked for that still holds, and what it has learned about writing
-  this book. It's short, all of it is in every brief, and the owner can see and edit it.
+  this book. All of it is in every brief, and the owner can see and edit it.
 - **Our own compaction**, designed for the story. Save first, trim second: turns leave the
   context only once the reference and a summary hold what they said, and a fold that fails
   trims nothing.

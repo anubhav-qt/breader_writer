@@ -10,24 +10,27 @@ import { pagesOf } from './pages.ts';
 /*
  * Recall: exact words in the reference, the scene summaries and every turn that still stands, for
  * when a summary isn't enough. The words match as given, in any case and however the text breaks
- * its lines. Pages are searched as Procreator reads them, people as [[Name]].
+ * its lines. Pages are searched as Procreator reads them, people as [[Name]]. Every match can be
+ * reached: a search shows a dozen at a time, and the next dozen are a search away, since a common
+ * name could otherwise pour hundreds into the session.
  */
 
-export const MAX_MATCHES = 12;
-/** How much of the text on each side of a match comes with it. */
-const AROUND = 120;
+/** How many matches a search shows at once. */
+export const SHOWN = 12;
 
 export interface Match {
   /** Where it is: "Aiko's page", "The Keep, a page", "Scene 3, its summary", "Scene 3, turn 41, the reply". */
   where: string;
-  /** The words, with some of the text around them. */
+  /** The paragraph the words are in. */
   text: string;
 }
 
 export interface Recall {
   matches: Match[];
-  /** How many more matched than are given. */
-  more: number;
+  /** The number of the first match shown, counting from 1. */
+  from: number;
+  /** How many matched in all. */
+  total: number;
 }
 
 function cleanWords(words: string): string {
@@ -38,23 +41,34 @@ function cleanWords(words: string): string {
   return spaced;
 }
 
-/** The words where they first come in the text, with some of the text around them, or null. */
+/** Text on one line, its whitespace run together, as the words are matched against it. */
+function flatten(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * The paragraph the words first come in, on one line, or the whole text when the words run across
+ * a paragraph break. Null when the text doesn't hold them.
+ */
 function excerpt(text: string, words: string): string | null {
-  const flat = text.replace(/\s+/g, ' ');
-  const at = flat.toLowerCase().indexOf(words.toLowerCase());
-  if (at === -1) {
-    return null;
+  const wanted = words.toLowerCase();
+  for (const paragraph of text.split(/\n\s*\n/)) {
+    const line = flatten(paragraph);
+    if (line.toLowerCase().includes(wanted)) {
+      return line;
+    }
   }
-  const start = Math.max(0, at - AROUND);
-  const end = Math.min(flat.length, at + words.length + AROUND);
-  let piece = flat.slice(start, end);
-  if (start > 0) {
-    piece = `…${piece}`;
+  const whole = flatten(text);
+  if (whole.toLowerCase().includes(wanted)) {
+    return whole;
   }
-  if (end < flat.length) {
-    piece = `${piece}…`;
-  }
-  return piece;
+  return null;
+}
+
+/** Text in parts, each part a paragraph of its own. */
+function inParagraphs(parts: string[]): string {
+  const written = parts.filter((part) => part.trim() !== '');
+  return written.join('\n\n');
 }
 
 /** A column's text holds the words, in any case and however its lines break. */
@@ -74,7 +88,7 @@ async function inPages(db: Db | Tx, bookId: string, words: string): Promise<Matc
     if (page) {
       parts.push(page.about, linked(page.body, names));
     }
-    const text = excerpt(parts.join('\n'), words);
+    const text = excerpt(inParagraphs(parts), words);
     if (text) {
       matches.push({ where: `${character.name}'s page`, text });
     }
@@ -82,7 +96,7 @@ async function inPages(db: Db | Tx, bookId: string, words: string): Promise<Matc
   const others = pages.filter((page) => page.characterId === null);
   others.sort((one, other) => one.title.localeCompare(other.title));
   for (const page of others) {
-    const text = excerpt(`${page.title}\n${page.about}\n${linked(page.body, names)}`, words);
+    const text = excerpt(inParagraphs([page.title, page.about, linked(page.body, names)]), words);
     if (text) {
       matches.push({ where: `${page.title}, a page`, text });
     }
@@ -132,15 +146,18 @@ async function inTurns(db: Db | Tx, bookId: string, words: string): Promise<Matc
   return matches;
 }
 
-/** Where the words are: pages first, then summaries and turns in story order. */
-export async function searchStory(db: Db | Tx, bookId: string, words: string): Promise<Recall> {
+/**
+ * Where the words are: pages first, then summaries and turns in story order. Shows a dozen
+ * matches, starting from match number `from`.
+ */
+export async function searchStory(db: Db | Tx, bookId: string, words: string, from = 1): Promise<Recall> {
   const clean = cleanWords(words);
   const found = [
     ...(await inPages(db, bookId, clean)),
     ...(await inSummaries(db, bookId, clean)),
     ...(await inTurns(db, bookId, clean)),
   ];
-  const matches = found.slice(0, MAX_MATCHES);
-  const more = found.length - matches.length;
-  return { matches, more };
+  const start = from - 1;
+  const matches = found.slice(start, start + SHOWN);
+  return { matches, from, total: found.length };
 }

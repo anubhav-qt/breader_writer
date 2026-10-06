@@ -417,7 +417,7 @@ describe('the wrap-up', () => {
     expect(promptOf(proxy.asked[1]).user.startsWith('<wrap_up>')).toBe(true);
     const [head] = textsOf(proxy.asked[2]);
     expect(head).toContain('<scene number="1" where="The ferry" when="Dusk">\nAiko waved, and Ren waved back.\n</scene>');
-    expect(head).toContain('<last_scene_ending scene="1">\n<turn number="1">\n<move by="Aiko">I wave at Ren.</move>');
+    expect(head).toContain('<last_scene number="1">\n<turn number="1">\n<move by="Aiko">I wave at Ren.</move>');
     expect((await sceneNow(scene)).summary).toBe('Aiko waved, and Ren waved back.');
   });
 });

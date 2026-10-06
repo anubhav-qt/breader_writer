@@ -4,7 +4,7 @@ import {
 	GoogleGenAI,
 	type ThinkingConfig,
 } from "@google/genai";
-import { calculateCost, clampThinkingLevel } from "../models.ts";
+import { calculateCost, clampThinkingLevel, usesGoogleThinkingLevel } from "../models.ts";
 import type {
 	Api,
 	AssistantMessage,
@@ -40,7 +40,6 @@ import {
 	supportsGoogleStrictToolSampling,
 	toGoogleSdkThinkingLevel,
 	toGoogleThinkingLevel,
-	usesGoogleThinkingLevel,
 } from "./google-shared.ts";
 import { buildBaseOptions } from "./simple-options.ts";
 

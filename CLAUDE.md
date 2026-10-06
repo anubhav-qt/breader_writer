@@ -193,7 +193,9 @@ See "The code" below for what exists.
   first few things are filled in (so it has something to go on), clicking into any field shows
   its suggestion for that field as faint text where you'd type, made from everything there so
   far. Tab or the right arrow key takes it, and on a phone, which has neither, a tap on the faint
-  text does (the owner's pick, 2026-10-06); typing anything else clears it.
+  text does (the owner's pick, 2026-10-06); typing anything else clears it. It runs on the
+  account's model, thinking as little as the model allows, so it lands before the owner starts
+  typing (the owner's call, 2026-10-06).
 - **Suggestions is a chat about the setup.** A Suggestions button opens a chat with Procreator:
   ask for anything, go back and forth, change your mind as often as you like. Once everything is
   agreed and you approve it, Procreator makes all the changes itself. On a laptop the chat is a
@@ -306,7 +308,7 @@ Each step ends working, committed, and with a short test checklist for the owner
   is being played (step 6), the owner's edits go through the log, asking "always so, or from
   now on?".
 - A relationship's history goes into the brief whole for the people in the scene.
-- Folds run on the account's own model and thinking level, like everything else.
+- Folds run on the account's own model and thinking level, as play does.
 - Nothing calls the sessions yet. Play (step 6) sends the owner's moves through `converse`, ends
   scenes and then calls `wrapUp`, tells Procreator of the owner's mid scene changes with
   `addNote`, and undoes turns with `cutSession` and `takeBack` of the turns' changes. How a move,
@@ -378,9 +380,14 @@ Each step ends working, committed, and with a short test checklist for the owner
 
 ### Notes for step 5
 
-- A suggestion runs on the account's own model and thinking level, like everything else, so it
-  can take a while. Nothing shows while it's on its way, and nothing shows when Procreator can't
-  help (offline, or no answer): the field is just a field.
+- A suggestion runs on the account's own model, thinking as little as the model allows
+  (`quick` in `server/src/suggestions/field.ts`), whatever level the account picked. Gemini 3 is
+  asked for low, and marked as a model that thinks even when the catalog can't tell (no
+  management key), or pi would ask for no level and it would think at its default, high.
+  Through the proxy, "minimal" is turned away (a 400), and no thinking at all (a budget of 0)
+  doesn't always hold. Any other model gets the lowest level the catalog knows it takes. Nothing
+  shows while it's on its way, and nothing shows when Procreator can't help (offline, or no
+  answer): the field is just a field.
 - It's asked for 0.4 seconds after a field is clicked into, so tabbing past a field asks
   nothing, and only once 3 things on the page are filled in (`SUGGEST_AFTER`, a default the
   owner hasn't picked).
@@ -412,6 +419,10 @@ Each step ends working, committed, and with a short test checklist for the owner
     cached.
   - One answer used an em dash (see "Open", 4).
   - Giving up stopped the call within half a second.
+  - Thinking low, the same twelve fields again: most took 3 to 6 seconds, as good as before. The
+    most open ones (a blank title, a blank personality, a name) still thought for 500 to 800
+    tokens and took 7 to 12. No thinking at all was about as quick, but one call in four thought
+    for 9 seconds anyway.
 
 ### Later versions
 
@@ -432,7 +443,9 @@ their code, changed where we need, not rewritten to ours.
   Responses, OpenAI Chat Completions), which is all CLIProxyAPI speaks. `streamSimple` in
   `src/stream.ts` picks the API by `model.api` and loads it on first use. Dropped from upstream:
   every other API, the provider catalogs, OAuth and credentials, images, telemetry. Kept: the
-  token estimates (`utils/estimate.ts`), for the context budget.
+  token estimates (`utils/estimate.ts`), for the context budget. Moved: whether a model takes
+  Gemini's thinking levels (`usesGoogleThinkingLevel`) is in `src/models.ts`, so the server can
+  ask without loading Google's SDK.
 - `pi-agent`: the agent loop (a reply, its tool calls, their results, again until it's done)
   and its events. Dropped: the proxy transport.
 
@@ -648,11 +661,11 @@ A Hono API, port 8790, built like breader's server.
 - `src/suggestions/`: setup help. `view.ts` lays out the page as it stands (`setupView`:
   everyone by name, the nameless numbered, two of one name told apart, `refsOf`) and the field
   asked about (`fieldView`: where it is, what's in it, how much it holds). `field.ts` makes a
-  field's suggestion (`suggestField`): one call on the account's model and thinking level.
-  `ghost.ts` turns the answer into the faint text (`ghostFrom`): fences, labels and quotes
-  around it come off, it's joined to the field's text with a space where one is needed, a
-  repeat of that text is gone on from, a line field keeps to one line, and it's cut at a word's
-  end to what the field holds.
+  field's suggestion (`suggestField`): one call on the account's model, thinking as little as
+  it can (`quick`). `ghost.ts` turns the answer into the faint text (`ghostFrom`): fences,
+  labels and quotes around it come off, it's joined to the field's text with a space where one
+  is needed, a repeat of that text is gone on from, a line field keeps to one line, and it's cut
+  at a word's end to what the field holds.
 - `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with what it
   was for (narrator, author, hints, fold, or setup for setup help), the tokens the writer
   counted before sending (`counted`) and what the model says it used, cache reads included. A
@@ -718,7 +731,7 @@ A Hono API, port 8790, built like breader's server.
   templates, `test/session.test.ts` sessions (the prefix each call keeps, what each provider is
   asked of its cache, tools, notes, undo), compaction and the wrap-up,
   `test/accounts.test.ts` the AI accounts, and `test/suggestions.test.ts` setup help (the faint
-  text made from an answer, the page's names, and the route).
+  text made from an answer, the page's names, the thinking it asks for, and the route).
 
 ### Running it locally
 

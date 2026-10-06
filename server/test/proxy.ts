@@ -109,6 +109,7 @@ export interface ClaudeRequest {
   system?: Marked[];
   tools?: Marked[];
   messages: { role: string; content: string | Marked[] }[];
+  thinking?: { type: string };
 }
 
 /** The parts of OpenAI's request (Responses) the tests read. */

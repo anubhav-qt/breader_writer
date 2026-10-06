@@ -1,4 +1,13 @@
-import { normalizeContext, streamSimple, type UserMessage } from '@writer/pi-ai';
+import {
+  clampThinkingLevel,
+  getSupportedThinkingLevels,
+  normalizeContext,
+  streamSimple,
+  usesGoogleThinkingLevel,
+  type Api,
+  type Model,
+  type UserMessage,
+} from '@writer/pi-ai';
 import type { DraftSetup, FieldRef } from '@writer/shared/suggestions';
 import type { Catalog } from '../ai/catalog.ts';
 import { counted, ModelError, recordCall, textOf, thinkingOf, type CallTag, type Sent } from '../ai/call.ts';
@@ -10,7 +19,7 @@ import { fieldView, refsOf, setupView, type FieldView } from './view.ts';
 
 /*
  * Procreator's suggestion for the field the owner clicks into on the setup page: one call, made
- * from the page as it stands, on the account's own model and thinking level.
+ * from the page as it stands, on the account's own model, thinking as little as it can.
  */
 
 /** What setup help runs on: the database, the model, and the account and book it's for. */
@@ -23,6 +32,26 @@ export interface Helper {
   bookId: string | null;
   /** Stops the call when nobody is waiting for it any more. */
   signal?: AbortSignal;
+}
+
+/**
+ * The account's model, thinking as little as it can: the faint text is a few words that have to
+ * land before the owner starts typing (the owner's call, 2026-10-06). Left to itself, Gemini 3.8
+ * Flash thought for 7 to 16 seconds a field. Gemini 3 takes no less than low through the proxy
+ * ("minimal" is turned away, and no thinking at all doesn't always hold), and at low it answered
+ * in 3 to 5. Any other model thinks at the lowest level the catalog knows it takes.
+ */
+function quick(inUse: InUse): InUse {
+  const model = inUse.model;
+  if (usesGoogleThinkingLevel(model)) {
+    // Without the proxy's management key the catalog can't tell that the model thinks, and pi
+    // would send no level at all.
+    const thinks: Model<Api> = { ...model, reasoning: true };
+    const level = clampThinkingLevel(thinks, 'low');
+    return { model: thinks, choice: { model: inUse.choice.model, thinking: level } };
+  }
+  const levels = getSupportedThinkingLevels(model);
+  return { model, choice: { model: inUse.choice.model, thinking: levels[0] } };
 }
 
 /** How much to suggest: by the field's size, and whether anything is written in it yet. */
@@ -58,9 +87,10 @@ export async function suggestField(helper: Helper, setup: DraftSetup, field: Fie
   const message: UserMessage = { role: 'user', content: ask, timestamp: Date.now() };
   const context = normalizeContext({ systemPrompt: system, messages: [message] });
 
+  const inUse = quick(helper.inUse);
   const sent: Sent = { startedAt: new Date(), estimate: counted(context.messages) };
-  const stream = streamSimple(helper.inUse.model, context, {
-    reasoning: thinkingOf(helper.inUse),
+  const stream = streamSimple(inUse.model, context, {
+    reasoning: thinkingOf(inUse),
     apiKey: helper.catalog.proxy.apiKey,
     signal: helper.signal,
     // The instructions are the same for every call and the page changes only as the owner
@@ -71,7 +101,7 @@ export async function suggestField(helper: Helper, setup: DraftSetup, field: Fie
   });
   const answer = await stream.result();
   const tag: CallTag = { userId: helper.userId, bookId: helper.bookId, sceneId: null, turnId: null, role: 'setup' };
-  await recordCall(helper.db, tag, helper.inUse, sent, answer);
+  await recordCall(helper.db, tag, inUse, sent, answer);
 
   if (answer.stopReason === 'aborted') {
     return '';

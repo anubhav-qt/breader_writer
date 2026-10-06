@@ -188,7 +188,8 @@ describe('POST /v1/suggestions/field', () => {
     expect(user).toContain("Where: Mara's sheet (the one the owner plays): who they are");
     expect(user).toContain('<written>\nA ferrywoman\n</written>');
     expect(user.endsWith('Suggest what comes next in this field: a sentence or two, going on from where it stops. Answer with only the words to add.')).toBe(true);
-    expect(asked.body.generationConfig?.thinkingConfig?.thinkingLevel).toBe('HIGH');
+    // The account thinks high, but a suggestion has to land before the owner starts typing.
+    expect(asked.body.generationConfig?.thinkingConfig?.thinkingLevel).toBe('LOW');
   });
 
   it('asks for the length a field holds', async () => {
@@ -209,13 +210,37 @@ describe('POST /v1/suggestions/field', () => {
     const bookId = await aBook(userId);
     await send(app, 'POST', '/v1/suggestions/field', cookie, { setup: page(), field, bookId });
     const mine = await lastCall(userId);
-    expect(mine).toMatchObject({ role: 'setup', bookId, sceneId: null, turnId: null, model: 'gemini-3.8-flash-high', thinking: 'high', input: 900 });
+    expect(mine).toMatchObject({ role: 'setup', bookId, sceneId: null, turnId: null, model: 'gemini-3.8-flash-high', thinking: 'low', input: 900 });
 
     const other = await setUp(catalogOf(proxy));
     const theirs = await aBook(other.userId);
     await send(app, 'POST', '/v1/suggestions/field', cookie, { setup: page(), field, bookId: theirs });
     const kept = await lastCall(userId);
     expect(kept.bookId).toBeNull();
+  });
+
+  it('asks Gemini 3 to think low even when the catalog can’t tell that it thinks', async () => {
+    const proxy = await proxyWith([{ text: 'who hates the sea' }]);
+    // Without the management key, the catalog knows no thinking levels.
+    const { app, cookie, userId } = await setUp(catalogOf(proxy, ''));
+    const r = await send(app, 'POST', '/v1/suggestions/field', cookie, { setup: page(), field, bookId: null });
+    expect(r.body).toEqual({ text: ' who hates the sea' });
+    const [asked] = proxy.asked;
+    expect(asked.body.generationConfig?.thinkingConfig?.thinkingLevel).toBe('LOW');
+    const mine = await lastCall(userId);
+    expect(mine.thinking).toBe('low');
+  });
+
+  it('asks any other model for the least thinking it takes', async () => {
+    const proxy = await proxyWith([{ text: 'who hates the sea' }]);
+    const { app, cookie, userId } = await setUp(catalogOf(proxy));
+    await send(app, 'PUT', '/v1/settings', cookie, { model: 'claude-sonnet-4-6', thinking: 'high' });
+    const r = await send(app, 'POST', '/v1/suggestions/field', cookie, { setup: page(), field, bookId: null });
+    expect(r.body).toEqual({ text: ' who hates the sea' });
+    const [asked] = proxy.askedClaude;
+    expect(asked.thinking).toEqual({ type: 'disabled' });
+    const mine = await lastCall(userId);
+    expect(mine).toMatchObject({ model: 'claude-sonnet-4-6', thinking: 'off' });
   });
 
   it('says so when the model doesn’t answer', async () => {

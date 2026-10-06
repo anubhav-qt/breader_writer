@@ -47,7 +47,8 @@ See "The code" below for what exists.
 - **Writing gets a feel of its own.** Breader is made for reading. Where the owner writes
   (setup's fields, the play box, sheets), the writer goes past breader: a better, richer text
   editor and input area, and a typeface that makes writing feel and look good in place of
-  Dongle. The specifics are asked screen by screen.
+  Dongle. The specifics are asked screen by screen. On the setup page (its fields, the
+  Suggestions chat and the Writer's notes) it's Literata (the owner's pick, 2026-10-06).
 - Accounts: the same key and login system as breader.
 - Each book's card has a progress bar for how much of the book has been written.
 - **The book is written scene by scene.** When a scene wraps (the place or time shifts), that
@@ -188,12 +189,25 @@ See "The code" below for what exists.
 - **Procreator helps with setup as you fill it in.** It watches the setup page, and once the
   first few things are filled in (so it has something to go on), clicking into any field shows
   its suggestion for that field as faint text where you'd type, made from everything there so
-  far. Tab or the right arrow key takes it; typing anything else clears it.
+  far. Tab or the right arrow key takes it, and on a phone, which has neither, a tap on the faint
+  text does (the owner's pick, 2026-10-06); typing anything else clears it.
 - **Suggestions is a chat about the setup.** A Suggestions button opens a chat with Procreator:
   ask for anything, go back and forth, change your mind as often as you like. Once everything is
   agreed and you approve it, Procreator makes all the changes itself. On a laptop the chat is a
   panel beside the setup page, which stays in view, so approved changes land where the owner
   can watch them; on a phone it rises as a sheet over the page (the owner's pick, 2026-10-06).
+- **Approving is a list, and each item can be redone on its own** (the owner's design,
+  2026-10-06). When the talk settles, Procreator lists every change it will make, with Approve
+  under the list. Each item is exactly what it will write (a field and its new text, someone new
+  and their sheet), so what's approved lands on the page word for word. Each item has its own
+  "Writer's notes": write what should change about just
+  that item, send it, and Procreator redoes only that item, in place. Nothing else on the screen
+  changes, and the list doesn't move up or down. Saying something else in the chat makes a new
+  list, which replaces the old one. Once approved, the changes land on the page one by one.
+  In the chat, the owner's words sit in a soft grey bubble on the right, and Procreator's run
+  plainly across the panel, lists included (the owner's pick, 2026-10-06). The Suggestions
+  button is in the setup page's top bar, beside the close button, so it stays in view (the
+  owner's pick, 2026-10-06).
 
 ### Open (ask the owner one at a time, in roughly this order)
 

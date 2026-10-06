@@ -2,9 +2,9 @@ import { z } from 'zod';
 import type { Env } from '../env.ts';
 
 /*
- * Seelie's CLIProxyAPI, which the writer shares (see CLAUDE.md), cut down to what the writer
+ * Procreator's CLIProxyAPI, which the writer shares (see CLAUDE.md), cut down to what the writer
  * reads: the models the signed in accounts serve, and what the proxy knows about each. Signing
- * accounts in stays in Seelie's settings.
+ * accounts in stays in Procreator's settings.
  */
 
 const TIMEOUT_MS = 15_000;

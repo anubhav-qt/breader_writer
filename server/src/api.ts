@@ -18,7 +18,7 @@ if (env.WRITER_EMAILS.length === 0) {
   log.warn('WRITER_EMAILS is empty, so nobody can write');
 }
 
-// The models come through Seelie's CLIProxyAPI. Without one, the AI is offline here.
+// The models come through Procreator's CLIProxyAPI. Without one, the AI is offline here.
 const proxy = proxyFrom(env);
 let catalog: Catalog | null = null;
 if (proxy) {

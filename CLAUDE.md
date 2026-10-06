@@ -24,7 +24,7 @@ the way a breader card fills with colour as you read.
 Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
 settings, world, cast and the relationship graph between them) on its own page, and changing it
 later. What's left of it is the owner's test. Step 3 (AI plumbing) is built: pi is forked
-(`packages/`), the server reads the models from Seelie's proxy and keeps each account's pick
+(`packages/`), the server reads the models from Procreator's proxy and keeps each account's pick
 of model and thinking level, and the story has its tables, its change log, its working context
 rebuilt from them through Nunjucks templates, and constant folding to keep that context in
 budget (`server/src/story/`, `server/src/prompts/`). Nothing plays a story yet (step 4), so
@@ -61,17 +61,17 @@ below for what exists.
   book the way light novels read: dialogue forward, short paragraphs, plenty of the protagonist's
   inner voice, brisk pacing, and short chapters with long descriptive titles. Point of view is
   still picked per book; light novels lean first person, so setup suggests it.
-- **The AI is a hard fork of pi, the way Seelie is in POM** (see below). We fork the generalized
+- **The AI is a hard fork of pi, the way Procreator is in POM** (see below). We fork the generalized
   harness and change it for our use. Models come from the owner's subscriptions (Google
   Antigravity first, with ChatGPT Codex and Claude as other options) through CLIProxyAPI.
-- **The writer shares Seelie's CLIProxyAPI.** One proxy per machine: Seelie's on the ThinkPad,
-  and on this Mac the one Homebrew runs (port 8317). Accounts are signed in once, in Seelie's
+- **The writer shares Procreator's CLIProxyAPI.** One proxy per machine: Procreator's on the ThinkPad,
+  and on this Mac the one Homebrew runs (port 8317). Accounts are signed in once, in Procreator's
   settings; a subscription's limits belong to the account whatever the proxy, so a second proxy
   would add a second place to sign in and no room. The writer only picks the model and thinking
   level. While the proxy is down, the AI shows offline.
 - **The model is picked in the header.** A chip by the account (the model's name and its
   thinking level) drops down the models the accounts serve, and a thinking control below them,
-  like Seelie's composer picker. Always in sight, one tap away. One pick per account, for every
+  like Procreator's composer picker. Always in sight, one tap away. One pick per account, for every
   book.
 - **Only allowlisted accounts can play.** Like breader's `SPEECH_EMAILS`: a list of emails, each
   with a confirmed address. Everyone else can see the writer, with a quiet note that it's invite
@@ -136,7 +136,7 @@ below for what exists.
 - **A book leaves the writer as an EPUB download, for now.** The owner adds it to breader by
   hand. A later version will send it to the breader library directly; keep the EPUB export clean
   enough that breader reads it well (chapters as sections, no publisher CSS tricks).
-- **While the ThinkPad is off, the writer shows offline**, like Seelie, and comes back by itself.
+- **While the ThinkPad is off, the writer shows offline**, like Procreator, and comes back by itself.
   No fallback server. The downloaded EPUB is the reading copy meanwhile.
 - **How dark a story goes is picked per book** at setup: Gentle (all ages), Mature (violence,
   grief, cruelty, romance, like a mainstream adult novel; the default) or Unflinching (whatever
@@ -169,7 +169,7 @@ Each step ends working, committed, and with a short test checklist for the owner
    length, content level. Cards in the library fill with words written over the goal.
 3. **AI plumbing.** Fork pi (`packages/pi-ai`, `packages/pi-agent`) and change it for us: the
    durable story state (with every version kept, see "Changing the past"), the working context
-   rebuilt from it, and constant compaction (see "The AI" below). Reach Seelie's CLIProxyAPI
+   rebuilt from it, and constant compaction (see "The AI" below). Reach Procreator's CLIProxyAPI
    and pick a model and thinking level from settings. Set up Nunjucks prompt templates and
    their tests.
 4. **Play.** The narrator agent and its tools: turns, the author toggle, hints on tap, undo
@@ -238,7 +238,7 @@ npm workspaces, as in breader. Node 24 (`.nvmrc`).
 ### `packages/` (`@writer/pi-ai`, `@writer/pi-agent`)
 
 Our hard fork of pi (`github.com/earendil-works/pi`, MIT, forked at `a276dab`), cut the way POM
-cut it for Seelie. Each keeps pi's LICENSE. They're TypeScript sources (`exports` points at
+cut it for Procreator. Each keeps pi's LICENSE. They're TypeScript sources (`exports` points at
 `src/index.ts`), run by tsx like the server, and keep pi's own style (tabs, its idioms): it's
 their code, changed where we need, not rewritten to ours.
 
@@ -322,7 +322,7 @@ A Hono API, port 8790, built like breader's server.
 - `src/env.ts`: every setting, validated with zod. `DATABASE_URL` is the writer's tables;
   `BREADER_DATABASE_URL` is where breader's logins are (unset in production, where it's the same
   Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
-  the invite list. `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are Seelie's
+  the invite list. `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are Procreator's
   CLIProxyAPI, shared; no URL means the AI is offline.
 - `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`: `books` (owner's
   breader user id, title, colour, length, word goal, words written, point of view, darkness),
@@ -439,7 +439,7 @@ writer reads that login. Only the writer's own tables are local.
 2. `npm run dev:env` (`scripts/dev-env.mjs`) writes `server/.env` from breader's `infra/.env`:
    `SESSION_SECRET`, `COOKIE_SECURE`, and `PRIMARY_URL` and `PRIMARY_SSL` as
    `BREADER_DATABASE_URL` and `BREADER_DATABASE_SSL`. From the CLIProxyAPI Homebrew runs here
-   (`/opt/homebrew/etc/cliproxyapi.conf`, the one Seelie uses too) it takes `CLIPROXY_URL` and
+   (`/opt/homebrew/etc/cliproxyapi.conf`, the one Procreator uses too) it takes `CLIPROXY_URL` and
    `CLIPROXY_API_KEY`. It prints none of them and keeps the rest of `server/.env`. The invited
    emails go in `WRITER_EMAILS` there, and the proxy's management key in
    `CLIPROXY_MANAGEMENT_KEY` (its config only keeps a hash of it, so it comes from the owner).
@@ -488,22 +488,22 @@ The main checkout is `~/anubhav/breader` on branch `dev` (production). It is pub
 change it for the writer's needs. Don't redraw a page from scratch that breader already has.
 Whatever we write or change in it follows the code standards below.
 
-## POM and Seelie, the model for our AI
+## POM and Procreator, the model for our AI
 
 POM is the owner's order management system (`~/anubhav/pom`, `github.com/anubhav-qt/pom`; the
-local checkout can be behind, so read `origin/dev`). Seelie is its AI agent, and our AI follows
+local checkout can be behind, so read `origin/dev`). Procreator is its AI agent, and our AI follows
 the same pattern:
 
 - **pi, hard forked.** `packages/pi-ai` (streaming over four APIs: Gemini, Anthropic Messages,
   OpenAI Responses, OpenAI Chat Completions) and `packages/pi-agent` (the agent loop, tool calls
   and their events), forked from pi (`github.com/earendil-works/pi`, MIT) and trimmed to what
-  Seelie needs. The LICENSE files stay with them.
+  Procreator needs. The LICENSE files stay with them.
 - **CLIProxyAPI** (`github.com/router-for-me/CLIProxyAPI`) turns the owner's subscriptions
-  (Antigravity, Codex, Claude) into one API. Accounts are signed in from Seelie's settings through
+  (Antigravity, Codex, Claude) into one API. Accounts are signed in from Procreator's settings through
   its management API (`src/lib/seelie/cliproxy.ts`); the model list and thinking levels come from
   it too (`src/lib/seelie/catalog.ts`). Settings show each account's 5 hour and weekly limits.
 - **Where it runs.** CLIProxyAPI runs on the ThinkPad beside the app (`infra/compose.yml`, the
-  `cliproxy` service, pinned image). The cloud fallback has no proxy, so Seelie shows offline
+  `cliproxy` service, pinned image). The cloud fallback has no proxy, so Procreator shows offline
   there instead of failing (`src/lib/seelie/config.ts`). Locally: `npm run cliproxy`
   (`scripts/cliproxy.mjs`).
 - **Runs survive the tab.** A reply runs detached from the request and is mirrored to Postgres as
@@ -525,7 +525,7 @@ These are the owner's requirements for the AI. They apply from step 3 on.
   cut only at clean boundaries (never between a tool call and its result), summarize
   iteratively by passing the previous summary in, and keep raw history stored even when it's no
   longer sent.
-- **Default model: Gemini 3.8 Flash, thinking high**, the same default as Seelie. Its window is
+- **Default model: Gemini 3.8 Flash, thinking high**, the same default as Procreator. Its window is
   1.05M tokens. The model and thinking level can be changed from settings.
 
 ### Never forget, and compact constantly
@@ -616,7 +616,7 @@ chat as the memory.
 
 ### Prompt templates
 
-- **Nunjucks** (`.njk`), the TypeScript world's Jinja, as POM's Seelie studio uses
+- **Nunjucks** (`.njk`), the TypeScript world's Jinja, as POM's Procreator studio uses
   (`src/lib/seelie/studio/templates/`). Templates use partials, macros and simple conditionals;
   any real logic stays in TypeScript, which hands the template a typed object.
 - **Dynamic:** every prompt is assembled per call from the book's settings (point of view,

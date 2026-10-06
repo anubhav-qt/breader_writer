@@ -41,7 +41,7 @@ const Env = z.object({
   WRITER_EMAILS: list.transform((emails) => emails.map((e) => e.toLowerCase())).default([]),
 
   /**
-   * Seelie's CLIProxyAPI, which the writer shares (see CLAUDE.md): its address, like
+   * Procreator's CLIProxyAPI, which the writer shares (see CLAUDE.md): its address, like
    * http://127.0.0.1:8317. Unset means no AI here, and the writer says it's offline.
    */
   CLIPROXY_URL: z.string().optional(),

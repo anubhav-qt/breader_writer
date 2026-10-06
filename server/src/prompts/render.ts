@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import nunjucks from 'nunjucks';
 
 /*
- * The prompts are Nunjucks templates in templates/ (Jinja's syntax), as Seelie's studio has them.
+ * The prompts are Nunjucks templates in templates/ (Jinja's syntax), as Procreator's studio has them.
  * Each takes a typed object that TypeScript prepares (story/view.ts); a template only lays it
  * out. A variable that's missing fails the render instead of leaving a hole in a prompt.
  */

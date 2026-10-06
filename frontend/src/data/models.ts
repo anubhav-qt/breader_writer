@@ -3,7 +3,7 @@ import { writer } from '../lib/api';
 
 /*
  * The model the owner's stories run on, and how hard it thinks: picked in the header, once for
- * every book. The models are whatever the accounts signed in to Seelie's proxy serve.
+ * every book. The models are whatever the accounts signed in to Procreator's proxy serve.
  */
 
 /** The server asks the proxy, which can take a while the first time. */
@@ -34,7 +34,7 @@ export function thinkingName(level: ThinkingLevel): string {
   return THINKING_NAMES[level];
 }
 
-/** The account kinds Seelie signs in, by the names their owners know them by. */
+/** The account kinds Procreator signs in, by the names their owners know them by. */
 const PROVIDER_NAMES: Record<string, string> = {
   antigravity: 'Antigravity',
   codex: 'ChatGPT',

@@ -61,7 +61,7 @@ function chipText(loaded: Loaded): string {
 
 /**
  * The header's model picker: the model the owner's stories run on, and how hard it thinks, for
- * every book. It drops down the models the accounts signed in to Seelie's proxy serve. Built from
+ * every book. It drops down the models the accounts signed in to Procreator's proxy serve. Built from
  * what the library has: its ghost button, the account menu's dropdown, and breader's segmented
  * control.
  */
@@ -84,7 +84,7 @@ export function ModelPicker() {
     void load();
   }, []);
 
-  // Opening it asks again, so a model just signed in at Seelie shows up.
+  // Opening it asks again, so a model just signed in at Procreator shows up.
   useEffect(() => {
     if (!open) {
       setMessage(null);
@@ -196,13 +196,13 @@ function Menu({ loaded, message, onRetry, onModel, onThinking }: MenuProps) {
   if (!settings.models) {
     return (
       <div className="acct-verify">
-        <span>The AI is offline: Seelie’s proxy can’t be reached. It comes back by itself.</span>
+        <span>The AI is offline: Procreator’s proxy can’t be reached. It comes back by itself.</span>
         <button type="button" className="login-link" onClick={onRetry}>Try again</button>
       </div>
     );
   }
   if (settings.models.length === 0) {
-    return <div className="acct-verify">No models yet. Sign an account in from Seelie’s settings.</div>;
+    return <div className="acct-verify">No models yet. Sign an account in from Procreator’s settings.</div>;
   }
 
   const current = modelIn(settings, settings.using.model);
@@ -232,7 +232,7 @@ function Menu({ loaded, message, onRetry, onModel, onThinking }: MenuProps) {
       {!picksThinking(current) && <div className="acct-verify">It thinks at its own pace.</div>}
       {message && <p className="acct-message" role="status">{message}</p>}
       <div className="acct-sep" />
-      <div className="acct-verify">For every book. Accounts are signed in at Seelie.</div>
+      <div className="acct-verify">For every book. Accounts are signed in at Procreator.</div>
     </>
   );
 }

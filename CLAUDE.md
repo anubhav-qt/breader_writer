@@ -61,24 +61,30 @@ below for what exists.
   book the way light novels read: dialogue forward, short paragraphs, plenty of the protagonist's
   inner voice, brisk pacing, and short chapters with long descriptive titles. Point of view is
   still picked per book; light novels lean first person, so setup suggests it.
-- **The AI is a hard fork of pi, the way Procreator is in POM** (see below). We fork the generalized
-  harness and change it for our use. Models come from the owner's subscriptions (Google
-  Antigravity first, with ChatGPT Codex and Claude as other options) through CLIProxyAPI.
-- **The writer shares Procreator's CLIProxyAPI.** One proxy per machine: Procreator's on the ThinkPad,
-  and on this Mac the one Homebrew runs (port 8317). Accounts are signed in once, in Procreator's
-  settings; a subscription's limits belong to the account whatever the proxy, so a second proxy
-  would add a second place to sign in and no room. The writer only picks the model and thinking
-  level. While the proxy is down, the AI shows offline.
+- **The AI is Procreator, a hard fork of pi** (see "The AI" below). We fork the generalized
+  harness and change it for our use. POM and its agent are a separate project: nothing here
+  comes from them.
+- **Models come through CLIProxyAPI, one per machine.** On this Mac it's the one Homebrew runs
+  (port 8317). Its accounts (Google Antigravity first, with ChatGPT Codex and Claude as other
+  options) are signed in to it outside the writer, through its management API; the writer only
+  picks the model and thinking level. While the proxy is down, the AI shows offline. This holds
+  until writers bring their own AI (below).
 - **The model is picked in the header.** A chip by the account (the model's name and its
-  thinking level) drops down the models the accounts serve, and a thinking control below them,
-  like Procreator's composer picker. Always in sight, one tap away. One pick per account, for every
-  book.
-- **Only allowlisted accounts can play.** Like breader's `SPEECH_EMAILS`: a list of emails, each
-  with a confirmed address. Everyone else can see the writer, with a quiet note that it's invite
-  only. This keeps the subscriptions personal and inside their limits. A key on its own isn't
-  enough to play, since a key has no email.
+  thinking level) drops down the models the accounts serve, and a thinking control below them.
+  Always in sight, one tap away. One pick per account, for every book.
+- **Anyone can write, with their own AI.** A writer brings their own: an API key (BYOK), or a
+  sign-in with a subscription they already have (Claude Code, Codex, Antigravity and the like).
+  Without either, a free trial writes one chapter on our key. Not built yet (see "Open").
+- **Until then, only invited accounts can play.** Like breader's `SPEECH_EMAILS`: a list of
+  emails (`WRITER_EMAILS`), each with a confirmed address. Everyone else can see the writer, with
+  a quiet note that it's invite only. A key on its own isn't enough to play, since a key has no
+  email.
 - **Your turn is free text, with hints on tap.** One box where you write what you do and say in
   your own words. A tap shows 3 possible moves when you're stuck; otherwise nothing is suggested.
+- **You can play more than the main character.** Above the box is a toggle, "Main character and
+  author only", on by default: you play the protagonist and write author notes. Turned off,
+  Procreator asks you each time another character is about to act whether you want to play them
+  this time.
 - **Author notes come from a toggle on the box.** One tap switches it from "as <protagonist>" to
   "as the author" ("skip to the next morning", "make the storm worse"). The story follows the
   note without the character saying it, and the book never mentions it.
@@ -90,12 +96,12 @@ below for what exists.
 - **A character starts as a few fields plus notes:** name, who they are, personality, past, and
   a free notes box. Only the name is required; the AI can fill any blank. How they relate to the
   others is in the relationship graph.
-- **Characters grow as the story goes.** Whenever the agent judges that a character has
-  developed (a new fear, a secret revealed, a changed loyalty, a habit), it adds to their sheet by
-  itself, and those additions compound over the story. Characters who matter most end up with
-  rich, complex sheets; walk-ons stay small. The owner can open and edit any cast member's sheet
-  at any time, and the edit reaches back through everything already played and written (see
-  "Changing the past").
+- **Characters grow as the story goes.** Whenever Procreator judges that a character has
+  developed (a new fear, a secret revealed, a changed loyalty, a habit), it adds to their page in
+  the reference by itself, below the owner's sheet, and those additions compound over the story.
+  Characters who matter most end up with rich, complex pages; walk-ons stay small. The owner can
+  open and edit any cast member's sheet or page at any time, and the edit reaches back through
+  everything already played and written (see "Changing the past").
 - **A change can reach back to the start.** When the owner changes something later, every
   earlier place that says otherwise can be brought in line: the state, the summaries, the turns
   and the written book.
@@ -136,8 +142,8 @@ below for what exists.
 - **A book leaves the writer as an EPUB download, for now.** The owner adds it to breader by
   hand. A later version will send it to the breader library directly; keep the EPUB export clean
   enough that breader reads it well (chapters as sections, no publisher CSS tricks).
-- **While the ThinkPad is off, the writer shows offline**, like Procreator, and comes back by itself.
-  No fallback server. The downloaded EPUB is the reading copy meanwhile.
+- **While the ThinkPad is off, the writer shows offline**, and comes back by itself. No fallback
+  server. The downloaded EPUB is the reading copy meanwhile.
 - **How dark a story goes is picked per book** at setup: Gentle (all ages), Mature (violence,
   grief, cruelty, romance, like a mainstream adult novel; the default) or Unflinching (whatever
   the model will write). The models' own filters apply on top.
@@ -149,13 +155,27 @@ below for what exists.
   personality, past, notes. It's the same sheet that opens mid story to read or edit someone, so
   it's built once and looks the same everywhere. A relationship opens the same way, as its own
   sheet.
+- **Procreator helps with setup as you fill it in.** It watches the setup page, and once the
+  first few things are filled in, clicking into any field shows a suggestion for it, made from
+  everything there so far.
+- **Suggestions is a chat about the setup.** A Suggestions button opens a chat with Procreator:
+  ask for anything, go back and forth, change your mind as often as you like. Once everything is
+  agreed and you approve it, Procreator makes all the changes itself.
 
 ### Open (ask the owner one at a time, in roughly this order)
 
-1. Design direction for each new screen (setup, play, cast sheets), asked when we reach it.
-   The library and the book view start as copies of breader's pages.
+1. Design direction for each new screen (setup, play, cast sheets, setup's suggestions), asked
+   when we reach it. The library and the book view start as copies of breader's pages.
 2. Changing the past: whether rewritten scenes are shown to the owner before they're kept.
    Asked when we reach it (step 5).
+3. Where setup's suggestions (the field suggestions and the Suggestions chat) go in the build
+   order.
+4. Bringing your own AI: what "our key" is for the free trial (a paid API key, or the owner's
+   own subscriptions, which are usually for personal use only), what a trial chapter is (one
+   scene written into the book?), how keys and sign-ins are kept, whether CLIProxyAPI still has
+   a part, each provider's terms for using a subscription from another app, and where it goes in
+   the build order. Until it's built, the model picker's copy says accounts are signed in at
+   Procreator's settings, which don't exist yet.
 
 ### Build order
 
@@ -167,20 +187,21 @@ Each step ends working, committed, and with a short test checklist for the owner
    schema. No AI yet.
 2. **Setup.** Make a book: world, cast and the relationship graph between them, point of view,
    length, content level. Cards in the library fill with words written over the goal.
-3. **AI plumbing.** Fork pi (`packages/pi-ai`, `packages/pi-agent`) and change it for us: the
-   durable story state (with every version kept, see "Changing the past"), the working context
-   rebuilt from it, and constant compaction (see "The AI" below). Reach Procreator's CLIProxyAPI
-   and pick a model and thinking level from settings. Set up Nunjucks prompt templates and
-   their tests.
-4. **Play.** The narrator agent and its tools: turns, the author toggle, hints on tap, undo
-   within a scene, scenes ending, the cast growing and new characters joining, relationships
+3. **AI plumbing.** Fork pi (`packages/pi-ai`, `packages/pi-agent`) and change it for us. Reach
+   CLIProxyAPI and pick a model and thinking level from settings. Procreator's memory (see "The
+   AI" below): the durable story state with every version kept, a session per scene that opens
+   with a brief built from it, the reference and memory Procreator keeps with its tools, and our
+   own compaction. Nunjucks prompt templates and their tests.
+4. **Play.** Procreator narrating, and its play tools: turns, the author toggle, playing other
+   characters (the "Main character and author only" toggle), hints on tap, undo within a scene,
+   scenes ending (and their wrap-up), the cast growing and new characters joining, relationships
    shifting, and the owner's changes reaching back through the turns and the state.
 5. **The book.** The scene writer, the book view (a copy of breader's reader), the progress bar
    and the EPUB download, and the owner's changes reaching back into written scenes.
 6. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
    the writer's app, the writer API behind the tunnel, and the nightly backup. The writer API
-   must reach POM's `cliproxy` service, management routes included, which only answer their own
-   machine unless told otherwise (`allow-remote`); work out how when we get there.
+   must reach a CLIProxyAPI on the ThinkPad, management routes included, which only answer their
+   own machine unless told otherwise (`allow-remote`); work out how when we get there.
 
 ### Notes for step 1
 
@@ -237,16 +258,16 @@ npm workspaces, as in breader. Node 24 (`.nvmrc`).
 
 ### `packages/` (`@writer/pi-ai`, `@writer/pi-agent`)
 
-Our hard fork of pi (`github.com/earendil-works/pi`, MIT, forked at `a276dab`), cut the way POM
-cut it for Procreator. Each keeps pi's LICENSE. They're TypeScript sources (`exports` points at
+Our hard fork of pi (`github.com/earendil-works/pi`, MIT, forked at `a276dab`), cut down to what
+the writer needs. Each keeps pi's LICENSE. They're TypeScript sources (`exports` points at
 `src/index.ts`), run by tsx like the server, and keep pi's own style (tabs, its idioms): it's
 their code, changed where we need, not rewritten to ours.
 
 - `pi-ai`: streaming one model reply over four APIs (Gemini, Anthropic Messages, OpenAI
   Responses, OpenAI Chat Completions), which is all CLIProxyAPI speaks. `streamSimple` in
   `src/stream.ts` picks the API by `model.api` and loads it on first use. Dropped from upstream:
-  every other API, the provider catalogs, OAuth and credentials, images, telemetry. Kept on top
-  of POM's cut: the token estimates (`utils/estimate.ts`), for the context budget.
+  every other API, the provider catalogs, OAuth and credentials, images, telemetry. Kept: the
+  token estimates (`utils/estimate.ts`), for the context budget.
 - `pi-agent`: the agent loop (a reply, its tool calls, their results, again until it's done)
   and its events. Dropped: the proxy transport.
 
@@ -322,8 +343,8 @@ A Hono API, port 8790, built like breader's server.
 - `src/env.ts`: every setting, validated with zod. `DATABASE_URL` is the writer's tables;
   `BREADER_DATABASE_URL` is where breader's logins are (unset in production, where it's the same
   Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
-  the invite list. `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are Procreator's
-  CLIProxyAPI, shared; no URL means the AI is offline.
+  the invite list. `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are the
+  CLIProxyAPI the models come through; no URL means the AI is offline.
 - `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`: `books` (owner's
   breader user id, title, colour, length, word goal, words written, point of view, darkness),
   `worlds` (one per book), `characters` (role `protagonist` or `cast`, in order; the key is the
@@ -439,8 +460,7 @@ writer reads that login. Only the writer's own tables are local.
 2. `npm run dev:env` (`scripts/dev-env.mjs`) writes `server/.env` from breader's `infra/.env`:
    `SESSION_SECRET`, `COOKIE_SECURE`, and `PRIMARY_URL` and `PRIMARY_SSL` as
    `BREADER_DATABASE_URL` and `BREADER_DATABASE_SSL`. From the CLIProxyAPI Homebrew runs here
-   (`/opt/homebrew/etc/cliproxyapi.conf`, the one Procreator uses too) it takes `CLIPROXY_URL` and
-   `CLIPROXY_API_KEY`. It prints none of them and keeps the rest of `server/.env`. The invited
+   (`/opt/homebrew/etc/cliproxyapi.conf`) it takes `CLIPROXY_URL` and `CLIPROXY_API_KEY`. It prints none of them and keeps the rest of `server/.env`. The invited
    emails go in `WRITER_EMAILS` there, and the proxy's management key in
    `CLIPROXY_MANAGEMENT_KEY` (its config only keeps a hash of it, so it comes from the owner).
 3. `npm run db`, `npm run migrate`, then `npm run api` (port 8790) and `npm run web` (5174).
@@ -488,84 +508,95 @@ The main checkout is `~/anubhav/breader` on branch `dev` (production). It is pub
 change it for the writer's needs. Don't redraw a page from scratch that breader already has.
 Whatever we write or change in it follows the code standards below.
 
-## POM and Procreator, the model for our AI
-
-POM is the owner's order management system (`~/anubhav/pom`, `github.com/anubhav-qt/pom`; the
-local checkout can be behind, so read `origin/dev`). Procreator is its AI agent, and our AI follows
-the same pattern:
-
-- **pi, hard forked.** `packages/pi-ai` (streaming over four APIs: Gemini, Anthropic Messages,
-  OpenAI Responses, OpenAI Chat Completions) and `packages/pi-agent` (the agent loop, tool calls
-  and their events), forked from pi (`github.com/earendil-works/pi`, MIT) and trimmed to what
-  Procreator needs. The LICENSE files stay with them.
-- **CLIProxyAPI** (`github.com/router-for-me/CLIProxyAPI`) turns the owner's subscriptions
-  (Antigravity, Codex, Claude) into one API. Accounts are signed in from Procreator's settings through
-  its management API (`src/lib/seelie/cliproxy.ts`); the model list and thinking levels come from
-  it too (`src/lib/seelie/catalog.ts`). Settings show each account's 5 hour and weekly limits.
-- **Where it runs.** CLIProxyAPI runs on the ThinkPad beside the app (`infra/compose.yml`, the
-  `cliproxy` service, pinned image). The cloud fallback has no proxy, so Procreator shows offline
-  there instead of failing (`src/lib/seelie/config.ts`). Locally: `npm run cliproxy`
-  (`scripts/cliproxy.mjs`).
-- **Runs survive the tab.** A reply runs detached from the request and is mirrored to Postgres as
-  it goes, so it keeps going when the tab closes and the stream resumes on return
-  (`src/lib/seelie/engine.ts`).
-
 ## The AI: harness, memory, tools and prompts
 
-These are the owner's requirements for the AI. They apply from step 3 on.
+These are the owner's requirements for the AI. They apply from step 3 on. The AI is called
+Procreator.
 
 ### The harness
 
 - **Fork upstream pi and change it to our needs.** Upstream is `github.com/earendil-works/pi`
   (MIT). Its `packages/ai` becomes our `packages/pi-ai` and `packages/agent` our
-  `packages/pi-agent`, kept with their LICENSE files, as POM did. Trim what we don't use and
-  change what we need; it's a hard fork, not a dependency we keep in sync.
-- **Borrow pi's compaction ideas** from `packages/coding-agent/docs/compaction.md`,
-  `packages/coding-agent/src/core/compaction/` and `packages/durable/src/harness/compaction.ts`:
-  cut only at clean boundaries (never between a tool call and its result), summarize
-  iteratively by passing the previous summary in, and keep raw history stored even when it's no
-  longer sent.
-- **Default model: Gemini 3.8 Flash, thinking high**, the same default as Procreator. Its window is
-  1.05M tokens. The model and thinking level can be changed from settings.
+  `packages/pi-agent`, kept with their LICENSE files. Trim what we don't use and change what we
+  need; it's a hard fork, not a dependency we keep in sync.
+- **Our own compaction**, designed for Procreator and the story, not borrowed from pi or
+  anywhere else (see below).
+- **Default model: Gemini 3.8 Flash, thinking high.** Its window is 1.05M tokens. The model and
+  thinking level can be changed from settings.
 
-### Never forget, and compact constantly
+### Procreator's memory
 
-The story must never forget anything, at any point. The way to get there is to stop treating the
-chat as the memory.
+The story must never forget anything, at any point, and no model's context holds a whole book.
+So the database is the memory, and each scene is played in a session of its own that starts
+from it.
 
-- **Durable state is the memory.** Everything the story knows lives in Postgres (the `writer`
-  schema): the world sheet; the cast sheets as they grow; the relationship graph; a ledger of
-  canon facts, each tied to the turn or scene it came from; open threads and promises the story
-  has made; the arc and its pacing (words written against the goal); a timeline; a summary of
-  every scene; and the raw text of every turn and every written scene. Nothing is ever deleted
-  by compaction.
-- **The working context is rebuilt from that state** for every call: the instructions, then the
-  story bible (world and cast), the arc and open threads, summaries of earlier scenes, the
-  current scene's turns word for word, and last the new input. The model never relies on
-  something that only lives in an old message.
-- **Compact constantly, within the same chat.** Keep the working context under **200k tokens**
-  out of the 1.05M window. Compaction is routine, not an emergency:
-  - At every scene end, that scene's turns fold into its summary and into the state (facts,
-    sheets, threads), and leave the context.
-  - Mid scene, when the context passes the 200k budget, the oldest turns of the scene fold the
-    same way.
-  - Compaction writes to the durable state first and trims second. Never trim what hasn't been
-    saved.
-- **Recall exact words on demand.** A tool searches the raw turns and the written book, so when a
-  summary isn't enough the model can look up exactly what was said.
-- **Measure it.** Record the tokens each call used, so the budget is visible and testable.
+- **The database is the memory.** Everything the story knows lives in Postgres (the `writer`
+  schema): the book's settings, the world and cast as the owner set them up, the relationship
+  graph, the reference, Procreator's memory, a summary of every scene, and the raw text of every
+  turn and every written scene. Nothing is ever deleted, by compaction or anything else.
+- **One session per scene.** A scene is played as one real chat: Procreator's instructions, the
+  brief it opens with, then the turns as they happened (the owner's moves, Procreator's replies,
+  its tool calls and their results), kept message by message. Every call sends the session as it
+  stands; since it only grows at the end, the provider's prompt cache can cover all of it but the
+  newest move, and the model carries its thinking from turn to turn (Gemini's thought
+  signatures). A session is a working copy: the database still holds everything it says.
+- **The brief** is built from the database when a session opens (and again after a compaction),
+  and stays word for word the same through it:
+  - the book's settings, and where it stands against its length;
+  - every earlier scene's summary, so the whole story is always in view;
+  - the Plan and Threads pages, and Procreator's memory;
+  - the cast: the people in the scene in full (the owner's sheet and Procreator's page), everyone
+    else in a line; the relationships among the people in the scene in full, everyone else's as
+    their bond;
+  - the page of the scene's place, if it has one, and the last scene's closing turns word for
+    word;
+  - the index of the reference: every page's title and what it holds.
+- **The reference** is the story's canon in depth, written by Procreator: a page for each
+  character, place, group, thing and part of the world, and the story's own pages (Plan,
+  Threads, Timeline). A character's page is the owner's sheet on top, which Procreator reads and
+  never changes, and Procreator's own depth below it. Procreator reads a page when it needs one,
+  and writes to it whenever the story establishes something that will matter beyond the scene.
+  The owner can read, edit and add pages too, and the owner's edit wins. The risk with depth on
+  demand is the model not looking, so what the scene needs is in the brief already, and anyone
+  who enters mid scene arrives with their page.
+- **Memory** is Procreator's notes to itself about the work, not the story: what the owner likes
+  and doesn't, what they've asked for that still holds, and what it has learned about writing
+  this book. It's short, all of it is in every brief, and the owner can see and edit it.
+- **Our own compaction**, designed for the story. Save first, trim second: turns leave the
+  context only once the reference and a summary hold what they said, and a fold that fails
+  changes nothing.
+  - **The wrap-up, at every scene's end.** In the same session, with the whole scene still in
+    view (and in the cache), Procreator saves everything the scene established to the reference
+    and its memory, then writes the scene's summary. The summary is the backbone the story so far
+    is made of, so it's short; the depth is in the pages it has just written. Then the session
+    closes.
+  - **Mid scene, as a safety net.** A scene's play is tens of thousands of tokens, so a session
+    should rarely pass 150k. Past 400k (sooner on a model whose window can't fit that and a
+    reply), Procreator first saves what the older turns established, the same way, then writes
+    the scene so far, keeping everything an earlier summary of it said. The session goes on from
+    a fresh brief, that summary and the latest turns word for word. The cut falls only between
+    turns, so a move, its reply and their tool calls stay together.
+- **Undo** cuts the session back to before the turn, and the change log takes back what the
+  turns from there on changed. **The owner's edits mid scene** join the session as a note when
+  they hold "from now on"; when they rewrite the past ("always so", a rename), the session starts
+  again from the rewritten turns.
+- **Recall exact words on demand.** A tool searches the reference, the scene summaries, every
+  turn played and (from step 5) the written book.
+- **Measure it.** Every call is recorded with the tokens counted before sending and what the
+  model says it used, cache reads included.
 
 ### State
 
-- **One source of truth:** the database. The agent changes state only through tools; it never
+- **One source of truth:** the database. Procreator changes state only through tools; it never
   keeps state only in its context.
-- **The owner's edits win.** An edit to any sheet is true from the next call on.
+- **The owner's edits win.** An edit to any sheet or page is true from the next call on.
 - **Every change is tagged** with who made it (the owner or the agent) and the turn it came
   from. That is what lets undo within a scene roll the state back along with the turns.
 - **People are referred to by id, never by name**, everywhere in the structured state: sheets,
-  relationships, facts, threads, the timeline. A name is written once, on its sheet, and filled
-  in when the context is built. So renaming someone changes every structured place at once, and
-  only text (turns, summaries, written scenes) needs rewriting.
+  relationships and their history, pages, memory. Procreator writes a cast member as a link,
+  `[[Name]]`, which is kept as their id and shown with their name as it is now. So renaming
+  someone changes every structured place at once, and only text (turns, summaries, written
+  scenes) needs rewriting.
 
 ### Relationships
 
@@ -573,8 +604,8 @@ chat as the memory.
   things to each other at once, and each can see the other differently.
 - **Every line keeps its history**: each change, tagged like any other with who made it and the
   turn or scene, so the story knows how two people got where they are, and undo rolls it back.
-- **In the working context**, the relationships between the people in the current scene go in
-  full, their history folded to a summary; everyone else's go in short.
+- **In the brief**, the relationships between the people in the scene go in full, with their
+  history; everyone else's go as their bond.
 - **A line is a bond and two sides** (see "Decided"): the shared bond, each side's view of the
   other and what they hide, and the history. What a side hides is for the narrator to play, not
   for the other character to know until the story reveals it.
@@ -603,22 +634,24 @@ chat as the memory.
   (typebox, as pi uses), validated before running.
 - Results are short and say what changed. Errors say how to fix the call.
 - Safe to repeat where possible, so a retry never doubles a change.
-- Likely set for the narrator (designed properly in step 4): end the scene, add to a character's
-  sheet, introduce a character, shift a relationship, record a fact, open or close a thread,
-  recall earlier text.
+- Procreator's memory tools come with its memory (step 3): reading, writing and editing pages,
+  searching, remembering and forgetting, and shifting a relationship. Its play tools are
+  designed with play (step 4): end the scene, introduce a character, and what else play needs.
 
-### The roles
+### Procreator's jobs
 
-- **Narrator:** plays the world around the protagonist, turn by turn, and keeps the state.
+- **Narrator:** plays the world around whoever the owner plays, turn by turn, in the scene's
+  session, and keeps the memory.
+- **Folds:** the wrap-up at each scene's end, and compaction when a session grows too long.
 - **Author:** writes each finished scene into the book, in the book's point of view, style and
   content level, from the scene's turns and the state.
-- **Hints:** a small call that suggests 3 moves when the owner taps for them.
+- **Hints:** suggests 3 moves when the owner taps for them.
+- **Setup help:** the suggestions in setup's fields, and the Suggestions chat.
 
 ### Prompt templates
 
-- **Nunjucks** (`.njk`), the TypeScript world's Jinja, as POM's Procreator studio uses
-  (`src/lib/seelie/studio/templates/`). Templates use partials, macros and simple conditionals;
-  any real logic stays in TypeScript, which hands the template a typed object.
+- **Nunjucks** (`.njk`), the TypeScript world's Jinja. Templates use partials, macros and simple
+  conditionals; any real logic stays in TypeScript, which hands the template a typed object.
 - **Dynamic:** every prompt is assembled per call from the book's settings (point of view,
   length and style, content level), its pacing (where we are in the arc against the goal), and
   the state.
@@ -628,8 +661,10 @@ chat as the memory.
   current official prompting guide for the model family it targets and follow it; they change
   with every model. Start from:
   - Gemini: `ai.google.dev/gemini-api/docs/prompting-strategies`, the Gemini 3 developer guide
-    `ai.google.dev/gemini-api/docs/gemini-3`, and the Gemini 3 prompting guide on Vertex AI
-    `docs.cloud.google.com/vertex-ai/generative-ai/docs/start/gemini-3-prompting-guide`.
+    `ai.google.dev/gemini-api/docs/gemini-3`, function calling
+    `ai.google.dev/gemini-api/docs/function-calling` and caching
+    `ai.google.dev/gemini-api/docs/caching`. (Vertex AI's Gemini 3 prompting guide moved; its
+    old address is a 404.)
   - Claude: `platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview` and its
     long context tips.
   - OpenAI: the prompting guides in the cookbook, `cookbook.openai.com`.
@@ -638,7 +673,10 @@ chat as the memory.
   put the persona, the rules and the output format in the system instruction; put long context
   first and the instruction or question last; keep temperature at its default of 1.0; don't write
   chain of thought instructions (the thinking level does that); and ask for length and detail
-  explicitly, since the model defaults to concise.
+  explicitly, since the model defaults to concise. Checked again for sessions (October 2026):
+  send the history back exactly as it came, thought signatures included; implicit caching is on
+  by default, starts at 4,096 tokens for the Flash models, and hits when large, common content
+  comes first and requests sharing a prefix come close together.
 
 ## How we work
 

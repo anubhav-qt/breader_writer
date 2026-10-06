@@ -1,9 +1,9 @@
 /*
  * Writes server/.env for running the writer here against production breader. Breader's own
  * settings (its infra/.env) give the secret its login cookie is signed with and where its logins
- * are. The CLIProxyAPI that Homebrew runs here (the one Procreator uses too) gives its address and its
- * API key. Everything else stays as server/.env has it, or as server/.env.example has it the first
- * time. Nothing read is printed.
+ * are. The CLIProxyAPI that Homebrew runs here gives its address and its API key. Everything
+ * else stays as server/.env has it, or as server/.env.example has it the first time. Nothing
+ * read is printed.
  *
  *   npm run dev:env                        breader's settings from ../breader/infra/.env
  *   BREADER_ENV=<path> npm run dev:env     from somewhere else

@@ -2,9 +2,9 @@ import { z } from 'zod';
 import type { Env } from '../env.ts';
 
 /*
- * Procreator's CLIProxyAPI, which the writer shares (see CLAUDE.md), cut down to what the writer
- * reads: the models the signed in accounts serve, and what the proxy knows about each. Signing
- * accounts in stays in Procreator's settings.
+ * The CLIProxyAPI the models come through (see CLAUDE.md), cut down to what the writer reads:
+ * the models the signed in accounts serve, and what the proxy knows about each. Accounts are
+ * signed in to it outside the writer, for now.
  */
 
 const TIMEOUT_MS = 15_000;

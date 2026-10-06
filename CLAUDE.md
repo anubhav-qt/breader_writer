@@ -186,7 +186,9 @@ See "The code" below for what exists.
   far. Tab or the right arrow key takes it; typing anything else clears it.
 - **Suggestions is a chat about the setup.** A Suggestions button opens a chat with Procreator:
   ask for anything, go back and forth, change your mind as often as you like. Once everything is
-  agreed and you approve it, Procreator makes all the changes itself.
+  agreed and you approve it, Procreator makes all the changes itself. On a laptop the chat is a
+  panel beside the setup page, which stays in view, so approved changes land where the owner
+  can watch them; on a phone it rises as a sheet over the page (the owner's pick, 2026-10-06).
 
 ### Open (ask the owner one at a time, in roughly this order)
 

@@ -5,20 +5,35 @@ import type { Proxy } from '../src/ai/proxy.ts';
 
 /*
  * A stand-in for CLIProxyAPI: the two routes the writer reads, and Gemini's streaming route for a
- * model's reply, answering from what a test hands it and turning away the wrong key the way the
- * proxy does. It keeps what each call was sent, so a test can read the prompt.
+ * model's reply, answering from what a test hands it (text, tool calls, a thought signature, what
+ * it read and what of that came from the cache) and turning away the wrong key the way the proxy
+ * does. It keeps what each call was sent, so a test can read the prompt.
  */
 
 export const API_KEY = 'test-api-key';
 export const MANAGEMENT_KEY = 'test-management-key';
 
-/** A model's answer: its text, or an error the proxy passes on. */
+/** A tool call in a model's answer. */
+export interface Call {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+/** A model's answer: its text and tool calls, or an error the proxy passes on. */
 export interface Reply {
   text?: string;
+  /** Tool calls, before any text. */
+  calls?: Call[];
+  /** A thought signature on the answer's first part, as Gemini 3 sends them. */
+  signature?: string;
   /** Gemini's finishReason, STOP unless said. MAX_TOKENS is a reply cut off. */
   finish?: string;
   /** An HTTP error instead of a reply. */
   status?: number;
+  /** The tokens it says it read, 1200 unless said. */
+  read?: number;
+  /** Of those, the ones it says came from the cache. */
+  cached?: number;
 }
 
 export interface Served {
@@ -36,10 +51,20 @@ export interface Asked {
   body: GeminiRequest;
 }
 
+/** A part of a message in Gemini's request. */
+export interface GeminiPart {
+  text?: string;
+  thought?: boolean;
+  thoughtSignature?: string;
+  functionCall?: { name: string; args: Record<string, unknown> };
+  functionResponse?: { name: string; response: Record<string, unknown> };
+}
+
 /** The parts of Gemini's request the tests read. */
 export interface GeminiRequest {
-  contents: { role: string; parts: { text?: string }[] }[];
+  contents: { role: string; parts: GeminiPart[] }[];
   systemInstruction?: { parts: { text?: string }[] };
+  tools?: { functionDeclarations: { name: string }[] }[];
   generationConfig?: { thinkingConfig?: { thinkingLevel?: string } };
 }
 
@@ -56,6 +81,30 @@ export function promptOf(asked: Asked): { system: string; user: string } {
   const last = asked.body.contents.at(-1);
   const user = last?.parts.map((part) => part.text ?? '').join('') ?? '';
   return { system, user };
+}
+
+/** Every message's text in a request, in order: what the model was sent, besides its instructions. */
+export function textsOf(asked: Asked): string[] {
+  const texts: string[] = [];
+  for (const content of asked.body.contents) {
+    for (const part of content.parts) {
+      if (part.text) {
+        texts.push(part.text);
+      }
+    }
+  }
+  return texts;
+}
+
+/** The tools a request declared, by name. */
+export function toolsOf(asked: Asked): string[] {
+  const names: string[] = [];
+  for (const tool of asked.body.tools ?? []) {
+    for (const declaration of tool.functionDeclarations) {
+      names.push(declaration.name);
+    }
+  }
+  return names;
 }
 
 function keyOf(header: string | undefined): string {
@@ -91,11 +140,32 @@ async function bodyOf(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-/** Gemini's streamed reply: one event with all the text, and what it used. */
+/** The parts of a reply: its tool calls, then its text. */
+function partsOf(reply: Reply): GeminiPart[] {
+  const parts: GeminiPart[] = [];
+  for (const call of reply.calls ?? []) {
+    parts.push({ functionCall: { name: call.name, args: call.args } });
+  }
+  if (reply.text !== undefined || parts.length === 0) {
+    parts.push({ text: reply.text ?? '' });
+  }
+  if (reply.signature) {
+    parts[0].thoughtSignature = reply.signature;
+  }
+  return parts;
+}
+
+/** Gemini's streamed reply: one event with all of it, and what it used. */
 function streamed(model: string, reply: Reply): string {
+  const read = reply.read ?? 1200;
   const event = {
-    candidates: [{ content: { role: 'model', parts: [{ text: reply.text ?? '' }] }, finishReason: reply.finish ?? 'STOP', index: 0 }],
-    usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 80, totalTokenCount: 1280 },
+    candidates: [{ content: { role: 'model', parts: partsOf(reply) }, finishReason: reply.finish ?? 'STOP', index: 0 }],
+    usageMetadata: {
+      promptTokenCount: read,
+      cachedContentTokenCount: reply.cached ?? 0,
+      candidatesTokenCount: 80,
+      totalTokenCount: read + 80,
+    },
     modelVersion: model,
   };
   return `data: ${JSON.stringify(event)}\n\n`;

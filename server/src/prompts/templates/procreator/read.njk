@@ -1,0 +1,10 @@
+{#-
+  A page as read_page gives it: someone in the cast whole, or another page. Takes `person`, a
+  CharacterView, or `page`, a PageView; the other is null.
+-#}
+{% from "partials/page.njk" import person as personPage, page as otherPage %}
+{% if person %}
+{{ personPage(person) }}
+{% else %}
+{{ otherPage(page) }}
+{% endif %}

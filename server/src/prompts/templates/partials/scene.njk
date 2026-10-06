@@ -1,7 +1,6 @@
 {#-
-  A scene: where and when, who is in it, what its folded turns said, and its turns not folded
-  yet, word for word. An author note is the owner speaking as the author: the story follows it
-  and never says it.
+  Turns, word for word: the owner's move or author note, and the reply. An author note is the
+  owner speaking as the author: the story follows it and never says it.
 -#}
 {% macro turns(list, protagonist) %}
 {% for turn in list %}
@@ -16,24 +15,4 @@
 {% endif %}
 </turn>
 {% endfor %}
-{% endmacro %}
-
-{% macro scene(s, protagonist) %}
-<scene number="{{ s.number }}">
-{% if s.place %}
-Where: {{ s.place }}
-{% endif %}
-{% if s.time %}
-When: {{ s.time }}
-{% endif %}
-{% if s.present.length %}
-Present: {{ s.present | join(', ') }}
-{% endif %}
-{% if s.summary %}
-<summary>
-{{ s.summary }}
-</summary>
-{% endif %}
-{{ turns(s.turns, protagonist) -}}
-</scene>
 {% endmacro %}

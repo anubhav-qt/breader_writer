@@ -1,38 +1,21 @@
-import { and, asc, eq, gt } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Db, Tx } from '../db/client.ts';
-import {
-  arcs,
-  books,
-  characters,
-  facts,
-  growth,
-  relationshipHistory,
-  relationships,
-  scenes,
-  threads,
-  timeline,
-  turns,
-  worlds,
-} from '../db/schema.ts';
-import type { Fact, Growth, HistoryEntry, Thread, TimelineEntry } from './ledger.ts';
+import { books, relationshipHistory, relationships, scenes, turns, worlds } from '../db/schema.ts';
+import { castOf, type CharacterRow } from './cast.ts';
+import { notesOf, type Note } from './memory.ts';
+import { pagesOf, type Page } from './pages.ts';
+import type { HistoryEntry } from './relationships.ts';
 import type { Scene, Turn } from './scenes.ts';
 
 /*
- * Everything a book's story knows, read from its tables in one go. The working context is built
- * from this for every call (story/view.ts), so the model never leans on something that only lived
- * in an old message.
+ * Everything a book's story knows, read from its tables in one go: what a session's brief is built
+ * from (story/view.ts), when the session opens and again after a compaction.
  */
 
 export type BookRow = typeof books.$inferSelect;
 export type WorldRow = typeof worlds.$inferSelect;
-export type CharacterRow = typeof characters.$inferSelect;
 export type RelationshipRow = typeof relationships.$inferSelect;
-
-/** A scene, and its turns not yet folded into its summary. */
-export interface SceneState {
-  scene: Scene;
-  unfolded: Turn[];
-}
+export type { CharacterRow };
 
 export interface Story {
   book: BookRow;
@@ -41,30 +24,12 @@ export interface Story {
   characters: CharacterRow[];
   relationships: RelationshipRow[];
   history: HistoryEntry[];
-  growth: Growth[];
-  facts: Fact[];
-  threads: Thread[];
-  timeline: TimelineEntry[];
-  arc: string;
+  /** The reference, characters' pages included. */
+  pages: Page[];
+  /** Procreator's memory, oldest first. */
+  notes: Note[];
   /** Every scene, in order. */
-  scenes: SceneState[];
-}
-
-/** Turns that still stand and haven't been folded, by scene. */
-async function unfoldedTurns(db: Db | Tx, bookId: string): Promise<Map<string, Turn[]>> {
-  const rows = await db
-    .select({ turn: turns })
-    .from(turns)
-    .innerJoin(scenes, eq(scenes.id, turns.sceneId))
-    .where(and(eq(turns.bookId, bookId), eq(turns.undone, false), gt(turns.number, scenes.foldedThrough)))
-    .orderBy(asc(turns.number));
-  const byScene = new Map<string, Turn[]>();
-  for (const { turn } of rows) {
-    const list = byScene.get(turn.sceneId) ?? [];
-    list.push(turn);
-    byScene.set(turn.sceneId, list);
-  }
-  return byScene;
+  scenes: Scene[];
 }
 
 export async function readStory(db: Db | Tx, bookId: string): Promise<Story> {
@@ -73,25 +38,29 @@ export async function readStory(db: Db | Tx, bookId: string): Promise<Story> {
     throw new Error(`There's no book ${bookId}.`);
   }
   const [world] = await db.select().from(worlds).where(eq(worlds.bookId, bookId));
-  const [arc] = await db.select().from(arcs).where(eq(arcs.bookId, bookId));
-  const sceneRows = await db.select().from(scenes).where(eq(scenes.bookId, bookId)).orderBy(asc(scenes.number));
-  const unfolded = await unfoldedTurns(db, bookId);
-
   return {
     book,
     world: world ?? null,
-    characters: await db.select().from(characters).where(eq(characters.bookId, bookId)).orderBy(asc(characters.position)),
+    characters: await castOf(db, bookId),
     relationships: await db
       .select()
       .from(relationships)
       .where(eq(relationships.bookId, bookId))
       .orderBy(asc(relationships.aId), asc(relationships.bId)),
     history: await db.select().from(relationshipHistory).where(eq(relationshipHistory.bookId, bookId)).orderBy(asc(relationshipHistory.id)),
-    growth: await db.select().from(growth).where(eq(growth.bookId, bookId)).orderBy(asc(growth.id)),
-    facts: await db.select().from(facts).where(eq(facts.bookId, bookId)).orderBy(asc(facts.id)),
-    threads: await db.select().from(threads).where(eq(threads.bookId, bookId)).orderBy(asc(threads.id)),
-    timeline: await db.select().from(timeline).where(eq(timeline.bookId, bookId)).orderBy(asc(timeline.id)),
-    arc: arc?.plan ?? '',
-    scenes: sceneRows.map((scene) => ({ scene, unfolded: unfolded.get(scene.id) ?? [] })),
+    pages: await pagesOf(db, bookId),
+    notes: await notesOf(db, bookId),
+    scenes: await db.select().from(scenes).where(eq(scenes.bookId, bookId)).orderBy(asc(scenes.number)),
   };
+}
+
+/** A scene's last turns that still stand, oldest first. */
+export async function lastTurns(db: Db | Tx, sceneId: string, count: number): Promise<Turn[]> {
+  const latest = await db
+    .select()
+    .from(turns)
+    .where(and(eq(turns.sceneId, sceneId), eq(turns.undone, false)))
+    .orderBy(desc(turns.number))
+    .limit(count);
+  return latest.reverse();
 }

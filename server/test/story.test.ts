@@ -1,20 +1,27 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { books, changes, facts, relationships, scenes, turns } from '../src/db/schema.ts';
-import { edit, remove, startChange, takeBack, versionsOf } from '../src/story/changes.ts';
-import { closeThread, openThread, recordFact, setArc, shiftRelationship } from '../src/story/ledger.ts';
+import { books, changes, notes, pages, relationships, scenes, turns } from '../src/db/schema.ts';
+import { edit, make, remove, startChange, takeBack, versionsOf } from '../src/story/changes.ts';
+import { remember } from '../src/story/memory.ts';
 import { mention } from '../src/story/mentions.ts';
+import { editPage, writePage } from '../src/story/pages.ts';
+import { shiftRelationship } from '../src/story/relationships.ts';
 import { addTurn, endScene, playingScene, setReply, startScene, turnsOf } from '../src/story/scenes.ts';
 import { deps } from './helpers.ts';
-import { aScene, tag } from './stories.ts';
+import { aScene, tag, writer } from './stories.ts';
 
 const db = deps.db;
+
+async function latestChange(bookId: string) {
+  const [change] = await db.select().from(changes).where(eq(changes.bookId, bookId)).orderBy(desc(changes.id)).limit(1);
+  return change;
+}
 
 describe('scenes and turns', () => {
   it('numbers scenes, and plays one at a time', async () => {
     const { bookId, scene } = await aScene();
-    expect(scene).toMatchObject({ number: 1, status: 'playing', place: 'The ferry', foldedThrough: 0 });
+    expect(scene).toMatchObject({ number: 1, status: 'playing', place: 'The ferry', summary: '' });
 
     const second = db.transaction(async (tx) => {
       const change = await startChange(tx, tag(bookId));
@@ -50,28 +57,27 @@ describe('the change log', () => {
   it('tags each change and keeps what it made', async () => {
     const { bookId, aiko, scene } = await aScene();
     const turn = await addTurn(db, scene, 'character', 'I look at the water.');
-    const { change, fact } = await db.transaction(async (tx) => {
-      const change = await startChange(tx, tag(bookId, { turnId: turn.id, what: 'Recorded a fact' }));
-      const fact = await recordFact(tx, change, scene.id, `${mention(aiko.id)} can't swim.`);
-      return { change, fact };
-    });
-    expect(change).toMatchObject({ bookId, turnId: turn.id, by: 'agent', what: 'Recorded a fact', takenBackBy: null });
+    const written = await db.transaction((tx) =>
+      writePage(tx, writer(bookId, { turnId: turn.id }), { title: 'The Ferry', kind: 'place', about: 'The boat across.', body: "[[Aiko]] can't swim." }),
+    );
+    const change = await latestChange(bookId);
+    expect(change).toMatchObject({ bookId, turnId: turn.id, by: 'agent', what: 'Wrote the page The Ferry', takenBackBy: null });
     const kept = await versionsOf(db, change.id);
     expect(kept).toHaveLength(1);
-    expect(kept[0]).toMatchObject({ table: 'facts', key: { id: fact.id }, before: null, after: { text: `<@${aiko.id}> can't swim.` } });
+    expect(kept[0]).toMatchObject({ table: 'pages', key: { id: written.page.id }, before: null, after: { body: `<@${aiko.id}> can't swim.` } });
   });
 
-  it('turns away text that is empty or mentions someone not in the cast', async () => {
-    const { bookId, scene } = await aScene();
+  it('turns away a relationship shift that is empty or mentions someone not in the cast', async () => {
+    const { bookId, aiko, ren, scene } = await aScene();
     const stranger = randomUUID();
     const unknown = db.transaction(async (tx) => {
       const change = await startChange(tx, tag(bookId));
-      return recordFact(tx, change, scene.id, `${mention(stranger)} is watching.`);
+      return shiftRelationship(tx, change, scene.id, { one: aiko.id, other: ren.id, what: `${mention(stranger)} is watching.` });
     });
     await expect(unknown).rejects.toThrow(`<@${stranger}> isn't anyone in the cast.`);
     const empty = db.transaction(async (tx) => {
       const change = await startChange(tx, tag(bookId));
-      return recordFact(tx, change, scene.id, '   ');
+      return shiftRelationship(tx, change, scene.id, { one: aiko.id, other: ren.id, what: '   ' });
     });
     await expect(empty).rejects.toThrow('The text is empty.');
   });
@@ -115,29 +121,25 @@ describe('the change log', () => {
 
   it('takes a change back, putting every row the way it was, as a change of its own', async () => {
     const { bookId, aiko, ren, scene } = await aScene();
-    const earlier = await db.transaction(async (tx) => {
-      const change = await startChange(tx, tag(bookId));
-      return recordFact(tx, change, null, 'The river is wide.');
-    });
+    const earlier = await db.transaction((tx) => remember(tx, writer(bookId), 'The owner likes the river cold.'));
     const change = await db.transaction(async (tx) => {
       const change = await startChange(tx, tag(bookId, { what: 'A busy turn' }));
-      await recordFact(tx, change, scene.id, `${mention(ren.id)} owns the ferry.`);
+      await make(tx, change, pages, { bookId, kind: 'place', title: 'The Ferry', about: 'The boat across.', body: `${mention(ren.id)} owns the ferry.` });
       await shiftRelationship(tx, change, scene.id, { one: aiko.id, other: ren.id, bond: 'rivals', what: 'They fall out.' });
-      await remove(tx, change, facts, { id: earlier.id });
-      await setArc(tx, change, 'Aiko crosses the river.');
+      await remove(tx, change, notes, { id: earlier.note.id });
       return change;
     });
 
     const back = await db.transaction((tx) => takeBack(tx, change.id, { turnId: null, by: 'owner' }));
     expect(back).toMatchObject({ by: 'owner', what: 'Took back: A busy turn' });
 
-    const left = await db.select().from(facts).where(eq(facts.bookId, bookId));
-    expect(left).toEqual([earlier]);
+    expect(await db.select().from(pages).where(eq(pages.bookId, bookId))).toEqual([]);
+    expect(await db.select().from(notes).where(eq(notes.bookId, bookId))).toEqual([earlier.note]);
     const lines = await db.select().from(relationships).where(eq(relationships.bookId, bookId));
     expect(lines.map((line) => line.bond).sort()).toEqual(['cousins', 'old friends']);
     const [original] = await db.select().from(changes).where(eq(changes.id, change.id));
     expect(original.takenBackBy).toBe(back.id);
-    expect(await versionsOf(db, back.id)).toHaveLength(5);
+    expect(await versionsOf(db, back.id)).toHaveLength(4);
   });
 
   it('brings back a removed row with its times', async () => {
@@ -154,23 +156,18 @@ describe('the change log', () => {
   });
 
   it('waits for a later change to the same row to be taken back first', async () => {
-    const { bookId, scene } = await aScene();
-    const opened = await db.transaction(async (tx) => {
-      const change = await startChange(tx, tag(bookId, { what: 'Opened a thread' }));
-      const thread = await openThread(tx, change, scene.id, 'Who cut the rope?');
-      return { change, thread };
-    });
-    const closed = await db.transaction(async (tx) => {
-      const change = await startChange(tx, tag(bookId, { what: 'Closed a thread' }));
-      await closeThread(tx, change, opened.thread.id, scene.id, 'The ferryman did.');
-      return change;
-    });
+    const { bookId } = await aScene();
+    await db.transaction((tx) => writePage(tx, writer(bookId), { title: 'Threads', kind: 'story', about: 'What is set up.', body: '- Who cut the rope?' }));
+    const wrote = await latestChange(bookId);
+    await db.transaction((tx) => editPage(tx, writer(bookId), { title: 'Threads', find: '', replace: '- The unopened letter.' }));
+    const added = await latestChange(bookId);
 
-    const early = db.transaction((tx) => takeBack(tx, opened.change.id, { turnId: null, by: 'owner' }));
-    await expect(early).rejects.toThrow(`Change ${closed.id} changed the same thing later. Take it back first.`);
+    const early = db.transaction((tx) => takeBack(tx, wrote.id, { turnId: null, by: 'owner' }));
+    await expect(early).rejects.toThrow(`Change ${added.id} changed the same thing later. Take it back first.`);
 
-    await db.transaction((tx) => takeBack(tx, closed.id, { turnId: null, by: 'owner' }));
-    await db.transaction((tx) => takeBack(tx, opened.change.id, { turnId: null, by: 'owner' }));
+    await db.transaction((tx) => takeBack(tx, added.id, { turnId: null, by: 'owner' }));
+    await db.transaction((tx) => takeBack(tx, wrote.id, { turnId: null, by: 'owner' }));
+    expect(await db.select().from(pages).where(eq(pages.bookId, bookId))).toEqual([]);
   });
 
   it('takes a change back once, and never takes back a take-back', async () => {
@@ -191,12 +188,9 @@ describe('the change log', () => {
   });
 
   it('goes with its book', async () => {
-    const { bookId, aiko, scene } = await aScene();
+    const { bookId, scene } = await aScene();
     const turn = await addTurn(db, scene, 'character', 'I wave.');
-    await db.transaction(async (tx) => {
-      const change = await startChange(tx, tag(bookId, { turnId: turn.id }));
-      await recordFact(tx, change, scene.id, `${mention(aiko.id)} waved.`);
-    });
+    await db.transaction((tx) => remember(tx, writer(bookId, { turnId: turn.id }), 'The owner waves a lot.'));
     await db.delete(books).where(eq(books.id, bookId));
     const left = await db.select().from(changes).where(and(eq(changes.bookId, bookId)));
     expect(left).toEqual([]);

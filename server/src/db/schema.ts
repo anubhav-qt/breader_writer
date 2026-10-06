@@ -125,25 +125,28 @@ export const settings = writer.table('settings', {
 });
 
 /*
- * The story: everything it knows lives in these tables, and the model's context is rebuilt from
- * them for every call (story/context.ts). Nothing here is ever deleted to save room.
+ * The story: everything it knows lives in these tables, and each scene's session opens with a
+ * brief built from them (story/session.ts, procreator/). Nothing here is ever deleted to save room.
  *
  * Every change to the story goes through the change log (story/changes.ts): one row in changes,
  * tagged with who made it and the turn it came from, and a row in versions for each row it
  * touched, before and after. That's what lets undo roll the story back, and a change be looked
  * over and taken back. So these tables keep no times of their own (the change has it), and in
- * the text they hold, people are written <@id> and named when the context is built, so a rename
- * reaches every one of them at once.
+ * the text they hold, people are written <@id> and named when it's shown, so a rename reaches
+ * every one of them at once.
  */
 
-/** A row number for the story's ledgers, short enough for the model to name ("close thread 12"). */
+/** A row number short enough for the model to name ("forget note 12"). */
 const serial = () => bigint('id', { mode: 'number' }).primaryKey().generatedByDefaultAsIdentity();
 const bookRef = () =>
   uuid('book_id')
     .notNull()
     .references(() => books.id, { onDelete: 'cascade' });
 
-/** A scene: played turn by turn, folded into its summary, then written into the book. */
+/**
+ * A scene: played turn by turn in a session of its own, wrapped up into its summary, then
+ * written into the book.
+ */
 export const scenes = writer.table(
   'scenes',
   {
@@ -157,12 +160,10 @@ export const scenes = writer.table(
     time: text('time').notNull().default(''),
     /** Who is in it, by character id. */
     present: uuid('present').array().notNull().default(sql`'{}'::uuid[]`),
-    /** playing until it wraps, then ended. */
+    /** playing, then ended. */
     status: text('status').notNull().default('playing'),
-    /** What happened, folded from its turns. While it plays, what the turns folded so far said. */
+    /** What happened, written by its wrap-up once it has ended. Every later brief holds it. */
     summary: text('summary').notNull().default(''),
-    /** The number of the last turn folded into the summary, 0 for none. */
-    foldedThrough: integer('folded_through').notNull().default(0),
   },
   (t) => [
     uniqueIndex('scenes_book_number').on(t.bookId, t.number),
@@ -204,7 +205,7 @@ export const changes = writer.table(
     turnId: uuid('turn_id').references(() => turns.id),
     /** owner or agent. */
     by: text('by').notNull(),
-    /** What it did, in a few words ("Recorded a fact"). */
+    /** What it did, in a few words ("Wrote the page The Keep"). */
     what: text('what').notNull(),
     /** Why, when there's a reason to give (a relationship shifting says why). */
     why: text('why').notNull().default(''),
@@ -235,66 +236,6 @@ export const versions = writer.table(
   (t) => [index('versions_change_idx').on(t.changeId), index('versions_row_idx').on(t.table, t.key)],
 );
 
-/** The canon: what is true in the story, each from the scene it came from. */
-export const facts = writer.table(
-  'facts',
-  {
-    id: serial(),
-    bookId: bookRef(),
-    /** Null for what was true before the story began. */
-    sceneId: uuid('scene_id').references(() => scenes.id),
-    text: text('text').notNull(),
-  },
-  (t) => [index('facts_book_idx').on(t.bookId)],
-);
-
-/** A thread the story has opened or a promise it has made, until it's paid off. */
-export const threads = writer.table(
-  'threads',
-  {
-    id: serial(),
-    bookId: bookRef(),
-    text: text('text').notNull(),
-    openedIn: uuid('opened_in').references(() => scenes.id),
-    /** Null while it's open. */
-    closedIn: uuid('closed_in').references(() => scenes.id),
-    /** How it was paid off. */
-    outcome: text('outcome').notNull().default(''),
-  },
-  (t) => [index('threads_book_idx').on(t.bookId)],
-);
-
-/** What happened when, in the story's own time, in order. */
-export const timeline = writer.table(
-  'timeline',
-  {
-    id: serial(),
-    bookId: bookRef(),
-    /** Null for what happened before the story began. */
-    sceneId: uuid('scene_id').references(() => scenes.id),
-    /** In the story's time ("the night of the fire", "twenty years before"). */
-    when: text('when').notNull(),
-    what: text('what').notNull(),
-  },
-  (t) => [index('timeline_book_idx').on(t.bookId)],
-);
-
-/**
- * What the story has added to a character's sheet: a new fear, a secret out, a changed loyalty.
- * They compound, so the people who matter most end up with the richest sheets.
- */
-export const growth = writer.table(
-  'growth',
-  {
-    id: serial(),
-    bookId: bookRef(),
-    characterId: uuid('character_id').notNull(),
-    sceneId: uuid('scene_id').references(() => scenes.id),
-    text: text('text').notNull(),
-  },
-  (t) => [index('growth_book_idx').on(t.bookId, t.characterId)],
-);
-
 /** How two people got where they are: each change to their relationship, in the scene it happened. */
 export const relationshipHistory = writer.table(
   'relationship_history',
@@ -312,13 +253,112 @@ export const relationshipHistory = writer.table(
   ],
 );
 
-/** Where the story is heading: the narrator's plan for its arc, paced to the book's length. */
-export const arcs = writer.table('arcs', {
-  bookId: uuid('book_id')
-    .primaryKey()
-    .references(() => books.id, { onDelete: 'cascade' }),
-  plan: text('plan').notNull().default(''),
-});
+/**
+ * A page of the reference: the story's canon in depth, one subject a page, written by Procreator
+ * as the story establishes things (story/pages.ts). A character's page is about a cast member,
+ * and goes by their name: their sheet is the owner's (characters), and this is Procreator's depth
+ * below it.
+ */
+export const pages = writer.table(
+  'pages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bookId: bookRef(),
+    /** character, place, group, thing, lore or story. */
+    kind: text('kind').notNull(),
+    /** On a character's page, the cast member it's about. */
+    characterId: uuid('character_id'),
+    /** What the index and the tools call it. Empty on a character's page, which has their name. */
+    title: text('title').notNull().default(''),
+    /** One line for the index: what the page holds. */
+    about: text('about').notNull().default(''),
+    /** The page, in Markdown. */
+    body: text('body').notNull().default(''),
+  },
+  (t) => [
+    index('pages_book_idx').on(t.bookId),
+    uniqueIndex('pages_book_title').on(t.bookId, t.title).where(sql`character_id is null`),
+    uniqueIndex('pages_book_character').on(t.bookId, t.characterId).where(sql`character_id is not null`),
+    foreignKey({ columns: [t.bookId, t.characterId], foreignColumns: [characters.bookId, characters.id] }).onDelete('cascade'),
+  ],
+);
+
+/**
+ * Procreator's memory: its notes to itself about the work, not the story (the owner's taste,
+ * what they've asked for that still holds, its own lessons). Every brief holds all of them.
+ */
+export const notes = writer.table(
+  'notes',
+  {
+    id: serial(),
+    bookId: bookRef(),
+    text: text('text').notNull(),
+  },
+  (t) => [index('notes_book_idx').on(t.bookId)],
+);
+
+/*
+ * A scene's session: the chat Procreator plays it in (story/session.ts). Like turns, it's raw
+ * history, not part of the change log: it's only ever added to, and an undo marks what it cut as
+ * undone instead of deleting it.
+ */
+
+/**
+ * A stretch of a scene's session: the message it opens with (the brief, and after a compaction
+ * the scene so far as well), then the session's messages from fromSeq on. The model is sent the
+ * latest one that still stands.
+ */
+export const sessionSegments = writer.table(
+  'session_segments',
+  {
+    id: serial(),
+    bookId: bookRef(),
+    sceneId: uuid('scene_id')
+      .notNull()
+      .references(() => scenes.id, { onDelete: 'cascade' }),
+    /** 1 when the session opens, and one more for each compaction. */
+    number: integer('number').notNull(),
+    /** The message it opens with, word for word, so every call in it starts the same. */
+    head: text('head').notNull(),
+    /** The scene so far, from the turns before fromSeq. Empty in the first. */
+    summary: text('summary').notNull().default(''),
+    /** The first of the session's messages sent after the head. */
+    fromSeq: integer('from_seq').notNull(),
+    /** The turn it was made at. Null when the session opened before any. */
+    turnId: uuid('turn_id').references(() => turns.id),
+    /** Cut away by an undo. */
+    undone: boolean('undone').notNull().default(false),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('session_segments_scene_number').on(t.sceneId, t.number)],
+);
+
+/** A message of a scene's session, as the model was sent it or sent it back. */
+export const sessionMessages = writer.table(
+  'session_messages',
+  {
+    id: serial(),
+    bookId: bookRef(),
+    sceneId: uuid('scene_id')
+      .notNull()
+      .references(() => scenes.id, { onDelete: 'cascade' }),
+    /** 1, 2, 3 and on, through the session. */
+    seq: integer('seq').notNull(),
+    /** The turn it belongs to. */
+    turnId: uuid('turn_id').references(() => turns.id),
+    /**
+     * play (the story), note (the owner telling Procreator of a change mid scene) or fold (a
+     * compaction or wrap-up at work, never sent again).
+     */
+    kind: text('kind').notNull(),
+    /** pi's message: a user's, Procreator's (assistant) or a tool's result. */
+    message: jsonb('message').notNull(),
+    /** Cut away by an undo. */
+    undone: boolean('undone').notNull().default(false),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('session_messages_scene_seq').on(t.sceneId, t.seq)],
+);
 
 /** A call to a model, with what it was sent and what it used, so the budget can be seen. */
 export const calls = writer.table(

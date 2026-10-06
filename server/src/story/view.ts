@@ -1,30 +1,81 @@
 import { SCENE_WORDS, type Darkness, type Length, type Pov } from '@writer/shared/book';
-import { named } from './mentions.ts';
-import type { CharacterRow, RelationshipRow, SceneState, Story } from './read.ts';
-import type { Voice } from './scenes.ts';
+import { namesOf } from './cast.ts';
+import { linked, named } from './mentions.ts';
+import { PAGE_KINDS, PLAN, THREADS, type Page } from './pages.ts';
+import type { BookRow, CharacterRow, RelationshipRow, Story } from './read.ts';
+import type { HistoryEntry } from './relationships.ts';
+import type { Scene, Turn, Voice } from './scenes.ts';
 
 /*
- * The story as the prompt templates take it (src/prompts/templates/): names filled in for every
- * <@id>, scenes by number, the relationships of the people in the scene in full and everyone
- * else's in short, and the pacing worked out. All the logic is here; the templates only lay it out.
+ * The story as Procreator's templates take it (src/prompts/templates/): the brief a scene's session
+ * opens with, and a page as read_page shows it. Every mention gets its name: as a link, [[Name]],
+ * in what Procreator writes (pages, memory), and plainly elsewhere. Scenes go by number, the
+ * people in the scene come in full and everyone else in a line. All the logic is here; the
+ * templates only lay it out.
  */
+
+export interface BookView {
+  title: string;
+  /** Its length and goal ("a novella of about 30,000 words"). */
+  length: string;
+  style: string;
+  pov: string;
+  darkness: string;
+  /** Where the story stands against its length. */
+  pacing: string;
+}
+
+export interface WorldView {
+  genre: string;
+  tone: string;
+  setting: string;
+  rules: string;
+  notes: string;
+}
+
+/** An earlier scene, as the story so far holds it. */
+export interface SummaryView {
+  number: number;
+  place: string;
+  time: string;
+  summary: string;
+}
+
+export interface NoteView {
+  id: number;
+  text: string;
+}
+
+/** The owner's sheet: theirs, and only theirs to change. */
+export interface SheetView {
+  who: string;
+  personality: string;
+  past: string;
+  notes: string;
+}
+
+/** Someone in full: the owner's sheet, and Procreator's page below it. */
+export interface CharacterView {
+  name: string;
+  /** The one the owner plays. */
+  protagonist: boolean;
+  sheet: SheetView;
+  about: string;
+  /** Procreator's page, or empty while it has written nothing. */
+  page: string;
+}
+
+/** Someone in a line. */
+export interface OtherView {
+  name: string;
+  protagonist: boolean;
+  line: string;
+}
 
 /** Something the story kept, and the scene it came from (null: before the story began). */
 export interface Dated {
   scene: number | null;
   text: string;
-}
-
-export interface CharacterView {
-  name: string;
-  /** The one the owner plays. */
-  protagonist: boolean;
-  who: string;
-  personality: string;
-  past: string;
-  notes: string;
-  /** What the story has added to the sheet, oldest first. */
-  growth: Dated[];
 }
 
 export interface SideView {
@@ -48,16 +99,18 @@ export interface BondView {
   bond: string;
 }
 
-export interface ThreadView {
-  id: number;
-  text: string;
-  opened: number | null;
+/** A page that isn't a character's. */
+export interface PageView {
+  title: string;
+  kind: string;
+  about: string;
+  body: string;
 }
 
-export interface EventView {
-  scene: number | null;
-  when: string;
-  what: string;
+export interface IndexEntry {
+  title: string;
+  kind: string;
+  about: string;
 }
 
 export interface TurnView {
@@ -67,49 +120,45 @@ export interface TurnView {
   reply: string;
 }
 
+/** How the scene before ended, word for word. */
+export interface ClosingView {
+  number: number;
+  turns: TurnView[];
+}
+
+/** The scene the session plays. */
 export interface SceneView {
   number: number;
   place: string;
   time: string;
   present: string[];
-  /** What the turns folded so far said. Whole, once the scene has ended and folded. */
-  summary: string;
-  /** Its turns not folded yet, word for word. */
-  turns: TurnView[];
 }
 
-export interface WorldView {
-  genre: string;
-  tone: string;
-  setting: string;
-  rules: string;
-  notes: string;
-}
-
-export interface StoryView {
-  title: string;
+export interface BriefView {
   protagonist: string;
-  /** Its length and goal ("a novella of about 30,000 words"). */
-  length: string;
-  style: string;
-  pov: string;
-  darkness: string;
-  pacing: string;
+  book: BookView;
   world: WorldView;
-  cast: CharacterView[];
+  /** Every scene before this one, with its summary. */
+  earlier: SummaryView[];
+  /** The Plan page, or empty. */
+  plan: string;
+  /** The Threads page, or empty. */
+  threads: string;
+  memory: NoteView[];
+  /** The people in the scene, in cast order. */
+  present: CharacterView[];
+  /** Everyone else. */
+  others: OtherView[];
   /** Between people who are both in the scene. */
   close: RelationshipView[];
   /** Everyone else's. */
   distant: BondView[];
-  arc: string;
-  /** Open ones only. */
-  threads: ThreadView[];
-  facts: Dated[];
-  timeline: EventView[];
-  /** Every scene that has ended, in order. */
-  earlier: SceneView[];
-  /** The scene being played, or null between scenes. */
-  scene: SceneView | null;
+  /** The pages of places the scene's place names. */
+  places: PageView[];
+  closing: ClosingView | null;
+  /** Every page but the characters', which the cast covers. */
+  index: IndexEntry[];
+  scene: SceneView;
 }
 
 const LENGTH_NAMES: Record<Length, string> = {
@@ -140,13 +189,10 @@ function words(count: number): string {
   return count.toLocaleString('en-US');
 }
 
-/** Where the story is against its length, from the scene it's on. */
-function pacingOf(story: Story): string {
-  const { book } = story;
+/** Where the story is against its length, from the scene being played. */
+function pacingOf(book: BookRow, number: number): string {
   const about = Math.max(1, Math.round(book.wordGoal / SCENE_WORDS));
-  const ended = story.scenes.filter((state) => state.scene.status === 'ended').length;
-  const current = ended + 1;
-  const share = current / about;
+  const share = number / about;
   let part = 'the beginning';
   if (share > 1) {
     part = 'past its planned length, so bring it to its ending';
@@ -156,98 +202,73 @@ function pacingOf(story: Story): string {
     part = 'the middle';
   }
   const written = `${words(book.wordsWritten)} of ${words(book.wordGoal)} words are written.`;
-  return `Scene ${current} of about ${about}: ${part}. ${written}`;
+  return `Scene ${number} of about ${about}: ${part}. ${written}`;
 }
 
-function namesOf(story: Story): Map<string, string> {
-  const names = new Map<string, string>();
-  for (const character of story.characters) {
-    names.set(character.id, character.name);
+function bookView(book: BookRow, number: number): BookView {
+  const length = book.length as Length;
+  let style = CONVENTIONAL;
+  if (length === 'light_novel') {
+    style = LIGHT_NOVEL;
   }
-  return names;
+  return {
+    title: book.title,
+    length: `${LENGTH_NAMES[length]} of about ${words(book.wordGoal)} words`,
+    style,
+    pov: POV_NAMES[book.pov as Pov],
+    darkness: DARKNESS_NAMES[book.darkness as Darkness],
+    pacing: pacingOf(book, number),
+  };
 }
 
-function sceneNumbers(story: Story): Map<string, number> {
-  const numbers = new Map<string, number>();
-  for (const { scene } of story.scenes) {
-    numbers.set(scene.id, scene.number);
+/** Someone in full, as the brief and read_page show them. */
+export function characterView(character: CharacterRow, page: Page | null, names: Map<string, string>): CharacterView {
+  let about = '';
+  let body = '';
+  if (page) {
+    about = page.about;
+    body = linked(page.body, names);
   }
-  return numbers;
-}
-
-/** Turns the story's rows into what the templates take. */
-class Viewer {
-  private readonly names: Map<string, string>;
-  private readonly numbers: Map<string, number>;
-
-  constructor(story: Story) {
-    this.names = namesOf(story);
-    this.numbers = sceneNumbers(story);
-  }
-
-  text(text: string): string {
-    return named(text, this.names);
-  }
-
-  name(id: string): string {
-    return this.text(`<@${id}>`);
-  }
-
-  scene(id: string | null): number | null {
-    if (id === null) {
-      return null;
-    }
-    return this.numbers.get(id) ?? null;
-  }
-
-  dated(row: { sceneId: string | null; text: string }): Dated {
-    return { scene: this.scene(row.sceneId), text: this.text(row.text) };
-  }
-}
-
-function characterView(viewer: Viewer, character: CharacterRow, story: Story): CharacterView {
-  const grown = story.growth.filter((entry) => entry.characterId === character.id);
   return {
     name: character.name,
     protagonist: character.role === 'protagonist',
-    who: character.who,
-    personality: character.personality,
-    past: character.past,
-    notes: character.notes,
-    growth: grown.map((entry) => viewer.dated(entry)),
+    sheet: { who: character.who, personality: character.personality, past: character.past, notes: character.notes },
+    about,
+    page: body,
   };
 }
 
-function relationshipView(viewer: Viewer, line: RelationshipRow, story: Story): RelationshipView {
-  const history = story.history.filter((entry) => entry.aId === line.aId && entry.bId === line.bId);
-  return {
-    bond: line.bond,
-    a: { name: viewer.name(line.aId), sees: line.aSees, hides: line.aHides },
-    b: { name: viewer.name(line.bId), sees: line.bSees, hides: line.bHides },
-    history: history.map((entry) => viewer.dated(entry)),
-  };
+/** A page that isn't a character's, as the brief and read_page show it. */
+export function pageView(page: Page, names: Map<string, string>): PageView {
+  return { title: page.title, kind: page.kind, about: page.about, body: linked(page.body, names) };
 }
 
-function sceneView(viewer: Viewer, state: SceneState): SceneView {
-  const { scene } = state;
-  return {
-    number: scene.number,
-    place: scene.place,
-    time: scene.time,
-    present: scene.present.map((id) => viewer.name(id)),
-    summary: scene.summary,
-    turns: state.unfolded.map((turn) => ({
-      number: turn.number,
-      voice: turn.voice as Voice,
-      input: turn.input,
-      reply: turn.reply,
-    })),
-  };
+/** Every page but the characters', by kind, then title. */
+export function indexOf(pages: Page[]): IndexEntry[] {
+  const others = pages.filter((page) => page.characterId === null);
+  const kinds: readonly string[] = PAGE_KINDS;
+  others.sort((one, other) => {
+    const byKind = kinds.indexOf(one.kind) - kinds.indexOf(other.kind);
+    if (byKind !== 0) {
+      return byKind;
+    }
+    return one.title.localeCompare(other.title);
+  });
+  return others.map((page) => ({ title: page.title, kind: page.kind, about: page.about }));
+}
+
+/** A story page's text, or empty while it hasn't been written. */
+function storyPage(story: Story, title: string, names: Map<string, string>): string {
+  const page = story.pages.find((each) => each.characterId === null && each.title.toLowerCase() === title.toLowerCase());
+  if (!page) {
+    return '';
+  }
+  return linked(page.body, names);
 }
 
 /** Who is in the scene: everyone it lists, and always the protagonist. */
-function presentIn(story: Story, playing: SceneState | undefined): Set<string> {
-  const present = new Set<string>(playing?.scene.present ?? []);
+function presentIn(story: Story, scene: Scene): Set<string> {
+  const present = new Set<string>(scene.present);
   for (const character of story.characters) {
     if (character.role === 'protagonist') {
       present.add(character.id);
@@ -256,42 +277,84 @@ function presentIn(story: Story, playing: SceneState | undefined): Set<string> {
   return present;
 }
 
-export function storyView(story: Story): StoryView {
-  const viewer = new Viewer(story);
-  const { book } = story;
-  const length = book.length as Length;
-  const playing = story.scenes.find((state) => state.scene.status === 'playing');
-  const present = presentIn(story, playing);
+/** The pages of the places the scene's place names ("The Keep's great hall" names The Keep). */
+function placesIn(story: Story, scene: Scene, names: Map<string, string>): PageView[] {
+  const where = scene.place.toLowerCase();
+  const places = story.pages.filter((page) => page.kind === 'place' && page.title !== '' && where.includes(page.title.toLowerCase()));
+  places.sort((one, other) => one.title.localeCompare(other.title));
+  return places.map((page) => pageView(page, names));
+}
+
+/** A history entry, named, with the number of the scene it came from. */
+function dated(entry: HistoryEntry, names: Map<string, string>, numbers: Map<string, number>): Dated {
+  let scene: number | null = null;
+  if (entry.sceneId !== null) {
+    scene = numbers.get(entry.sceneId) ?? null;
+  }
+  return { scene, text: named(entry.text, names) };
+}
+
+function relationshipView(line: RelationshipRow, story: Story, names: Map<string, string>, numbers: Map<string, number>): RelationshipView {
+  const history = story.history.filter((entry) => entry.aId === line.aId && entry.bId === line.bId);
+  return {
+    bond: line.bond,
+    a: { name: named(`<@${line.aId}>`, names), sees: line.aSees, hides: line.aHides },
+    b: { name: named(`<@${line.bId}>`, names), sees: line.bSees, hides: line.bHides },
+    history: history.map((entry) => dated(entry, names, numbers)),
+  };
+}
+
+function turnView(turn: Turn): TurnView {
+  return { number: turn.number, voice: turn.voice as Voice, input: turn.input, reply: turn.reply };
+}
+
+/**
+ * The brief for a scene's session, from the story as it stands. `closing` is the scene before's
+ * last turns, word for word, for picking the story up where it left off.
+ */
+export function briefView(story: Story, scene: Scene, closing: Turn[]): BriefView {
+  const names = namesOf(story.characters);
+  const numbers = new Map<string, number>();
+  for (const each of story.scenes) {
+    numbers.set(each.id, each.number);
+  }
+  const present = presentIn(story, scene);
+
+  const inScene: CharacterView[] = [];
+  const others: OtherView[] = [];
+  for (const character of story.characters) {
+    const page = story.pages.find((each) => each.characterId === character.id) ?? null;
+    if (present.has(character.id)) {
+      inScene.push(characterView(character, page, names));
+      continue;
+    }
+    let line = character.who;
+    if (!line && page) {
+      line = page.about;
+    }
+    others.push({ name: character.name, protagonist: character.role === 'protagonist', line });
+  }
 
   const close: RelationshipView[] = [];
   const distant: BondView[] = [];
   for (const line of story.relationships) {
     if (present.has(line.aId) && present.has(line.bId)) {
-      close.push(relationshipView(viewer, line, story));
+      close.push(relationshipView(line, story, names, numbers));
     } else {
-      distant.push({ a: viewer.name(line.aId), b: viewer.name(line.bId), bond: line.bond });
+      distant.push({ a: named(`<@${line.aId}>`, names), b: named(`<@${line.bId}>`, names), bond: line.bond });
     }
   }
 
+  const earlier = story.scenes.filter((each) => each.number < scene.number);
+  let closingView: ClosingView | null = null;
+  if (closing.length > 0) {
+    closingView = { number: scene.number - 1, turns: closing.map(turnView) };
+  }
   const protagonist = story.characters.find((character) => character.role === 'protagonist');
-  let style = CONVENTIONAL;
-  if (length === 'light_novel') {
-    style = LIGHT_NOVEL;
-  }
-  const ended = story.scenes.filter((state) => state.scene.status === 'ended');
-  let scene: SceneView | null = null;
-  if (playing) {
-    scene = sceneView(viewer, playing);
-  }
 
   return {
-    title: book.title,
     protagonist: protagonist?.name ?? '',
-    length: `${LENGTH_NAMES[length]} of about ${words(book.wordGoal)} words`,
-    style,
-    pov: POV_NAMES[book.pov as Pov],
-    darkness: DARKNESS_NAMES[book.darkness as Darkness],
-    pacing: pacingOf(story),
+    book: bookView(story.book, scene.number),
     world: {
       genre: story.world?.genre ?? '',
       tone: story.world?.tone ?? '',
@@ -299,20 +362,22 @@ export function storyView(story: Story): StoryView {
       rules: story.world?.rules ?? '',
       notes: story.world?.notes ?? '',
     },
-    cast: story.characters.map((character) => characterView(viewer, character, story)),
+    earlier: earlier.map((each) => ({ number: each.number, place: each.place, time: each.time, summary: each.summary })),
+    plan: storyPage(story, PLAN, names),
+    threads: storyPage(story, THREADS, names),
+    memory: story.notes.map((note) => ({ id: note.id, text: linked(note.text, names) })),
+    present: inScene,
+    others,
     close,
     distant,
-    arc: viewer.text(story.arc),
-    threads: story.threads
-      .filter((thread) => thread.closedIn === null)
-      .map((thread) => ({ id: thread.id, text: viewer.text(thread.text), opened: viewer.scene(thread.openedIn) })),
-    facts: story.facts.map((fact) => viewer.dated(fact)),
-    timeline: story.timeline.map((entry) => ({
-      scene: viewer.scene(entry.sceneId),
-      when: viewer.text(entry.when),
-      what: viewer.text(entry.what),
-    })),
-    earlier: ended.map((state) => sceneView(viewer, state)),
-    scene,
+    places: placesIn(story, scene, names),
+    closing: closingView,
+    index: indexOf(story.pages),
+    scene: {
+      number: scene.number,
+      place: scene.place,
+      time: scene.time,
+      present: inScene.map((character) => character.name),
+    },
   };
 }

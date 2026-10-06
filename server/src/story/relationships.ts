@@ -1,20 +1,15 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Tx } from '../db/client.ts';
-import { arcs, characters, facts, growth, relationshipHistory, relationships, threads, timeline } from '../db/schema.ts';
-import { edit, make, StoryError, type Change } from './changes.ts';
+import { characters, relationshipHistory, relationships } from '../db/schema.ts';
+import { edit, make, startChange, StoryError, type Change, type Writer } from './changes.ts';
 import { mentionsIn } from './mentions.ts';
 
 /*
- * What the story keeps besides its scenes: the canon facts, the open threads, the timeline, what
- * characters have grown into, how relationships shift, and the arc. Each write is part of a
- * change (story/changes.ts), so it's tagged and can be taken back. The narrator's tools (step 4)
- * call these.
+ * How relationships shift as the story goes: the line between two people changes (its bond,
+ * either side), tying them first if they weren't, and what happened goes into the line's history.
+ * Each shift is part of a change, so it's tagged and can be taken back.
  */
 
-export type Fact = typeof facts.$inferSelect;
-export type Thread = typeof threads.$inferSelect;
-export type TimelineEntry = typeof timeline.$inferSelect;
-export type Growth = typeof growth.$inferSelect;
 export type HistoryEntry = typeof relationshipHistory.$inferSelect;
 
 async function castIds(tx: Tx, bookId: string): Promise<Set<string>> {
@@ -44,59 +39,6 @@ async function checkInCast(tx: Tx, bookId: string, id: string) {
   }
 }
 
-/** Records something as true in the story, from the scene it came out of (null: before the story). */
-export async function recordFact(tx: Tx, change: Change, sceneId: string | null, text: string): Promise<Fact> {
-  const kept = await checked(tx, change.bookId, text);
-  return make(tx, change, facts, { bookId: change.bookId, sceneId, text: kept });
-}
-
-export async function openThread(tx: Tx, change: Change, sceneId: string | null, text: string): Promise<Thread> {
-  const kept = await checked(tx, change.bookId, text);
-  return make(tx, change, threads, { bookId: change.bookId, openedIn: sceneId, text: kept });
-}
-
-/** Closes an open thread of the book's, saying how it was paid off. */
-export async function closeThread(tx: Tx, change: Change, id: number, sceneId: string, outcome: string): Promise<Thread> {
-  const [thread] = await tx
-    .select()
-    .from(threads)
-    .where(and(eq(threads.id, id), eq(threads.bookId, change.bookId)));
-  if (!thread) {
-    throw new StoryError(`There's no thread ${id} in this book.`);
-  }
-  if (thread.closedIn !== null) {
-    throw new StoryError(`Thread ${id} is closed already.`);
-  }
-  const kept = await checked(tx, change.bookId, outcome);
-  return edit(tx, change, threads, { id }, { closedIn: sceneId, outcome: kept });
-}
-
-/** Adds what happened, and when in the story's own time. */
-export async function addToTimeline(
-  tx: Tx,
-  change: Change,
-  sceneId: string | null,
-  when: string,
-  what: string,
-): Promise<TimelineEntry> {
-  const keptWhen = await checked(tx, change.bookId, when);
-  const keptWhat = await checked(tx, change.bookId, what);
-  return make(tx, change, timeline, { bookId: change.bookId, sceneId, when: keptWhen, what: keptWhat });
-}
-
-/** Adds to a character's sheet what the story has made of them. */
-export async function addGrowth(
-  tx: Tx,
-  change: Change,
-  characterId: string,
-  sceneId: string | null,
-  text: string,
-): Promise<Growth> {
-  await checkInCast(tx, change.bookId, characterId);
-  const kept = await checked(tx, change.bookId, text);
-  return make(tx, change, growth, { bookId: change.bookId, characterId, sceneId, text: kept });
-}
-
 /** One person's side of a relationship, changed. */
 export interface SideShift {
   id: string;
@@ -115,7 +57,16 @@ export interface Shift {
   what: string;
 }
 
+type RelationshipRow = typeof relationships.$inferSelect;
 type RelationshipSet = Partial<typeof relationships.$inferInsert>;
+
+/** The pair as the line is stored: the smaller id first. */
+function inOrder(shift: Shift): { aId: string; bId: string } {
+  if (shift.other < shift.one) {
+    return { aId: shift.other, bId: shift.one };
+  }
+  return { aId: shift.one, bId: shift.other };
+}
 
 /** The columns a shift sets, with the pair's smaller id as side a, as the line is stored. */
 function shiftedColumns(shift: Shift, aId: string): RelationshipSet {
@@ -160,12 +111,7 @@ export async function shiftRelationship(tx: Tx, change: Change, sceneId: string 
   }
   const what = await checked(tx, change.bookId, shift.what);
 
-  let aId = shift.one;
-  let bId = shift.other;
-  if (bId < aId) {
-    aId = shift.other;
-    bId = shift.one;
-  }
+  const { aId, bId } = inOrder(shift);
   const key = { bookId: change.bookId, aId, bId };
   const set = shiftedColumns(shift, aId);
   const [line] = await tx
@@ -180,12 +126,46 @@ export async function shiftRelationship(tx: Tx, change: Change, sceneId: string 
   return make(tx, change, relationshipHistory, { ...key, sceneId, text: what });
 }
 
-/** Writes where the story is heading, replacing the plan before it (which the log keeps). */
-export async function setArc(tx: Tx, change: Change, plan: string) {
-  const kept = await checked(tx, change.bookId, plan);
-  const [arc] = await tx.select().from(arcs).where(eq(arcs.bookId, change.bookId));
-  if (!arc) {
-    return make(tx, change, arcs, { bookId: change.bookId, plan: kept });
+/** Whether the line already says everything the shift sets. */
+function saysAlready(line: RelationshipRow, set: RelationshipSet): boolean {
+  for (const [column, value] of Object.entries(set)) {
+    if (line[column as keyof RelationshipRow] !== value) {
+      return false;
+    }
   }
-  return edit(tx, change, arcs, { bookId: change.bookId }, { plan: kept });
+  return true;
+}
+
+/** Whether this shift is in place already: the line says it, and it's the latest in their history, from this scene. */
+async function isShifted(tx: Tx, bookId: string, sceneId: string | null, shift: Shift): Promise<boolean> {
+  const { aId, bId } = inOrder(shift);
+  const [line] = await tx
+    .select()
+    .from(relationships)
+    .where(and(eq(relationships.bookId, bookId), eq(relationships.aId, aId), eq(relationships.bId, bId)));
+  if (!line) {
+    return false;
+  }
+  if (!saysAlready(line, shiftedColumns(shift, aId))) {
+    return false;
+  }
+  const [latest] = await tx
+    .select()
+    .from(relationshipHistory)
+    .where(and(eq(relationshipHistory.bookId, bookId), eq(relationshipHistory.aId, aId), eq(relationshipHistory.bId, bId)))
+    .orderBy(desc(relationshipHistory.id))
+    .limit(1);
+  if (!latest) {
+    return false;
+  }
+  return latest.sceneId === sceneId && latest.text === shift.what.trim();
+}
+
+/** Shifts a relationship as a change of its own, or does nothing when it's so already (the same shift sent twice). */
+export async function shiftOnce(tx: Tx, writer: Writer, sceneId: string | null, shift: Shift): Promise<HistoryEntry | null> {
+  if (await isShifted(tx, writer.bookId, sceneId, shift)) {
+    return null;
+  }
+  const change = await startChange(tx, { ...writer, what: 'Shifted a relationship', why: shift.what.trim() });
+  return shiftRelationship(tx, change, sceneId, shift);
 }

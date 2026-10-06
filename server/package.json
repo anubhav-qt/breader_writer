@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
+    "@writer/pi-agent": "*",
     "@writer/pi-ai": "*",
     "@writer/shared": "*",
     "drizzle-orm": "^0.45.3",

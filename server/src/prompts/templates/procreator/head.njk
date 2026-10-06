@@ -1,0 +1,164 @@
+{#-
+  What a segment of a scene's session opens with: the brief, the story as it stands, built from the
+  database (story/view.ts). After a compaction it's built fresh, with the scene so far, which the
+  turns after it go on from word for word. It's the long context, so it comes first, and it stays
+  word for word the same through its segment, so every call can be cached. Takes a BriefView and a
+  summary (empty when the session opens).
+-#}
+{% from "partials/page.njk" import person, page %}
+{% from "partials/scene.njk" import turns %}
+{% macro when(number) %}{% if number === null %}Before the story{% else %}Scene {{ number }}{% endif %}{% endmacro %}
+<book>
+Title: {{ book.title }}
+Length: {{ book.length }}
+Style: {{ book.style }}
+Point of view: {{ book.pov }}
+How dark: {{ book.darkness }}
+Where it stands: {{ book.pacing }}
+</book>
+{% if world.genre or world.tone or world.setting or world.rules or world.notes %}
+
+<world>
+{% if world.genre %}
+Genre: {{ world.genre }}
+{% endif %}
+{% if world.tone %}
+Tone: {{ world.tone }}
+{% endif %}
+{% if world.setting %}
+Setting: {{ world.setting }}
+{% endif %}
+{% if world.rules %}
+Rules: {{ world.rules }}
+{% endif %}
+{% if world.notes %}
+Notes: {{ world.notes }}
+{% endif %}
+</world>
+{% endif %}
+
+<story_so_far>
+{% for s in earlier %}
+<scene number="{{ s.number }}"{% if s.place %} where="{{ s.place }}"{% endif %}{% if s.time %} when="{{ s.time }}"{% endif %}>
+{% if s.summary %}
+{{ s.summary }}
+{% else %}
+Not summed up yet.
+{% endif %}
+</scene>
+{% else %}
+Nothing yet: this is the first scene.
+{% endfor %}
+</story_so_far>
+
+<plan>
+{% if plan %}
+{{ plan }}
+{% else %}
+Not written yet.
+{% endif %}
+</plan>
+
+<threads>
+{% if threads %}
+{{ threads }}
+{% else %}
+Not written yet.
+{% endif %}
+</threads>
+
+<memory>
+{% for note in memory %}
+- [{{ note.id }}] {{ note.text }}
+{% else %}
+Nothing yet.
+{% endfor %}
+</memory>
+
+<cast>
+{% for c in present %}
+{{ person(c) -}}
+{% endfor %}
+{% for c in others %}
+{% if c.line %}
+<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}>{{ c.line }}</character>
+{% else %}
+<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}/>
+{% endif %}
+{% endfor %}
+</cast>
+{% if close.length or distant.length %}
+
+<relationships>
+{% for r in close %}
+<relationship between="{{ r.a.name }} and {{ r.b.name }}">
+{% if r.bond %}
+Bond: {{ r.bond }}
+{% endif %}
+{% if r.a.sees %}
+How {{ r.a.name }} sees {{ r.b.name }}: {{ r.a.sees }}
+{% endif %}
+{% if r.a.hides %}
+What {{ r.a.name }} hides from {{ r.b.name }}: {{ r.a.hides }}
+{% endif %}
+{% if r.b.sees %}
+How {{ r.b.name }} sees {{ r.a.name }}: {{ r.b.sees }}
+{% endif %}
+{% if r.b.hides %}
+What {{ r.b.name }} hides from {{ r.a.name }}: {{ r.b.hides }}
+{% endif %}
+{% if r.history.length %}
+How they got here:
+{% for h in r.history %}
+- {{ when(h.scene) }}: {{ h.text }}
+{% endfor %}
+{% endif %}
+</relationship>
+{% endfor %}
+{% if distant.length %}
+Between people not both in the scene, in short:
+{% for r in distant %}
+{% if r.bond %}
+- {{ r.a }} and {{ r.b }}: {{ r.bond }}
+{% else %}
+- {{ r.a }} and {{ r.b }}: tied, with nothing written yet
+{% endif %}
+{% endfor %}
+{% endif %}
+</relationships>
+{% endif %}
+{% for p in places %}
+
+{{ page(p) -}}
+{% endfor %}
+{% if closing %}
+
+<last_scene_ending scene="{{ closing.number }}">
+{{ turns(closing.turns, protagonist) -}}
+</last_scene_ending>
+{% endif %}
+
+<reference_index>
+{% for e in index %}
+- {{ e.title }} ({{ e.kind }}): {{ e.about }}
+{% else %}
+No pages yet but the cast's.
+{% endfor %}
+</reference_index>
+
+<this_scene number="{{ scene.number }}">
+{% if scene.place %}
+Where: {{ scene.place }}
+{% endif %}
+{% if scene.time %}
+When: {{ scene.time }}
+{% endif %}
+Present: {{ scene.present | join(', ') }}
+</this_scene>
+{% if summary %}
+
+<scene_so_far>
+{{ summary }}
+</scene_so_far>
+The scene goes on from here, word for word.
+{% endif %}

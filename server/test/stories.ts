@@ -3,18 +3,12 @@ import { eq } from 'drizzle-orm';
 import type { BookSetup, Character } from '@writer/shared/book';
 import { createBook } from '../src/books/setup.ts';
 import { scenes, turns } from '../src/db/schema.ts';
-import { startChange, type Tag } from '../src/story/changes.ts';
-import {
-  addGrowth,
-  addToTimeline,
-  closeThread,
-  openThread,
-  recordFact,
-  setArc,
-  shiftRelationship,
-} from '../src/story/ledger.ts';
+import { startChange, type Tag, type Writer } from '../src/story/changes.ts';
+import { remember } from '../src/story/memory.ts';
 import { mention } from '../src/story/mentions.ts';
-import { addTurn, endScene, setReply, startScene } from '../src/story/scenes.ts';
+import { writePage } from '../src/story/pages.ts';
+import { shiftRelationship } from '../src/story/relationships.ts';
+import { addTurn, endScene, setReply, startScene, type Scene } from '../src/story/scenes.ts';
 import { deps } from './helpers.ts';
 
 /*
@@ -31,7 +25,12 @@ export function tag(bookId: string, over: Partial<Tag> = {}): Tag {
   return { bookId, turnId: null, by: 'agent', what: 'Something happened', ...over };
 }
 
-/** A novella with Aiko, the protagonist, and Ren and Sora in the cast. Aiko and Ren are tied. */
+/** Who writes pages and memory: the agent, at no turn unless said. */
+export function writer(bookId: string, over: Partial<Writer> = {}): Writer {
+  return { bookId, turnId: null, by: 'agent', ...over };
+}
+
+/** A novella with Aiko, the protagonist, and Ren and Sora in the cast. Aiko and Ren are tied, and Ren and Sora. */
 export async function aBook(userId = `user-${randomUUID()}`) {
   const aiko = sheet('Aiko', { who: 'A lamplighter', personality: 'Stubborn, kind' });
   const ren = sheet('Ren', { who: 'The ferryman’s son' });
@@ -54,54 +53,65 @@ export async function aBook(userId = `user-${randomUUID()}`) {
   return { bookId: card.id, userId, aiko, ren, sora };
 }
 
-/** A book with its first scene playing. */
+/** Starts the book's next scene. */
+export async function nextScene(bookId: string, place: string, present: string[]): Promise<Scene> {
+  return db.transaction(async (tx) => {
+    const change = await startChange(tx, tag(bookId, { what: 'Started a scene' }));
+    return startScene(tx, change, { place, time: 'Dusk', present });
+  });
+}
+
+/** Ends a scene. */
+export async function end(bookId: string, scene: Scene): Promise<Scene> {
+  return db.transaction(async (tx) => {
+    const change = await startChange(tx, tag(bookId, { what: 'Ended a scene' }));
+    return endScene(tx, change, scene);
+  });
+}
+
+/** A book with its first scene playing, at the ferry with Aiko and Ren. */
 export async function aScene() {
   const book = await aBook();
-  const scene = await db.transaction(async (tx) => {
-    const change = await startChange(tx, tag(book.bookId, { what: 'Started a scene' }));
-    return startScene(tx, change, { place: 'The ferry', time: 'Dusk', present: [book.aiko.id, book.ren.id] });
-  });
+  const scene = await nextScene(book.bookId, 'The ferry', [book.aiko.id, book.ren.id]);
   return { ...book, scene };
 }
 
 /**
- * A book played into its second scene. Scene 1 has ended and folded (its one turn into its
- * summary). Scene 2 is playing at the ferry with Aiko and Ren, two turns in, one of them an
- * author note. Something is in every ledger.
+ * A book played into its second scene. Scene 1, at the Lamp House with Aiko, had one turn, has
+ * ended and is wrapped up. The reference has Aiko's page, the Lamp House's, and the Plan, Threads
+ * and Timeline; memory has a note; Aiko and Ren's line has a history. Scene 2 is playing at the
+ * ferry with Aiko and Ren, two turns in, one of them an author note, and a third taken back.
  */
 export async function aPlayedStory() {
   const book = await aBook();
   const { bookId, aiko, ren } = book;
-  const a = mention(aiko.id);
-  const r = mention(ren.id);
 
   const first = await db.transaction(async (tx) => {
     const change = await startChange(tx, tag(bookId, { what: 'Started a scene' }));
-    return startScene(tx, change, { place: 'The lamp house', time: 'Morning', present: [aiko.id] });
+    return startScene(tx, change, { place: 'The Lamp House, at the top of the stairs', time: 'Morning', present: [aiko.id] });
   });
   const opening = await addTurn(db, first, 'character', 'I light the first lamp.');
   await setReply(db, opening, 'The wick catches. Ren is at the door.');
+  const by = writer(bookId, { turnId: opening.id });
   await db.transaction(async (tx) => {
-    const change = await startChange(tx, tag(bookId, { turnId: opening.id }));
-    await recordFact(tx, change, null, `${r} owes the guild money.`);
-    await recordFact(tx, change, first.id, `${a} can’t swim.`);
-    await addToTimeline(tx, change, null, 'Twenty years before', 'The flood took the old bridge.');
-    await addGrowth(tx, change, aiko.id, first.id, 'Afraid of deep water since the flood.');
-    await shiftRelationship(tx, change, first.id, { one: aiko.id, other: ren.id, what: `${a} forgives ${r} for leaving.` });
-    await openThread(tx, change, first.id, 'Who cut the ferry rope?');
-    const letter = await openThread(tx, change, first.id, 'The unopened letter.');
-    await closeThread(tx, change, letter.id, first.id, `${a} burns it.`);
-    await setArc(tx, change, `${a} crosses the river and learns who cut the rope.`);
+    await writePage(tx, by, { title: 'Aiko', kind: 'character', about: '', body: 'Afraid of deep water since the flood.' });
+    await writePage(tx, by, {
+      title: 'The Lamp House',
+      kind: 'place',
+      about: 'Where the city’s lamps are kept.',
+      body: 'A narrow house of oil and wicks. [[Ren]] owes its keeper money.',
+    });
+    await writePage(tx, by, { title: 'Plan', kind: 'story', about: 'Where the story is heading.', body: '[[Aiko]] crosses the river and learns who cut the rope.' });
+    await writePage(tx, by, { title: 'Threads', kind: 'story', about: 'What the story has set up.', body: '- Who cut the ferry rope?' });
+    await writePage(tx, by, { title: 'Timeline', kind: 'story', about: 'What happened when.', body: '- Twenty years before: the flood took the old bridge.' });
+    await remember(tx, by, 'The owner wants [[Ren]] kept likeable.');
+    const change = await startChange(tx, tag(bookId, { turnId: opening.id, what: 'Shifted a relationship' }));
+    await shiftRelationship(tx, change, first.id, { one: aiko.id, other: ren.id, what: `${mention(aiko.id)} forgives ${mention(ren.id)} for leaving.` });
     await endScene(tx, change, first);
   });
-  await db.update(scenes).set({ summary: 'Aiko lit the first lamp, and Ren came to the door.', foldedThrough: opening.number }).where(eq(scenes.id, first.id));
+  await db.update(scenes).set({ summary: 'Aiko lit the first lamp, and Ren came to the door.' }).where(eq(scenes.id, first.id));
 
-  const second = await db.transaction(async (tx) => {
-    const change = await startChange(tx, tag(bookId, { turnId: opening.id, what: 'Started a scene' }));
-    const scene = await startScene(tx, change, { place: 'The ferry', time: 'Dusk', present: [aiko.id, ren.id] });
-    await addToTimeline(tx, change, scene.id, 'Dusk', 'They cross.');
-    return scene;
-  });
+  const second = await nextScene(bookId, 'The ferry', [aiko.id, ren.id]);
   const move = await addTurn(db, second, 'character', 'I ask Ren who cut the rope.');
   await setReply(db, move, '"Not me," Ren says, too quickly.');
   const note = await addTurn(db, second, 'author', 'Make the river rise.');

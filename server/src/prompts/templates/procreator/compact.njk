@@ -1,0 +1,24 @@
+{#-
+  The compaction's request, sent at the end of a scene's session that has grown past its limit
+  (procreator/folds.ts). Procreator first saves what the older turns established, then writes the
+  scene so far, which the next segment opens with. The task comes last, after the session, as
+  Google's Gemini 3 guides advise. Takes a CompactPrompt.
+-#}
+<compaction>
+This session has grown too long, so turns {{ from }} to {{ to }} of scene {{ scene }} are about to leave your context. You'll go on with a fresh brief, the scene so far as you write it now, and turn {{ keptFrom }} onward word for word. Whatever those turns said that isn't in the reference, your memory or the scene so far will be gone from your context.
+
+First, save. Go through turns {{ from }} to {{ to }} and make sure the reference holds everything they established that matters beyond this scene: write or edit the pages it belongs on, shift the relationships that changed, and bring Threads and Timeline up to date. Put what you've learned about the owner or the work in your memory. Skip what's saved already.
+
+Then write the scene so far, from its start to the end of turn {{ to }}{% if earlier %}, keeping everything the scene so far above already says{% endif %}. Keep:
+- what happened, in order: what each person did and said that moved the scene;
+- exact words wherever they matter, quoted: promises, threats, lies, confessions, orders, names and numbers;
+- who knows what: what each person learned, revealed or kept hidden, and who saw or heard it;
+- how feelings between people shifted, and why;
+- how things stand at the end of turn {{ to }}: where everyone is, and anything hurt, lost, given, taken or broken;
+- small details the turns set down (a scar, a door left unlocked, the weather), since the scene may come back to them;
+- what you were building toward in this scene and haven't reached yet.
+
+An author note is the owner steering from outside the story: keep what it made happen, never the note itself.
+
+After your tool calls, answer with the scene so far and nothing else: plain prose, past tense, people by name, as long as it needs to be to keep everything above.
+</compaction>

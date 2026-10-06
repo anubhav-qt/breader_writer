@@ -1,0 +1,44 @@
+{#-
+  A page of the reference, as the brief and read_page show it. Someone in the cast comes whole:
+  the owner's sheet, which only the owner changes, then Procreator's page below it. Takes a
+  CharacterView or a PageView (story/view.ts).
+-#}
+{% macro person(c) %}
+<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}>
+<sheet>
+{% if c.sheet.who %}
+Who: {{ c.sheet.who }}
+{% endif %}
+{% if c.sheet.personality %}
+Personality: {{ c.sheet.personality }}
+{% endif %}
+{% if c.sheet.past %}
+Past: {{ c.sheet.past }}
+{% endif %}
+{% if c.sheet.notes %}
+Notes: {{ c.sheet.notes }}
+{% endif %}
+{% if not (c.sheet.who or c.sheet.personality or c.sheet.past or c.sheet.notes) %}
+The owner left it blank.
+{% endif %}
+</sheet>
+<page>
+{% if c.about %}
+About: {{ c.about }}
+{% endif %}
+{% if c.page %}
+{{ c.page }}
+{% else %}
+Nothing of yours yet.
+{% endif %}
+</page>
+</character>
+{% endmacro %}
+
+{% macro page(p) %}
+<page title="{{ p.title }}" kind="{{ p.kind }}">
+About: {{ p.about }}
+
+{{ p.body }}
+</page>
+{% endmacro %}

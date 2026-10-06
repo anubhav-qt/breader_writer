@@ -2,16 +2,13 @@ import { and, asc, desc, eq, getTableColumns, getTableName, gt, isNull, ne, notE
 import { alias, getTableConfig, type PgColumn } from 'drizzle-orm/pg-core';
 import type { Db, Tx } from '../db/client.ts';
 import {
-  arcs,
   changes,
   characters,
-  facts,
-  growth,
+  notes,
+  pages,
   relationshipHistory,
   relationships,
   scenes,
-  threads,
-  timeline,
   turns,
   versions,
   worlds,
@@ -32,10 +29,13 @@ export interface Tag {
   /** The turn being played, or the latest when the owner changes something between turns. Null before the first. */
   turnId: string | null;
   by: Who;
-  /** What it does, in a few words ("Recorded a fact"). */
+  /** What it does, in a few words ("Wrote the page The Keep"). */
   what: string;
   why?: string;
 }
+
+/** Who makes a change, and at which turn, for writes that say for themselves what they did. */
+export type Writer = Omit<Tag, 'what'>;
 
 export type Change = typeof changes.$inferSelect;
 export type Version = typeof versions.$inferSelect;
@@ -46,7 +46,7 @@ type Row = Record<string, unknown>;
 /** Something the story asked of the log that it can't do, said so the caller can tell the owner or the model. */
 export class StoryError extends Error {}
 
-const STORY_TABLES = [scenes, turns, facts, threads, timeline, growth, relationshipHistory, arcs, worlds, characters, relationships];
+const STORY_TABLES = [scenes, turns, pages, notes, relationshipHistory, worlds, characters, relationships];
 
 export type StoryTable = (typeof STORY_TABLES)[number];
 

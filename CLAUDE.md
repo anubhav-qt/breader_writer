@@ -24,13 +24,14 @@ the way a breader card fills with colour as you read.
 Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
 settings, world, cast and the relationship graph between them) on its own page, and changing it
 later. What's left of it is the owner's test. Step 3 (AI plumbing) is built: pi is forked
-(`packages/`), the server reads the models from Procreator's proxy and keeps each account's pick
-of model and thinking level, and the story has its tables, its change log, its working context
-rebuilt from them through Nunjucks templates, and constant folding to keep that context in
-budget (`server/src/story/`, `server/src/prompts/`). Nothing plays a story yet (step 4), so
-what the owner can try of it is the model picker. The owner has a real book set up locally that they mean to play through before
-production, so its data must survive every change (see "Running it locally"). See "The code"
-below for what exists.
+(`packages/`), and the server reads the models from CLIProxyAPI and keeps each account's pick of
+model and thinking level. Procreator's memory was redesigned after the owner's review
+(2026-10-06) and rebuilt to it: a session per scene that opens with a brief built from the
+database, the reference and memory Procreator keeps with its tools, the change log, and our own
+compaction (`server/src/story/`, `server/src/procreator/`, `server/src/prompts/`). Nothing plays
+a story yet (step 4), so what the owner can try of it is the model picker. The owner has a real
+book set up locally that they mean to play through before production, so its data must survive
+every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
 
@@ -239,14 +240,22 @@ Each step ends working, committed, and with a short test checklist for the owner
 - The setup page still saves a book's sheets directly, not through the change log. Once a book
   is being played (step 4), the owner's edits go through the log, asking "always so, or from
   now on?".
-- A relationship's history goes into the context whole for the people in the scene. If it grows
-  long enough to matter, fold it to a summary at the scene's end (step 4, when the narrator
-  starts writing it).
-- Folding writes the scene's summary only. Folding the scene into the rest of the state (facts,
-  sheets, threads) at its end needs the narrator's tools, so it comes with them in step 4.
-- Folding runs on the account's own model and thinking level, like everything else.
-- `fitBudget` measures the story and the scene being played. Once the narrator has its prompt
-  (step 4), measure its whole context instead.
+- A relationship's history goes into the brief whole for the people in the scene. If it grows
+  long enough to matter, fold it to a summary at the wrap-up.
+- Folds run on the account's own model and thinking level, like everything else.
+- Nothing calls the sessions yet. Play (step 4) sends the owner's moves through `converse`, ends
+  scenes and then calls `wrapUp`, tells Procreator of the owner's mid scene changes with
+  `addNote`, and undoes turns with `cutSession` and `takeBack` of the turns' changes. How a move,
+  an author note and a note are written in the session is play's to decide; until then a message
+  is its text.
+- A session's instructions and tools must be the same for every call in it, folds included, or
+  the provider's cache misses. Play's tools join the memory tools for every run, not only for
+  play's own.
+- "Always so" edits and renames (steps 4 and 5) start the session again from the rewritten
+  turns: a new segment with a fresh head, the turns rebuilt as plain messages (their tool calls
+  and thinking don't survive a rewrite).
+- Sessions haven't run against a real model yet: the tests use the stand-in proxy, and the
+  local `server/.env` has no proxy (`npm run dev:env` adds it).
 
 ### Later versions
 
@@ -352,17 +361,19 @@ A Hono API, port 8790, built like breader's server.
   `relationships` (one row per pair, smaller id first, which a check enforces: the bond and each
   side's "sees" and "hides"), and `settings` (one per account: its model and thinking level).
   The story's own tables follow (see `src/story/`): `scenes` (numbered, one playing at a time,
-  with where, when, who is in it and its summary), `turns` (the owner's move and the narrator's
-  reply, word for word, numbered through the book), `changes` and `versions` (the change log),
-  `facts`, `threads`, `timeline`, `growth` (what the story added to a character's sheet),
-  `relationship_history`, `arcs` (the narrator's plan), and `calls` (each model call and the
-  tokens it used). The story's tables keep no times of their own; the change that made a row
-  has it. drizzle-kit only sees this file and this schema.
+  with where, when, who is in it and, once wrapped up, its summary), `turns` (the owner's move
+  and the reply, word for word, numbered through the book), `changes` and `versions` (the change
+  log), `pages` (the reference: a page per subject, by title, or by character for a cast
+  member's), `notes` (Procreator's memory), `relationship_history`, `session_segments` and
+  `session_messages` (each scene's session), and `calls` (each model call and the tokens it
+  used). The story's tables keep no times of their own; the change that made a row has it. A
+  session is raw history like turns, only ever added to. drizzle-kit only sees this file and this
+  schema.
 - `src/books/setup.ts`: a book's setup in and out of those tables. Saving keeps the ids of
   characters who stay and removes only those who left, since later steps hang the story off
   them. Relationships are written whole on each save, and read back in pair order.
 - `src/ai/`: the models.
-  - `proxy.ts` reads the shared CLIProxyAPI: the models its accounts serve (`/v1/models`, with
+  - `proxy.ts` reads CLIProxyAPI: the models its accounts serve (`/v1/models`, with
     the API key), and what it knows about them (the management API's model definitions, with the
     management key, read only). Answers are checked with zod; a proxy that can't be reached or
     says no is a `ProxyError`.
@@ -384,37 +395,72 @@ A Hono API, port 8790, built like breader's server.
     take-back isn't taken back itself. Undo takes back the newest first.
   - `scenes.ts`: starting and ending scenes, and turns. Turns are raw history: making one isn't
     a change (changes are tagged with turns), but rewriting one is.
-  - `ledger.ts`: facts, threads, the timeline, growth, relationship shifts (tying the two first
-    if they weren't, and adding to the line's history) and the arc. It turns away blank text and
-    mentions of anyone not in the cast. The narrator's tools (step 4) call these.
-  - `mentions.ts`: in that structured text a person is `<@id>`, named when the context is built.
+  - `mentions.ts`: in the structured text (pages, notes, relationship history) a person is
+    `<@id>`, and named when it's shown. Procreator writes a person as a link, `[[Name]]`
+    (`unlinked` keeps it as a mention, and turns away a name no one or more than one in the cast
+    has), and reads them as links with their name as it is now (`linked`). `cast.ts` gives the
+    cast in order and by name.
+  - `pages.ts`: the reference. A page has a kind (character, place, group, thing, lore, story),
+    a title, a line for the index and a body. A character's page goes by their name and holds
+    only Procreator's part: their sheet stays on `characters`, the owner's. `writePage` makes or
+    replaces a page whole, `editPage` changes text found on it exactly once, or adds to its end
+    (and makes a character's page the first time). A write starts its change only when it
+    changes something, so the same write sent twice leaves one trace; it turns away blank text,
+    unknown links, a title that takes a cast member's name, and pages past 24,000 characters.
+    Plan, Threads and Timeline are story pages by those titles.
+  - `memory.ts`: Procreator's notes, at most 40, each one line of at most 300 characters. The
+    same note twice (in any case) is kept once. Remembering and forgetting are changes.
+  - `relationships.ts`: shifting a relationship (tying the two first if they weren't, and adding
+    to the line's history); `shiftOnce` does nothing when the shift is in place already.
+  - `search.ts`: exact words in the pages (as Procreator reads them), the scene summaries and
+    every standing turn, in any case and across line breaks, a dozen at a time.
+  - `session.ts`: a scene's session as it's kept: segments (`startSegment`, `currentSegment`),
+    each a head and the messages from its `fromSeq` on, and messages (`addMessage`) of kind
+    `play`, `note` or `fold`; a segment sends its standing play and notes (`segmentMessages`).
+    `cutSession` is undo's side: the messages and segments of the turns from one on are marked
+    undone, kept. The segment a session opens with is made at no turn, so it's never cut.
   - `read.ts` reads everything a book's story knows in one go (`readStory`), and `view.ts`
-    turns it into what the prompt templates take (`storyView`): names filled in for every
-    mention, scenes by number, the relationships of the people in the scene in full (bond, both
-    sides, what each hides, the history) and everyone else's as their bond, open threads only,
-    and where the story stands against its length. Every scene comes with its summary and its
-    turns not folded yet, word for word, so turns leave the context only once a summary holds them.
-  - `fold.ts` is the compaction. `foldScene` folds an ended scene's turns into its summary;
-    `foldTurns` folds a scene's turns up to one of them. The model gets the story, the scene's
-    summary so far and the turns, and writes the summary anew, keeping what it said; the
-    summary is saved as a change before the turns leave the context, and a model that fails,
-    runs out of room or writes nothing changes nothing. `fitBudget`, before a call, folds any
-    ended scene still waiting, then, while the story and the scene being played
-    (`partials/context.njk`) are over budget, the scene's oldest turns, to three quarters of
-    the budget and never the latest four. The budget is 200k tokens, or half the window of a
-    model with less than 400k.
-- `src/ai/call.ts`: one call to the model in use (`ask`): the instructions and one message, and
-  the reply's text. Every call goes in `calls`, with the tokens the writer counted before sending
-  and what the model says it used. A call that comes back with no answer is a `ModelError`.
+    turns it into what the templates take (`briefView`): the people in the scene in full (sheet
+    and page) and everyone else in a line, the relationships among those present in full with
+    their history and everyone else's as their bond, every earlier scene's summary, the Plan and
+    Threads pages, memory, the pages of places the scene's place names, the last three turns of
+    the scene before, the index (every page but the characters', by kind), and where the story
+    stands against its length. Pages and notes show people as links; the rest by plain name.
+- `src/procreator/`: Procreator at work in a scene's session.
+  - `brief.ts`: its instructions (`instructionsFor`) and a segment's head (`headFor`: the brief,
+    and after a compaction the scene so far).
+  - `tools.ts`: the memory tools (`read_page`, `write_page`, `edit_page`, `search`,
+    `remember`, `forget`, `shift_relationship`), typebox schemas checked by pi before they run.
+    Each write is one change, by the agent, at the run's turn. The story's refusals reach the
+    model as they are; any other failure is logged and the model is told it's the writer's.
+  - `run.ts`: one exchange (`exchange`): the session sent as it stands (instructions and tool
+    declarations, the head, the segment's messages) plus one message, through pi's agent loop,
+    tools run one at a time, at most 24 calls. Every message is kept as it ends and every call
+    recorded, so the next call sends exactly this one's start and the cache holds.
+    `sessionTokens` is pi's estimate: the tokens the model last said it read, plus what came
+    after.
+  - `folds.ts`: our compaction. `compactAt` is 400k, or the window less the longest answer when
+    that's smaller (half the window at least). `cutPoint` keeps the newest turns that fit in a
+    fifth of that, always the latest, and folds the rest, cutting only between turns. `compact`
+    asks Procreator, in the session, to save what the folded turns established and then write
+    the scene so far, and starts a segment with a fresh head and the kept turns. `wrapUp` asks it
+    to save what the ended scene established and write its summary, kept as a change;
+    `wrapUpEnded` does it for every ended scene still waiting. A fold that's cut off or writes
+    nothing keeps no summary and trims nothing (`FoldError`), though what it saved stays saved;
+    its messages are kind `fold`, never sent again.
+  - `converse.ts`: the way in for play (`converse`): opens the session if it hasn't been (with
+    earlier scenes wrapped up first), compacts it if it's past its limit (and goes on as it was
+    if that fails), then sends the move. `addNote` adds the owner's mid scene change as a note.
+- `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with the
+  tokens the writer counted before sending and what the model says it used, cache reads
+  included. A call that comes back with no answer is a `ModelError`.
 - `src/prompts/`: the prompts, as Nunjucks templates in `templates/` (`render.ts`). A template
-  takes a typed object (a `StoryView`, plus what its role needs) and only lays it out; a missing
-  value fails the render. `partials/story.njk` is the story as it stands (the book, world, cast,
-  relationships, arc, open threads, facts, timeline and earlier scenes), in XML tags, and
-  `partials/scene.njk` a scene with its turns (an author note is marked as one), and
-  `partials/context.njk` both with the scene being played. A call's context is the role's
-  instructions as the system message, then one user message: the story first, as the long
-  context, then the scene, then the task, last. `fold/` is the fold's prompt, written to the
-  Gemini 3 guides (October 2026).
+  takes a typed object and only lays it out; a missing value fails the render.
+  `procreator/system.njk` is Procreator's instructions; `procreator/head.njk` the brief, in XML
+  tags, with the scene so far after a compaction; `procreator/read.njk` a page as `read_page`
+  gives it (`partials/page.njk`); `partials/scene.njk` turns word for word (an author note is
+  marked as one); `procreator/compact.njk` and `procreator/wrap.njk` the folds' requests, which
+  come last, after the session. Written to the Gemini 3 guides (October 2026).
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -438,17 +484,21 @@ A Hono API, port 8790, built like breader's server.
   security, as breader's do. New migration: change `schema.ts`, then
   `npm run db:generate -w server`. When a table looks renamed, drizzle-kit asks about it in the
   terminal and fails anywhere else; make it two migrations instead (add the new table and copy
-  the data, then drop the old one), as 0002 and 0003 did.
+  the data, then drop the old one), as 0002 and 0003 did. 0006 and 0007 did the same when the
+  old ledgers (facts, threads, timeline, growth, arcs) became pages; 0007 refuses to drop them
+  while they hold anything.
 - `test/`: vitest against the writer's Docker Postgres (`npm run db`, port 54329), in a fresh
   `writer_test` database. `test/breader.sql` makes breader's login tables, and `test/breader.ts`
   is a stand-in for breader's server: a real Better Auth, the version breader pins (1.7.6),
   configured as breader configures it. Tests log in through it and hand its cookie to the
   writer. If breader upgrades Better Auth, upgrade it here too and run the tests. `test/proxy.ts`
   is a stand-in for CLIProxyAPI, so no test reaches a real model: it answers Gemini's streaming
-  route with the replies a test hands it and keeps what each call was sent. `test/stories.ts`
-  makes books with stories in them, through the change log; `test/story.test.ts` covers the
-  log and the ledgers, `test/context.test.ts` the story's view and its templates, and
-  `test/fold.test.ts` folding and the budget.
+  route with the replies a test hands it (text, tool calls, a thought signature, the tokens
+  read and cached) and keeps what each call was sent. `test/stories.ts` makes books with stories
+  in them, through the change log; `test/story.test.ts` covers scenes, turns and the log,
+  `test/pages.test.ts` links, pages, memory and search, `test/brief.test.ts` the brief and its
+  templates, and `test/session.test.ts` sessions (the prefix each call keeps, tools, notes,
+  undo), compaction and the wrap-up.
 
 ### Running it locally
 
@@ -564,7 +614,7 @@ from it.
   this book. It's short, all of it is in every brief, and the owner can see and edit it.
 - **Our own compaction**, designed for the story. Save first, trim second: turns leave the
   context only once the reference and a summary hold what they said, and a fold that fails
-  changes nothing.
+  trims nothing.
   - **The wrap-up, at every scene's end.** In the same session, with the whole scene still in
     view (and in the cache), Procreator saves everything the scene established to the reference
     and its memory, then writes the scene's summary. The summary is the backbone the story so far
@@ -616,8 +666,9 @@ from it.
 
 - **Renames always reach back; anything else is "always so" or "from now on"**, the owner's
   pick when saving (see "Decided").
-- **Always so reaches back.** Everything earlier that says otherwise is brought in line: facts,
-  summaries, relationship history, the turns and the written book. A rename rewrites the name
+- **Always so reaches back.** Everything earlier that says otherwise is brought in line: the
+  reference, memory, summaries, relationship history, the turns and the written book. A rename
+  rewrites the name
   wherever it's written, with its forms (possessives, nicknames made from it). A change of habit,
   personality or past rewrites only the passages that contradict it and keeps the rest word for
   word.

@@ -206,8 +206,8 @@ See "The code" below for what exists.
   list, which replaces the old one. Once approved, the changes land on the page one by one.
   In the chat, the owner's words sit in a soft grey bubble on the right, and Procreator's run
   plainly across the panel, lists included (the owner's pick, 2026-10-06). The Suggestions
-  button is in the setup page's top bar, beside the close button, so it stays in view (the
-  owner's pick, 2026-10-06).
+  button sits at the right of the page's heading ("New book", or the book's title), on the
+  same line (the owner's pick, 2026-10-06, in place of the top bar).
 
 ### Open (ask the owner one at a time, in roughly this order)
 

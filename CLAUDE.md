@@ -28,8 +28,10 @@ later. What's left of it is the owner's test. Step 3 (AI plumbing) is built: pi 
 model and thinking level. Procreator's memory was redesigned after the owner's review
 (2026-10-06) and rebuilt to it: a session per scene that opens with a brief built from the
 database, the reference and memory Procreator keeps with its tools, the change log, and our own
-compaction (`server/src/story/`, `server/src/procreator/`, `server/src/prompts/`). Nothing plays
-a story yet (step 4), so what the owner can try of it is the model picker. The owner has a real
+compaction (`server/src/story/`, `server/src/procreator/`, `server/src/prompts/`). It ran end to
+end against the real model the same day (see "Notes for step 3"). Nothing plays a story yet
+(step 6), so what the owner can try of it is the model picker. Next is settings (step 4). The
+owner has a real
 book set up locally that they mean to play through before production, so its data must survive
 every change (see "Running it locally"). See "The code" below for what exists.
 
@@ -39,6 +41,10 @@ every change (see "Running it locally"). See "The code" below for what exists.
 - Address: `breader.site/writer`.
 - Look: breader's. The interface is white or black with no colour of its own; colour belongs to
   the books. Doto for the interface, Dongle for reading. See breader's `frontend/src/styles/`.
+- **Writing gets a feel of its own.** Breader is made for reading. Where the owner writes
+  (setup's fields, the play box, sheets), the writer goes past breader: a better, richer text
+  editor and input area, and a typeface that makes writing feel and look good in place of
+  Dongle. The specifics are asked screen by screen.
 - Accounts: the same key and login system as breader.
 - Each book's card has a progress bar for how much of the book has been written.
 - **The book is written scene by scene.** When a scene wraps (the place or time shifts), that
@@ -66,16 +72,22 @@ every change (see "Running it locally"). See "The code" below for what exists.
   harness and change it for our use. POM and its agent are a separate project: nothing here
   comes from them.
 - **Models come through CLIProxyAPI, one per machine.** On this Mac it's the one Homebrew runs
-  (port 8317). Its accounts (Google Antigravity first, with ChatGPT Codex and Claude as other
-  options) are signed in to it outside the writer, through its management API; the writer only
-  picks the model and thinking level. While the proxy is down, the AI shows offline. This holds
-  until writers bring their own AI (below).
+  (port 8317). The owner signs its accounts in and out from the writer's settings (Google
+  Antigravity first, with ChatGPT Codex and Claude as other options), through the proxy's
+  management API; every writer picks the model and thinking level. While the proxy is down, the
+  AI shows offline. This holds until writers bring their own AI (below).
 - **The model is picked in the header.** A chip by the account (the model's name and its
   thinking level) drops down the models the accounts serve, and a thinking control below them.
   Always in sight, one tap away. One pick per account, for every book.
+- **Settings is where AI accounts are signed in.** The owner signs the shared accounts in and
+  out there (the free chapter's Antigravity first); only the owner sees them. Later it's where
+  every writer brings their own AI. Its look is asked before it's built.
 - **Anyone can write, with their own AI.** A writer brings their own: an API key (BYOK), or a
   sign-in with a subscription they already have (Claude Code, Codex, Antigravity and the like).
-  Without either, a free trial writes one chapter on our key. Not built yet (see "Open").
+  Everyone's first chapter is free, on the owner's own Antigravity account (the one signed in to
+  CLIProxyAPI): normal writing, nothing held back or marked as a trial. Once that chapter is
+  done, the owner's account writes no more of the book, and going on needs the writer's own AI.
+  Not built yet (see "Open").
 - **Until then, only invited accounts can play.** Like breader's `SPEECH_EMAILS`: a list of
   emails (`WRITER_EMAILS`), each with a confirmed address. Everyone else can see the writer, with
   a quiet note that it's invite only. A key on its own isn't enough to play, since a key has no
@@ -157,26 +169,28 @@ every change (see "Running it locally"). See "The code" below for what exists.
   it's built once and looks the same everywhere. A relationship opens the same way, as its own
   sheet.
 - **Procreator helps with setup as you fill it in.** It watches the setup page, and once the
-  first few things are filled in, clicking into any field shows a suggestion for it, made from
-  everything there so far.
+  first few things are filled in (so it has something to go on), clicking into any field shows
+  its suggestion for that field as faint text where you'd type, made from everything there so
+  far. Tab or the right arrow key takes it; typing anything else clears it.
 - **Suggestions is a chat about the setup.** A Suggestions button opens a chat with Procreator:
   ask for anything, go back and forth, change your mind as often as you like. Once everything is
   agreed and you approve it, Procreator makes all the changes itself.
 
 ### Open (ask the owner one at a time, in roughly this order)
 
-1. Design direction for each new screen (setup, play, cast sheets, setup's suggestions), asked
-   when we reach it. The library and the book view start as copies of breader's pages.
+1. Design direction for each new screen (settings, setup's suggestions, play, cast sheets),
+   asked when we reach it. The library and the book view start as copies of breader's pages;
+   where the owner writes, the writer goes past breader (see "Writing gets a feel of its own").
 2. Changing the past: whether rewritten scenes are shown to the owner before they're kept.
-   Asked when we reach it (step 5).
-3. Where setup's suggestions (the field suggestions and the Suggestions chat) go in the build
-   order.
-4. Bringing your own AI: what "our key" is for the free trial (a paid API key, or the owner's
-   own subscriptions, which are usually for personal use only), what a trial chapter is (one
-   scene written into the book?), how keys and sign-ins are kept, whether CLIProxyAPI still has
-   a part, each provider's terms for using a subscription from another app, and where it goes in
-   the build order. Until it's built, the model picker's copy says accounts are signed in at
-   Procreator's settings, which don't exist yet.
+   Asked when we reach it (step 7).
+3. Bringing your own AI (step 9): how a writer's own key or sign-in is kept and used
+   (CLIProxyAPI pools the accounts signed in to it, so one writer's sign-in could end up
+   serving another's calls), and what counts as the free chapter (chapters come with the book,
+   step 7). A risk to keep in view: subscription sign-ins like Antigravity are generally for
+   their holder's own use, so serving every writer's first chapter through the owner's could
+   get it limited.
+4. Whether the story's prose may use em dashes. The no-dash rule covers our own writing, and
+   Gemini's prose uses them freely. Asked with the narrator's prompt (step 6).
 
 ### Build order
 
@@ -193,16 +207,24 @@ Each step ends working, committed, and with a short test checklist for the owner
    AI" below): the durable story state with every version kept, a session per scene that opens
    with a brief built from it, the reference and memory Procreator keeps with its tools, and our
    own compaction. Nunjucks prompt templates and their tests.
-4. **Play.** Procreator narrating, and its play tools: turns, the author toggle, playing other
+4. **Settings.** Where the owner signs CLIProxyAPI's accounts in and out (Antigravity first),
+   through its management API, and sees which are signed in. Only the owner sees them.
+5. **Setup help.** Procreator's suggestion in whichever setup field is clicked into (faint text,
+   taken with Tab or the right arrow key), and the Suggestions chat, which makes the agreed
+   changes itself once the owner approves them.
+6. **Play.** Procreator narrating, and its play tools: turns, the author toggle, playing other
    characters (the "Main character and author only" toggle), hints on tap, undo within a scene,
    scenes ending (and their wrap-up), the cast growing and new characters joining, relationships
    shifting, and the owner's changes reaching back through the turns and the state.
-5. **The book.** The scene writer, the book view (a copy of breader's reader), the progress bar
+7. **The book.** The scene writer, the book view (a copy of breader's reader), the progress bar
    and the EPUB download, and the owner's changes reaching back into written scenes.
-6. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
+8. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
    the writer's app, the writer API behind the tunnel, and the nightly backup. The writer API
    must reach a CLIProxyAPI on the ThinkPad, management routes included, which only answer their
    own machine unless told otherwise (`allow-remote`); work out how when we get there.
+9. **Open to everyone.** A writer's own AI in settings (a key, or a subscription sign-in), and
+   everyone's first chapter free on the owner's account. It follows the book, since the free
+   chapter needs chapters.
 
 ### Notes for step 1
 
@@ -216,7 +238,7 @@ Each step ends working, committed, and with a short test checklist for the owner
 
 ### Notes for step 2
 
-- Until playing exists (step 4), a card opens its book's setup page, to look over and change.
+- Until playing exists (step 6), a card opens its book's setup page, to look over and change.
   Nothing changes until Save, and leaving with changes asks first.
 - A new book's setup is kept in this browser as it's typed (`writer.draft.v1`), so closing the
   page loses nothing. Start makes the book and clears it; Clear empties it.
@@ -233,17 +255,16 @@ Each step ends working, committed, and with a short test checklist for the owner
   old draft in the browser is converted the same way when it's read. The draft isn't written
   until something is typed, so a draft the page can't read is never overwritten by opening it.
 - The pages have their own addresses (`/writer/new`, `/writer/books/<id>/setup`), so in
-  production whatever serves `/writer` must answer every path under it with `index.html` (step 6).
+  production whatever serves `/writer` must answer every path under it with `index.html` (step 8).
 
 ### Notes for step 3
 
 - The setup page still saves a book's sheets directly, not through the change log. Once a book
-  is being played (step 4), the owner's edits go through the log, asking "always so, or from
+  is being played (step 6), the owner's edits go through the log, asking "always so, or from
   now on?".
-- A relationship's history goes into the brief whole for the people in the scene. If it grows
-  long enough to matter, fold it to a summary at the wrap-up.
+- A relationship's history goes into the brief whole for the people in the scene.
 - Folds run on the account's own model and thinking level, like everything else.
-- Nothing calls the sessions yet. Play (step 4) sends the owner's moves through `converse`, ends
+- Nothing calls the sessions yet. Play (step 6) sends the owner's moves through `converse`, ends
   scenes and then calls `wrapUp`, tells Procreator of the owner's mid scene changes with
   `addNote`, and undoes turns with `cutSession` and `takeBack` of the turns' changes. How a move,
   an author note and a note are written in the session is play's to decide; until then a message
@@ -251,11 +272,21 @@ Each step ends working, committed, and with a short test checklist for the owner
 - A session's instructions and tools must be the same for every call in it, folds included, or
   the provider's cache misses. Play's tools join the memory tools for every run, not only for
   play's own.
-- "Always so" edits and renames (steps 4 and 5) start the session again from the rewritten
+- "Always so" edits and renames (steps 6 and 7) start the session again from the rewritten
   turns: a new segment with a fresh head, the turns rebuilt as plain messages (their tool calls
   and thinking don't survive a rewrite).
-- Sessions haven't run against a real model yet: the tests use the stand-in proxy, and the
-  local `server/.env` has no proxy (`npm run dev:env` adds it).
+- First run against the real model (2026-10-06): Gemini 3.8 Flash through the owner's
+  Antigravity, two moves and the wrap-up, in a scratch database (never the owner's). It worked
+  end to end. The first move set up Plan, Threads and Timeline before narrating; the wrap-up
+  wrote both people's pages, a place, a group and some lore, shifted their relationship, and
+  summed the scene up well, keeping what each hides. To watch:
+  - The wrap-up saved one thing per call (13 calls for two moves), though Gemini can make
+    several calls at once. Fine for quality, slow on a long scene.
+  - Cache reads came back 0 on every call, even past Gemini's 4,096 token minimum: Antigravity
+    may not cache, or the proxy may not pass the count on.
+  - Without `CLIPROXY_MANAGEMENT_KEY` the catalog knows no thinking levels and takes the window
+    as 128k, so compaction would start at 96k instead of 400k. The key comes from the owner.
+  - Its prose uses em dashes (see "Open").
 
 ### Later versions
 
@@ -638,7 +669,7 @@ from it.
   they hold "from now on"; when they rewrite the past ("always so", a rename), the session starts
   again from the rewritten turns.
 - **Recall exact words on demand.** A tool searches the reference, the scene summaries, every
-  turn played and (from step 5) the written book.
+  turn played and (from step 7) the written book.
 - **Measure it.** Every call is recorded with the tokens counted before sending and what the
   model says it used, cache reads included.
 
@@ -694,7 +725,7 @@ from it.
 - Safe to repeat where possible, so a retry never doubles a change.
 - Procreator's memory tools come with its memory (step 3): reading, writing and editing pages,
   searching, remembering and forgetting, and shifting a relationship. Its play tools are
-  designed with play (step 4): end the scene, introduce a character, and what else play needs.
+  designed with play (step 6): end the scene, introduce a character, and what else play needs.
 
 ### Procreator's jobs
 

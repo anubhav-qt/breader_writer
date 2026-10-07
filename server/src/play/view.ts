@@ -30,22 +30,39 @@ function nameOf(names: Map<string, string>, id: string): string {
   return names.get(id) ?? GONE;
 }
 
+/** The cast as the quiet lines need it: each person's name, and their place in the cast. */
+interface CastIndex {
+  names: Map<string, string>;
+  places: Map<string, number>;
+}
+
+/** Two people in cast order, the one the owner plays first, as a relationship's sheet has them. */
+function inCastOrder(cast: CastIndex, a: string, b: string): [string, string] {
+  const placeOfA = cast.places.get(a) ?? Infinity;
+  const placeOfB = cast.places.get(b) ?? Infinity;
+  if (placeOfB < placeOfA) {
+    return [b, a];
+  }
+  return [a, b];
+}
+
 /** A row Procreator made at a turn, as a quiet line: someone joining the cast, or a relationship shifting. */
-function markOf(table: string, after: unknown, names: Map<string, string>): Mark | null {
+function markOf(table: string, after: unknown, cast: CastIndex): Mark | null {
   if (table === 'characters') {
     const person = after as { id: string; name: string };
-    return { kind: 'joined', id: person.id, name: names.get(person.id) ?? person.name };
+    return { kind: 'joined', id: person.id, name: cast.names.get(person.id) ?? person.name };
   }
   if (table === 'relationship_history') {
     const entry = after as { aId: string; bId: string; text: string };
-    const between = `${nameOf(names, entry.aId)} and ${nameOf(names, entry.bId)}`;
-    return { kind: 'shifted', a: entry.aId, b: entry.bId, between, text: named(entry.text, names) };
+    const [first, second] = inCastOrder(cast, entry.aId, entry.bId);
+    const between = `${nameOf(cast.names, first)} and ${nameOf(cast.names, second)}`;
+    return { kind: 'shifted', a: first, b: second, between, text: named(entry.text, cast.names) };
   }
   return null;
 }
 
 /** The quiet lines after each turn, by turn: what Procreator made at it that still stands. */
-async function marksOf(db: Db, turns: Turn[], names: Map<string, string>): Promise<Map<string, Mark[]>> {
+async function marksOf(db: Db, turns: Turn[], cast: CastIndex): Promise<Map<string, Mark[]>> {
   const marks = new Map<string, Mark[]>();
   if (turns.length === 0) {
     return marks;
@@ -68,7 +85,7 @@ async function marksOf(db: Db, turns: Turn[], names: Map<string, string>): Promi
     )
     .orderBy(asc(versions.id));
   for (const row of rows) {
-    const mark = markOf(row.table, row.after, names);
+    const mark = markOf(row.table, row.after, cast);
     if (!mark || !row.turnId) {
       continue;
     }
@@ -79,12 +96,13 @@ async function marksOf(db: Db, turns: Turn[], names: Map<string, string>): Promi
   return marks;
 }
 
-async function turnsShown(db: Db, scene: Scene | null, names: Map<string, string>): Promise<PlayTurn[]> {
+async function turnsShown(db: Db, scene: Scene | null, cast: CastIndex): Promise<PlayTurn[]> {
   if (!scene) {
     return [];
   }
+  const names = cast.names;
   const turns = await turnsOf(db, scene.id);
-  const marks = await marksOf(db, turns, names);
+  const marks = await marksOf(db, turns, cast);
   return turns.map((turn) => {
     let played: Person | null = null;
     if (turn.played !== null) {
@@ -151,7 +169,8 @@ async function standingOf(db: Db, all: Scene[]): Promise<Standing> {
 export async function playView(db: Db, bookId: string): Promise<Play> {
   const [book] = await db.select().from(books).where(eq(books.id, bookId));
   const cast = await castOf(db, bookId);
-  const names = namesOf(cast);
+  const places = new Map(cast.map((person, place) => [person.id, place]));
+  const index: CastIndex = { names: namesOf(cast), places };
   const protagonist = cast.find((person) => person.role === 'protagonist');
   if (!book || !protagonist) {
     throw new Error(`Book ${bookId} has no protagonist.`);
@@ -178,7 +197,7 @@ export async function playView(db: Db, bookId: string): Promise<Play> {
     stage: standing.stage,
     scene,
     openings,
-    turns: await turnsShown(db, standing.onPage, names),
+    turns: await turnsShown(db, standing.onPage, index),
     next,
   };
 }

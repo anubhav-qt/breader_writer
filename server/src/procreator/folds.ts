@@ -28,7 +28,7 @@ import { exchange, type Answer, type Procreator } from './run.ts';
 /** A session is compacted past this many tokens, or sooner on a model whose window can't take that and an answer. */
 export const COMPACT_AT = 400_000;
 /** After a compaction, the latest turns kept word for word take up to this share of the limit. */
-const KEEP_SHARE = 0.2;
+export const KEEP_SHARE = 0.2;
 
 /** A fold that couldn't be kept: no summary, and nothing trimmed. */
 export class FoldError extends Error {}

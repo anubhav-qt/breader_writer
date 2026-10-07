@@ -21,6 +21,7 @@ export interface Asking {
   mode?: 'play' | 'hints';
   kind?: 'play' | 'aside';
   role?: Role;
+  playOthers?: boolean;
   onText?: Ask['onText'];
   onScene?: Ask['onScene'];
 }
@@ -35,7 +36,7 @@ async function openSession(ai: Procreator, scene: Scene): Promise<Segment> {
 
 /** The segment to send in: this one, or a new one when the session has grown past its limit and could be compacted. */
 async function fit(ai: Procreator, scene: Scene, segment: Segment, text: string, turnId: string | null): Promise<Segment> {
-  const tools = toolsFor({ db: ai.db, scene, turnId, mode: 'play', outcome: noOutcome(), onScene: () => {} });
+  const tools = toolsFor({ ai, db: ai.db, scene, turnId, mode: 'play', playOthers: false, outcome: noOutcome(), onScene: () => {} });
   const context = await sessionContext(ai.db, scene, segment, tools);
   const next: UserMessage = { role: 'user', content: text, timestamp: Date.now() };
   const tokens = sessionTokens([...(context.messages as Message[]), next]);
@@ -76,6 +77,7 @@ export async function converse(ai: Procreator, scene: Scene, text: string, turnI
     kind: asking.kind ?? 'play',
     role: asking.role ?? 'narrator',
     mode: asking.mode ?? 'play',
+    playOthers: asking.playOthers,
     onText: asking.onText,
     onScene: asking.onScene,
   };

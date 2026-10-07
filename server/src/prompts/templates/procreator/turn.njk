@@ -1,7 +1,8 @@
 {#-
-  A turn as Procreator is sent it in a scene's session (play/play.ts): the owner's move, an author
-  note, or a scene opening, with where and when the scene is and who is in it, and in the first
-  scene the owner's pick of how the story opens. Takes a TurnPrompt.
+  A turn as Procreator is sent it in a scene's session (play/play.ts): the owner's move (as the
+  protagonist, or as someone cued), an author note, a scene opening, with where and when the scene
+  is and who is in it, and in the first scene the owner's pick of how the story opens, or the
+  answer of the actor who played someone cued. Takes a TurnPrompt.
 -#}
 {% if voice == 'author' %}
 <author_note>{{ input }}</author_note>
@@ -20,6 +21,8 @@ When: {{ scene.time }}
 Present: {{ scene.present | join(', ') }}
 {% endif %}
 </scene_opens>
+{% elif voice == 'actor' %}
+<actor name="{{ played }}">{{ input }}</actor>
 {% else %}
 <move by="{{ played }}">{{ input }}</move>
 {% endif %}

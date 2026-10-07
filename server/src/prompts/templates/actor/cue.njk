@@ -1,0 +1,24 @@
+{#-
+  A cue, as an actor is sent it (procreator/actor.ts): who they are now, when that changed since
+  they were last told; the scene, when it's new to them; then what they see, hear and know now,
+  in Procreator's words. When the owner played them this time, it ends with what they did, and
+  nothing is asked. Takes news (a rendered actor/self.njk, or empty), scene (number, place and
+  time, or null), sees and did (or empty).
+-#}
+<cue>
+{% if news %}
+<you_now>
+Who you are has changed since you were last told. This is who you are now:
+{{ news }}
+</you_now>
+{% endif %}
+{% if scene %}
+<scene number="{{ scene.number }}"{% if scene.place %} where="{{ scene.place }}"{% endif %}{% if scene.time %} when="{{ scene.time }}"{% endif %}/>
+{% endif %}
+{{ sees }}
+</cue>
+{% if did %}
+<played>
+{{ did }}
+</played>
+{% endif %}

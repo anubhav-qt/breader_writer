@@ -16,13 +16,16 @@ import {
   prepareScene,
   reframeScene,
   sceneNow,
+  setInput,
   setReply as replySet,
   summarize as sceneSummarize,
+  type Cue,
   type Opening,
   type Scene,
   type Turn,
   type Voice,
 } from './story/scenes.ts';
+import { cutActors } from './story/actors.ts';
 import { cutSession } from './story/session.ts';
 
 /*
@@ -33,8 +36,11 @@ import { cutSession } from './story/session.ts';
  * then every part that depends on it is told, so it can make its own change. What depends on
  * what, so far:
  *
- * - a turn taken back: what Procreator changed at it is taken back, and the scene's session is
- *   cut back to before it, so the next call is sent as if it never happened.
+ * - a turn taken back: what Procreator changed at it is taken back, and the scene's session and
+ *   every actor's chat are cut back to before it, so the next call is sent as if it never
+ *   happened.
+ * - someone's sheet, page or relationships changed: their actor is told who they are now with
+ *   their next cue (procreator/actor.ts compares what it last told them with what stands).
  *
  * Everything Procreator writes comes through without dashes (ai/dashes.ts). The story's own
  * modules (story/) do the writing; only this file calls their writes, which a test holds it to.
@@ -223,16 +229,21 @@ export async function addTurn(db: Db, scene: Scene, voice: Voice, input: string,
   return turn;
 }
 
-/** Procreator's narration for a turn. */
-export async function setReply(db: Db, turn: Turn, reply: string): Promise<Turn> {
-  return replySet(db, turn, undashed(reply));
+/** Procreator's narration for a turn, and the cue it stopped at for the owner, if it did. */
+export async function setReply(db: Db, turn: Turn, reply: string, cue: Cue | null = null): Promise<Turn> {
+  return replySet(db, turn, undashed(reply), cue);
+}
+
+/** An actor's turn's words: the actor's answer. */
+export async function setActorAnswer(db: Db, turn: Turn, answer: string): Promise<Turn> {
+  return setInput(db, turn, undashed(answer));
 }
 
 /**
  * Takes a turn back: what Procreator changed at it is taken back, newest first, and the turn is
- * kept but left out of the story. The scene's session is told, and cuts everything sent and said
- * at the turn, so the next call goes as if it never happened. What the owner changed between
- * turns stays.
+ * kept but left out of the story. The scene's session and the actors' chats are told, and cut
+ * everything sent and said at the turn, so the next call goes as if it never happened. What the
+ * owner changed between turns stays.
  */
 export async function takeBackTurn(db: Db, turn: Turn): Promise<void> {
   await db.transaction(async (tx) => {
@@ -241,5 +252,6 @@ export async function takeBackTurn(db: Db, turn: Turn): Promise<void> {
     }
     await markUndone(tx, turn);
     await cutSession(tx, turn.sceneId, turn.number);
+    await cutActors(tx, turn.sceneId, turn.number);
   });
 }

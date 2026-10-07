@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { PlayEvent, type Play } from '@writer/shared/play';
 import type { Catalog } from '../src/ai/catalog.ts';
 import { users } from '../src/db/breader.ts';
-import { calls, changes, scenes, sessionMessages, turns } from '../src/db/schema.ts';
+import { actorMessages, actorSegments, calls, changes, scenes, sessionMessages, turns } from '../src/db/schema.ts';
 import { ORIGIN, account, address, call, deps, writer, type Writer } from './helpers.ts';
-import { antigravity, catalogOf, fakeProxy, promptOf, textsOf, toolsOf, type FakeProxy, type Reply } from './proxy.ts';
+import { antigravity, catalogOf, fakeProxy, promptOf, textsOf, toolsOf, type Asked, type FakeProxy, type Reply } from './proxy.ts';
 import { aBook } from './stories.ts';
 
 const db = deps.db;
@@ -330,5 +330,260 @@ describe('play', () => {
     const off = await ask(offline.app, offline.cookie, offline.bookId, 'openings');
     expect(off.status).toBe(503);
     expect(off.body.code).toBe('ai_offline');
+  });
+});
+
+/** The calls made in actors' chats: they declare no tools, where Procreator's always do. */
+function actorCalls(proxy: FakeProxy): Asked[] {
+  return proxy.asked.filter((asked) => toolsOf(asked).length === 0);
+}
+
+/** The call after this one. */
+function callAfter(proxy: FakeProxy, asked: Asked): Asked {
+  const next = proxy.asked[proxy.asked.indexOf(asked) + 1];
+  if (!next) {
+    throw new Error('no call came after it');
+  }
+  return next;
+}
+
+/** What the last tool told Procreator, as its next call sends it back. */
+function toldIn(asked: Asked): Record<string, unknown> | undefined {
+  return asked.body.contents.at(-1)?.parts[0].functionResponse?.response;
+}
+
+function lastText(asked: Asked | undefined): string {
+  if (!asked) {
+    throw new Error('no such call');
+  }
+  return textsOf(asked).at(-1) ?? '';
+}
+
+/** Someone's actor's chat as it's kept, in order. */
+async function actorChatOf(bookId: string, characterId: string) {
+  return db
+    .select()
+    .from(actorMessages)
+    .where(and(eq(actorMessages.bookId, bookId), eq(actorMessages.characterId, characterId)))
+    .orderBy(asc(actorMessages.seq));
+}
+
+function contentOf(message: unknown): string {
+  return (message as { content: string }).content;
+}
+
+function cueing(who: string, sees: string): Reply {
+  return { calls: [{ name: 'cue', args: { who, sees } }] };
+}
+
+describe('actors', () => {
+  it('cues an actor with only their side of the story, and narrates from the answer', async () => {
+    const saving = {
+      calls: [
+        { name: 'write_page', args: { title: 'Plan', kind: 'story', about: 'Where the story goes', body: '[[Ren]] betrays [[Aiko]] at the bridge.' } },
+        { name: 'write_page', args: { title: 'Ren', kind: 'character', about: '', body: '[[Ren]] owes the ferry guild.' } },
+        { name: 'write_page', args: { title: 'Aiko', kind: 'character', about: '', body: '[[Aiko]] fears the river.' } },
+      ],
+    };
+    const answer = { text: 'I take the oars\u2014slowly. "Fine."' };
+    const { app, cookie, bookId, ren, proxy } = await opened([saving, cueing('Ren', 'Aiko asks you to row\u2014now.'), answer, { text: 'Ren took the oars.' }]);
+    const r = await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I ask Ren to row.' });
+    const play = playOf(r.events);
+    expect(play).toMatchObject({ stage: 'playing', cue: null });
+    expect(play.turns[1]).toMatchObject({ voice: 'character', input: 'I ask Ren to row.', reply: 'Ren took the oars.' });
+
+    const [acting] = actorCalls(proxy);
+    expect(promptOf(acting).system).toContain('You are Ren\'s actor.');
+    const [head, cue] = textsOf(acting);
+    expect(head).toContain('<you name="Ren">');
+    expect(head).toContain('Who: The ferryman’s son');
+    expect(head).toContain('Ren owes the ferry guild.');
+    expect(head).toContain('<tie with="Aiko">');
+    expect(head).toContain('What you are to each other: old friends');
+    expect(head).toContain('Setting: A river city, winter');
+    // Never the plan, anyone else's sheet or page, or how Aiko sees Ren and what she hides from him.
+    for (const hidden of ['betrays', 'fears the river', 'lamplighter', 'Stubborn', 'a brother', 'docks']) {
+      expect(head).not.toContain(hidden);
+    }
+    expect(cue).toContain('<scene number="1" where="The ferry" when="Dawn"/>');
+    expect(cue).toContain('Aiko asks you to row, now.');
+    expect(cue).not.toContain('<you_now>');
+
+    // Procreator is told the answer, without its dashes.
+    expect(toldIn(callAfter(proxy, acting))).toEqual({ output: 'Ren’s actor answers:\n\nI take the oars, slowly. "Fine."' });
+    const chat = await actorChatOf(bookId, ren.id);
+    expect(chat.map((row) => [row.kind, row.turnId, row.undone])).toEqual([
+      ['play', play.turns[1].id, false],
+      ['play', play.turns[1].id, false],
+    ]);
+    const recorded = await db.select().from(calls).where(and(eq(calls.bookId, bookId), eq(calls.role, 'actor')));
+    expect(recorded).toHaveLength(1);
+  });
+
+  it('tells an actor who they are now when that changed, and the scene only when it’s new to them', async () => {
+    const growing = { calls: [{ name: 'edit_page', args: { title: 'Ren', find: '', replace: '[[Ren]] is afraid of deep water.' } }] };
+    const { app, cookie, bookId, proxy } = await opened([
+      cueing('Ren', 'Aiko asks you to row.'),
+      { text: 'I row.' },
+      { text: 'Ren rowed.' },
+      growing,
+      cueing('Ren', 'The boat rocks.'),
+      { text: 'I grip the side.' },
+      { text: 'Ren gripped the side.' },
+      cueing('Ren', 'Aiko laughs.'),
+      { text: 'I scowl.' },
+      { text: 'Ren scowled.' },
+    ]);
+    await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I ask Ren to row.' });
+    await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I rock the boat.' });
+    await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I laugh.' });
+
+    const [first, second, third] = actorCalls(proxy);
+    expect(lastText(first)).toContain('<scene number="1"');
+    expect(lastText(second)).toContain('<you_now>');
+    expect(lastText(second)).toContain('Ren is afraid of deep water.');
+    expect(lastText(second)).not.toContain('<scene');
+    expect(lastText(third)).not.toContain('<you_now>');
+    expect(lastText(third)).not.toContain('<scene');
+    // Each call starts as the one before, so the cache holds.
+    expect(second.body.systemInstruction).toEqual(first.body.systemInstruction);
+    expect(second.body.contents.slice(0, first.body.contents.length)).toEqual(first.body.contents);
+    expect(third.body.contents.slice(0, second.body.contents.length)).toEqual(second.body.contents);
+  });
+
+  it('cues only the cast, never the one the owner plays, and brings whoever it cues into the scene', async () => {
+    const { app, cookie, bookId, sora, proxy } = await opened([
+      cueing('Aiko', 'The river.'),
+      cueing('Corwin', 'The river.'),
+      cueing('[[Sora]]', 'Aiko is on the ferry.'),
+      { text: 'I wave from the bank.' },
+      { text: 'Sora waved from the bank.' },
+    ]);
+    const r = await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I look to the bank.' });
+    expect(playOf(r.events).turns[1].reply).toBe('Sora waved from the bank.');
+    expect(String(toldIn(proxy.asked[3])?.error)).toContain('Aiko is the owner');
+    expect(String(toldIn(proxy.asked[4])?.error)).toContain('play passing extras yourself');
+    const [first] = await db.select().from(scenes).where(eq(scenes.bookId, bookId));
+    expect(first.present).toContain(sora.id);
+  });
+
+  it('sends an answer back with a note, only once the actor has answered this turn', async () => {
+    const sending = { calls: [{ name: 'send_back', args: { who: 'Ren', note: 'He would never refuse her.' } }] };
+    const { app, cookie, bookId, proxy } = await opened([
+      sending,
+      cueing('Ren', 'Aiko asks you to row.'),
+      { text: 'No.' },
+      sending,
+      { text: 'Fine. I row.' },
+      { text: 'Ren rowed.' },
+    ]);
+    const r = await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I ask Ren to row.' });
+    expect(playOf(r.events).turns[1].reply).toBe('Ren rowed.');
+    expect(String(toldIn(proxy.asked[3])?.error)).toContain('hasn’t answered a cue this turn');
+
+    const [answered, again] = actorCalls(proxy);
+    expect(lastText(again).startsWith('<director>')).toBe(true);
+    expect(lastText(again)).toContain('He would never refuse her.');
+    expect(again.body.contents.slice(0, answered.body.contents.length)).toEqual(answered.body.contents);
+    expect(toldIn(callAfter(proxy, again))).toEqual({ output: 'Ren’s actor answers again:\n\nFine. I row.' });
+  });
+
+  it('takes an actor’s chat back with the turn, and starts it afresh at the next cue', async () => {
+    const { app, cookie, bookId, ren, proxy } = await opened([
+      cueing('Ren', 'Aiko asks you to row.'),
+      { text: 'I row.' },
+      { text: 'Ren rowed.' },
+      cueing('Ren', 'Aiko waves.'),
+      { text: 'I wave back.' },
+      { text: 'Ren waved back.' },
+    ]);
+    await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I ask Ren to row.' });
+    await ask(app, cookie, bookId, 'undo');
+    const cut = await actorChatOf(bookId, ren.id);
+    expect(cut.map((row) => row.undone)).toEqual([true, true]);
+    const segments = await db.select().from(actorSegments).where(eq(actorSegments.bookId, bookId));
+    expect(segments.map((segment) => segment.undone)).toEqual([true]);
+
+    await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I wave.' });
+    const [, fresh] = actorCalls(proxy);
+    expect(textsOf(fresh).some((text) => text.includes('I row.'))).toBe(false);
+    expect(textsOf(fresh)).toHaveLength(2);
+  });
+
+  it('offers hints for the one about to act, while the owner says who plays them', async () => {
+    const moves = { calls: [{ name: 'offer_moves', args: { moves: ['I row harder.', 'I drop the oars.', 'I laugh.'] } }] };
+    const { app, cookie, bookId, proxy } = await opened([
+      { text: 'Ren looks up.', calls: [{ name: 'cue', args: { who: 'Ren', sees: 'Aiko splashes you.' } }] },
+      moves,
+    ]);
+    await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I splash Ren.', playOthers: true });
+    const r = await ask(app, cookie, bookId, 'hints');
+    expect(r.body).toEqual({ moves: ['I row harder.', 'I drop the oars.', 'I laugh.'] });
+    expect(lastText(proxy.asked.at(-1))).toContain("The owner asks for help with Ren's next move.");
+  });
+
+  it('with the switch off, stops for the owner to play the one about to act, or let their actor', async () => {
+    const { app, cookie, bookId, ren, proxy } = await opened([
+      { text: 'Ren looks up from the oars.', calls: [{ name: 'cue', args: { who: 'Ren', sees: 'Aiko splashes you.' } }] },
+      { text: 'The boat drifts.' },
+      { text: 'Ren turns.', calls: [{ name: 'cue', args: { who: 'Ren', sees: 'Aiko follows you.' } }] },
+      { text: 'I splash her back\u2014hard.' },
+      { text: 'Ren splashed her back.' },
+      { text: 'I duck.' },
+      { text: 'Ren ducked.' },
+    ]);
+    const early = await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I row.', as: ren.id, playOthers: true });
+    expect(early.events.at(-1)).toMatchObject({ type: 'error', code: 'play_conflict' });
+
+    const r = await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I splash Ren.', playOthers: true });
+    const stopped = playOf(r.events);
+    expect(stopped).toMatchObject({ stage: 'cue', cue: { id: ren.id, name: 'Ren' } });
+    expect(stopped.turns[1].reply).toBe('Ren looks up from the oars.');
+    expect(actorCalls(proxy)).toHaveLength(0);
+
+    // Only Ren can act now.
+    const asAiko = await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I wait.', playOthers: true });
+    expect(asAiko.events.at(-1)).toMatchObject({ type: 'error', code: 'play_conflict' });
+    const note = await ask(app, cookie, bookId, 'move', { voice: 'author', text: 'Make it rain.', playOthers: true });
+    expect(note.events.at(-1)).toMatchObject({ type: 'error', code: 'play_conflict' });
+
+    // The owner plays Ren: Procreator is sent it as his move, and his actor is told it as his own, with nothing asked.
+    const played = await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I row away.', as: ren.id, playOthers: true });
+    const going = playOf(played.events);
+    expect(going).toMatchObject({ stage: 'playing', cue: null });
+    expect(going.turns[2]).toMatchObject({ voice: 'character', played: { id: ren.id, name: 'Ren' }, input: 'I row away.', reply: 'The boat drifts.' });
+    expect(lastText(proxy.asked.at(-1))).toBe('<move by="Ren">I row away.</move>');
+    expect(actorCalls(proxy)).toHaveLength(0);
+    const told = await actorChatOf(bookId, ren.id);
+    expect(told).toHaveLength(1);
+    expect(contentOf(told[0].message)).toContain('Aiko splashes you.');
+    expect(contentOf(told[0].message)).toContain('<played>\nI row away.\n</played>');
+
+    // This time his actor plays him.
+    await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I follow.', playOthers: true });
+    const acted = await ask(app, cookie, bookId, 'actor', { playOthers: true });
+    const after = playOf(acted.events);
+    expect(after.turns[4]).toMatchObject({
+      voice: 'actor',
+      played: { id: ren.id, name: 'Ren' },
+      input: 'I splash her back, hard.',
+      reply: 'Ren splashed her back.',
+    });
+    const [acting] = actorCalls(proxy);
+    expect(textsOf(acting).some((text) => text.includes('I row away.'))).toBe(true);
+    expect(lastText(acting)).toContain('Aiko follows you.');
+    expect(lastText(proxy.asked.at(-1))).toBe('<actor name="Ren">I splash her back, hard.</actor>');
+
+    // Another reply has the actor play the moment afresh.
+    const again = await ask(app, cookie, bookId, 'again', { playOthers: true });
+    expect(playOf(again.events).turns[4]).toMatchObject({ voice: 'actor', input: 'I duck.', reply: 'Ren ducked.' });
+    const [, afresh] = actorCalls(proxy);
+    expect(textsOf(afresh).some((text) => text.includes('I splash her back'))).toBe(false);
+
+    // Undo takes the actor's turn back and asks again, with no words for the box.
+    const undone = await ask(app, cookie, bookId, 'undo');
+    expect(undone.body).toMatchObject({ voice: 'actor', words: '', play: { stage: 'cue', cue: { id: ren.id } } });
+    const standing = (await actorChatOf(bookId, ren.id)).filter((row) => !row.undone);
+    expect(standing).toHaveLength(1);
   });
 });

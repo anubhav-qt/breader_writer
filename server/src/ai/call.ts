@@ -11,10 +11,11 @@ import type { InUse } from './settings.ts';
  */
 
 /**
- * What the model is asked to do. openings are the first scene's, offered to pick from; setup is the
- * help with setup: suggestions and the Suggestions chat.
+ * What the model is asked to do. actor is a cast member's actor answering a cue; openings are the
+ * first scene's, offered to pick from; setup is the help with setup: suggestions and the
+ * Suggestions chat.
  */
-export type Role = 'narrator' | 'author' | 'hints' | 'openings' | 'fold' | 'setup';
+export type Role = 'narrator' | 'actor' | 'author' | 'hints' | 'openings' | 'fold' | 'setup';
 
 /** A model call that came back with no answer: the proxy down, an account out of its limits. */
 export class ModelError extends Error {}

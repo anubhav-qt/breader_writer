@@ -27,9 +27,11 @@ const WRITES: Record<string, string[]> = {
     'summarize',
     'addTurn',
     'setReply',
+    'setInput',
     'markUndone',
   ],
   'story/session.ts': ['cutSession'],
+  'story/actors.ts': ['cutActors'],
 };
 
 function sourceFiles(dir: string): string[] {

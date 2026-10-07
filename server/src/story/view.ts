@@ -313,6 +313,17 @@ function relationshipView(line: RelationshipRow, story: Story, names: Map<string
   };
 }
 
+/** The world, as the prompts give it. */
+function worldOf(story: Story): WorldView {
+  return {
+    genre: story.world?.genre ?? '',
+    tone: story.world?.tone ?? '',
+    setting: story.world?.setting ?? '',
+    rules: story.world?.rules ?? '',
+    notes: story.world?.notes ?? '',
+  };
+}
+
 /** A turn word for word, with who the owner played by name: the protagonist, unless it says. */
 function turnView(turn: Turn, names: Map<string, string>, protagonist: string): TurnView {
   let played = protagonist;
@@ -371,13 +382,7 @@ export function briefView(story: Story, scene: Scene, lastScene: Turn[]): BriefV
   return {
     protagonist: protagonistName,
     book: bookView(story.book, scene.number),
-    world: {
-      genre: story.world?.genre ?? '',
-      tone: story.world?.tone ?? '',
-      setting: story.world?.setting ?? '',
-      rules: story.world?.rules ?? '',
-      notes: story.world?.notes ?? '',
-    },
+    world: worldOf(story),
     earlier: earlier.map((each) => ({ number: each.number, place: each.place, time: each.time, summary: each.summary })),
     plan: storyPage(story, PLAN, names),
     threads: storyPage(story, THREADS, names),
@@ -396,4 +401,72 @@ export function briefView(story: Story, scene: Scene, lastScene: Turn[]): BriefV
       present: inScene.map((character) => character.name),
     },
   };
+}
+
+/** Someone else as an actor's character knows them: what the two are, how they see them and what they hide from them. */
+export interface TieView {
+  other: string;
+  bond: string;
+  sees: string;
+  hides: string;
+}
+
+/**
+ * A cast member as their actor knows them: the owner's sheet, Procreator's page about them, and
+ * their own side of each relationship, never the other's. People are named plainly.
+ */
+export interface SelfView {
+  name: string;
+  sheet: SheetView;
+  about: string;
+  page: string;
+  ties: TieView[];
+}
+
+/** What an actor's chat opens with: the book as far as it shapes them, the world, who they are, and what they remember. */
+export interface ActorHeadView {
+  title: string;
+  darkness: string;
+  world: WorldView;
+  /** Who they are, as actor/self.njk lays a SelfView out. */
+  self: string;
+  /** What they remember from before, after a compaction. */
+  memory: string;
+}
+
+/** A cast member as their actor knows them. */
+export function selfView(story: Story, characterId: string): SelfView {
+  const names = namesOf(story.characters);
+  const character = story.characters.find((each) => each.id === characterId);
+  if (!character) {
+    throw new Error(`No one in the cast has the id ${characterId}.`);
+  }
+  const page = story.pages.find((each) => each.characterId === characterId) ?? null;
+  let about = '';
+  let body = '';
+  if (page) {
+    about = page.about;
+    body = named(page.body, names);
+  }
+  const ties: TieView[] = [];
+  for (const line of story.relationships) {
+    if (line.aId === characterId) {
+      ties.push({ other: named(`<@${line.bId}>`, names), bond: line.bond, sees: line.aSees, hides: line.aHides });
+    } else if (line.bId === characterId) {
+      ties.push({ other: named(`<@${line.aId}>`, names), bond: line.bond, sees: line.bSees, hides: line.bHides });
+    }
+  }
+  return {
+    name: character.name,
+    sheet: { who: character.who, personality: character.personality, past: character.past, notes: character.notes },
+    about,
+    page: body,
+    ties,
+  };
+}
+
+/** What an actor's chat opens with, given who they are (rendered) and what they remember. */
+export function actorHeadView(story: Story, self: string, memory: string): ActorHeadView {
+  const settings = settingsView(story.book.length as Length, story.book.wordGoal, story.book.pov as Pov, story.book.darkness as Darkness);
+  return { title: story.book.title, darkness: settings.darkness, world: worldOf(story), self, memory };
 }

@@ -13,6 +13,8 @@ async function tables(schema: string) {
 describe('the writer schema', () => {
   it('keeps the writer’s tables and migrations to itself', async () => {
     expect(await tables('writer')).toEqual([
+      'actor_messages',
+      'actor_segments',
       'books',
       'calls',
       'changes',

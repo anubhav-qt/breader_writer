@@ -1,0 +1,51 @@
+{#-
+  Who a cast member is, as their actor knows them (procreator/actor.ts): the owner's sheet,
+  Procreator's page about them, and their own side of each relationship, never the other's. It
+  opens their chat, and comes again in a cue whenever it has changed. Takes a SelfView
+  (story/view.ts).
+-#}
+<you name="{{ name }}">
+<sheet>
+{% if sheet.who %}
+Who: {{ sheet.who }}
+{% endif %}
+{% if sheet.personality %}
+Personality: {{ sheet.personality }}
+{% endif %}
+{% if sheet.past %}
+Past: {{ sheet.past }}
+{% endif %}
+{% if sheet.notes %}
+Notes: {{ sheet.notes }}
+{% endif %}
+{% if not (sheet.who or sheet.personality or sheet.past or sheet.notes) %}
+Nothing written yet: the story makes {{ name }} who they are.
+{% endif %}
+</sheet>
+{% if about or page %}
+<so_far>
+{% if about %}
+{{ about }}
+{% endif %}
+{% if page %}
+{{ page }}
+{% endif %}
+</so_far>
+{% endif %}
+{% for t in ties %}
+<tie with="{{ t.other }}">
+{% if t.bond %}
+What you are to each other: {{ t.bond }}
+{% endif %}
+{% if t.sees %}
+How you see {{ t.other }}: {{ t.sees }}
+{% endif %}
+{% if t.hides %}
+What you hide from {{ t.other }}: {{ t.hides }}
+{% endif %}
+{% if not (t.bond or t.sees or t.hides) %}
+You know each other; the story hasn't said how yet.
+{% endif %}
+</tie>
+{% endfor %}
+</you>

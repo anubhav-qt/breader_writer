@@ -5,7 +5,7 @@ import type { Db } from '../db/client.ts';
 import { books, changes, scenes, versions } from '../db/schema.ts';
 import { castOf, namesOf } from '../story/cast.ts';
 import { GONE, named } from '../story/mentions.ts';
-import { turnsOf, type Scene, type Turn, type Voice } from '../story/scenes.ts';
+import { cueOf, turnsOf, type Scene, type Turn, type Voice } from '../story/scenes.ts';
 
 /*
  * The play as the page shows it (shared/src/play.ts): where it stands, the scene on the page with
@@ -125,21 +125,32 @@ interface Standing {
   stage: Stage;
   onPage: Scene | null;
   next: Scene | null;
+  /** Who is about to act, by id, while the owner says who plays them. */
+  cue: string | null;
 }
 
-/** A scene being played: playing once it has a turn, else waiting for its opening (the first, for the owner's pick). */
+/**
+ * A scene being played: playing once it has a turn (or waiting for the owner to say who plays
+ * someone, when its newest turn stopped at a cue), else waiting for its opening (the first, for
+ * the owner's pick).
+ */
 async function standingOfPlaying(db: Db, playing: Scene): Promise<Standing> {
   const turns = await turnsOf(db, playing.id);
-  if (turns.length > 0) {
-    return { stage: 'playing', onPage: playing, next: null };
+  const newest = turns.at(-1);
+  if (newest) {
+    const cue = cueOf(newest);
+    if (cue) {
+      return { stage: 'cue', onPage: playing, next: null, cue: cue.who };
+    }
+    return { stage: 'playing', onPage: playing, next: null, cue: null };
   }
   if (playing.number === 1 && playing.openings) {
-    return { stage: 'openings', onPage: playing, next: null };
+    return { stage: 'openings', onPage: playing, next: null, cue: null };
   }
   if (playing.number === 1) {
-    return { stage: 'start', onPage: playing, next: null };
+    return { stage: 'start', onPage: playing, next: null, cue: null };
   }
-  return { stage: 'opening', onPage: playing, next: null };
+  return { stage: 'opening', onPage: playing, next: null, cue: null };
 }
 
 async function standingOf(db: Db, all: Scene[]): Promise<Standing> {
@@ -150,19 +161,19 @@ async function standingOf(db: Db, all: Scene[]): Promise<Standing> {
   const waiting = all.find((scene) => scene.status === 'next');
   if (waiting && waiting.number === 1) {
     if (waiting.openings) {
-      return { stage: 'openings', onPage: waiting, next: null };
+      return { stage: 'openings', onPage: waiting, next: null, cue: null };
     }
-    return { stage: 'start', onPage: waiting, next: null };
+    return { stage: 'start', onPage: waiting, next: null, cue: null };
   }
   if (waiting) {
     const ended = all.find((scene) => scene.number === waiting.number - 1) ?? null;
-    return { stage: 'ended', onPage: ended, next: waiting };
+    return { stage: 'ended', onPage: ended, next: waiting, cue: null };
   }
   const last = all.at(-1);
   if (!last) {
-    return { stage: 'start', onPage: null, next: null };
+    return { stage: 'start', onPage: null, next: null, cue: null };
   }
-  return { stage: 'ended', onPage: last, next: null };
+  return { stage: 'ended', onPage: last, next: null, cue: null };
 }
 
 /** The play of a book as the page shows it. */
@@ -190,6 +201,10 @@ export async function playView(db: Db, bookId: string): Promise<Play> {
   if (standing.next) {
     next = headOf(standing.next);
   }
+  let cue: Person | null = null;
+  if (standing.cue) {
+    cue = { id: standing.cue, name: nameOf(index.names, standing.cue) };
+  }
   return {
     bookId,
     title: book.title,
@@ -198,6 +213,7 @@ export async function playView(db: Db, bookId: string): Promise<Play> {
     scene,
     openings,
     turns: await turnsShown(db, standing.onPage, index),
+    cue,
     next,
   };
 }

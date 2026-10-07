@@ -1,0 +1,14 @@
+{#-
+  An actor's compaction (procreator/actor.ts), sent at the end of their chat when it has grown past
+  its limit, so everything is in view and in the cache. The actor writes what they remember of the
+  scenes that fold, in their own voice; the chat goes on from a new start with who they are now,
+  that memory, and the scenes kept word for word. The task comes last. Takes their name, the
+  number of the first scene kept, and whether the chat opened with memories already.
+-#}
+<remember>
+This chat has grown too long to keep whole. It goes on from a fresh start: who you are now, what you remember, then Scene {{ from }} on, word for word.
+
+Write what {{ name }} remembers of everything before Scene {{ from }}{% if remembered %}, keeping everything the memories at the start of this chat hold{% endif %}: what happened to you and around you, what you said, promised and kept back, what you learned and from whom, and how you feel about the others now. Write it in your own voice, in the first person and the past tense, as {{ name }} remembers it. Keep everything that still matters to you, and leave out only what never will.
+
+Answer with your memories and nothing else.
+</remember>

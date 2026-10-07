@@ -17,7 +17,7 @@ import type { Db } from '../db/client.ts';
 import type { Scene } from '../story/scenes.ts';
 import { addMessage, segmentMessages, type MessageKind, type Segment } from '../story/session.ts';
 import { instructionsFor } from './brief.ts';
-import { noOutcome, toolsFor, type Outcome } from './play.ts';
+import { noOutcome, stopped, toolsFor, type Outcome } from './play.ts';
 import type { Mode } from './tools.ts';
 
 /*
@@ -50,6 +50,8 @@ export interface Ask {
   turnId: string | null;
   /** What the run is for, which says what its tools may do. */
   mode: Mode;
+  /** The owner plays others too: a cue stops the turn for them to say who plays the one about to act. */
+  playOthers?: boolean;
   /** Procreator's words as they come, without dashes. */
   onText?: (delta: string) => void;
   /** Where and when the scene is, whenever set_scene changes it. */
@@ -180,7 +182,8 @@ class Keeper {
 export async function exchange(ai: Procreator, scene: Scene, segment: Segment, ask: Ask): Promise<Answer> {
   const outcome = noOutcome();
   const onScene = ask.onScene ?? (() => {});
-  const tools = toolsFor({ db: ai.db, scene, turnId: ask.turnId, mode: ask.mode, outcome, onScene });
+  const playOthers = ask.playOthers ?? false;
+  const tools = toolsFor({ ai, db: ai.db, scene, turnId: ask.turnId, mode: ask.mode, playOthers, outcome, onScene });
   const context = await sessionContext(ai.db, scene, segment, tools);
   const prompt: UserMessage = { role: 'user', content: ask.text, timestamp: Date.now() };
   const keeper = new Keeper(ai, scene, ask);
@@ -200,6 +203,14 @@ export async function exchange(ai: Procreator, scene: Scene, segment: Segment, a
     convertToLlm: (messages) => messages as Message[],
     prepareRequest: (request) => {
       keeper.sending(request.context.messages);
+    },
+    // A scene that ended, or a cue the owner answers, stops the run even when other tool calls
+    // came with it, so Procreator writes nothing past it.
+    finishTurn: () => {
+      if (stopped(outcome)) {
+        return { action: 'end' };
+      }
+      return undefined;
     },
   };
   await runAgentLoop([prompt], context, config, (event) => keeper.keep(event), ai.signal, streamSimple);

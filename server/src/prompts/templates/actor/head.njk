@@ -1,0 +1,38 @@
+{#-
+  What a segment of an actor's chat opens with (procreator/actor.ts): the story as far as it
+  shapes them (its title, how dark it goes, the world), who they are, and after a compaction what
+  they remember of the chat before, in their own voice. It stays word for word the same through
+  its segment, so every call can be cached. Takes an ActorHeadView (story/view.ts).
+-#}
+<story title="{{ title }}">
+How dark: {{ darkness }}
+</story>
+{% if world.genre or world.tone or world.setting or world.rules or world.notes %}
+
+<world>
+{% if world.genre %}
+Genre: {{ world.genre }}
+{% endif %}
+{% if world.tone %}
+Tone: {{ world.tone }}
+{% endif %}
+{% if world.setting %}
+Setting: {{ world.setting }}
+{% endif %}
+{% if world.rules %}
+Rules: {{ world.rules }}
+{% endif %}
+{% if world.notes %}
+Notes: {{ world.notes }}
+{% endif %}
+</world>
+{% endif %}
+
+{{ self }}
+{% if memory %}
+
+<what_you_remember>
+{{ memory }}
+</what_you_remember>
+The chat goes on from here, word for word.
+{% endif %}

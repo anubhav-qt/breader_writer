@@ -19,10 +19,27 @@ export type Scene = typeof scenes.$inferSelect;
 export type Turn = typeof turns.$inferSelect;
 
 /**
- * As someone in the cast, as the author (a note the story follows and never says), or Procreator
- * opening the scene.
+ * As someone in the cast, as the author (a note the story follows and never says), Procreator
+ * opening the scene, or someone's actor playing them when the owner let it.
  */
-export type Voice = 'character' | 'author' | 'opening';
+export type Voice = 'character' | 'author' | 'opening' | 'actor';
+
+/**
+ * Someone in the cast about to act, when Procreator stopped the turn for the owner to say who
+ * plays them this time: who, by id, and what Procreator told them they see and know now.
+ */
+export interface Cue {
+  who: string;
+  sees: string;
+}
+
+/** The cue a turn stopped at, or null. */
+export function cueOf(turn: Turn): Cue | null {
+  if (!turn.cue) {
+    return null;
+  }
+  return turn.cue as Cue;
+}
 
 /** Where a scene opens and who is in it. */
 export interface Opening {
@@ -194,15 +211,31 @@ export async function newestTurn(db: Db | Tx, sceneId: string): Promise<Turn | n
   return turn;
 }
 
-/** The narrator's reply, the first time it's written. Writing it again is a rewrite, and a change. */
-export async function setReply(db: Db | Tx, turn: Turn, reply: string): Promise<Turn> {
+/**
+ * The narrator's reply, the first time it's written, and the cue it stopped at, if it stopped for
+ * the owner. Writing it again is a rewrite, and a change.
+ */
+export async function setReply(db: Db | Tx, turn: Turn, reply: string, cue: Cue | null = null): Promise<Turn> {
   const [written] = await db
     .update(turns)
-    .set({ reply })
-    .where(and(eq(turns.id, turn.id), eq(turns.reply, '')))
+    .set({ reply, cue })
+    .where(and(eq(turns.id, turn.id), eq(turns.reply, ''), eq(turns.undone, false)))
     .returning();
   if (!written) {
     throw new StoryError(`Turn ${turn.number} has its reply already.`);
+  }
+  return written;
+}
+
+/** An actor's turn's words: the actor's answer, once it comes, the first time. */
+export async function setInput(db: Db | Tx, turn: Turn, input: string): Promise<Turn> {
+  const [written] = await db
+    .update(turns)
+    .set({ input })
+    .where(and(eq(turns.id, turn.id), eq(turns.voice, 'actor'), eq(turns.input, '')))
+    .returning();
+  if (!written) {
+    throw new StoryError(`Turn ${turn.number} has its words already.`);
   }
   return written;
 }

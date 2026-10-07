@@ -43,8 +43,10 @@ all at once not yet. The Suggestions chat is built: its server, tried against th
 session that built it had none). Step 5 is done once it has been. Step 6 (play) is under way
 (see "Notes for step 6"): breading_ground is the one door for story changes, and play's server
 is built (the openings, moves narrated as they're written, scenes ending and going on, undo,
-another reply, hints, someone joining the cast), with its tests against a stand-in proxy. It
-hasn't been tried against the real model yet. The actors and the play page are next. The owner
+another reply, hints, someone joining the cast), and so are the cast's actors (cues, sending an
+answer back, the owner playing others with the switch off, each actor's chat and its
+compaction), with their tests against a stand-in proxy. Neither has been tried against the real
+model yet. The play page is next. The owner
 has a real book set up locally that they mean to play through before production, so its data
 must survive every change (see "Running it locally"). See "The code" below for what exists.
 
@@ -578,9 +580,10 @@ through them all in one local test once everything is built (see "Status").
   where and when the scene opens and who is in it; with the owner's own opening, Procreator sets
   them (`set_scene`). The openings stay with the scene, so taking the opening back shows them
   again.
-- A turn is a move (`character`, with who the owner played in `played`), an author note, or a
+- A turn is a move (`character`, with who the owner played in `played`), an author note, a
   scene's opening (`opening`: the first scene's has the owner's pick in it, a later one's is
-  empty). Each is sent as `procreator/turn.njk` lays it out.
+  empty), or an actor's (`actor`: who they played in `played`, their answer as its input). Each
+  is sent as `procreator/turn.njk` lays it out.
 - The narration is everything Procreator writes in the run, reply after reply, streamed as it
   comes and kept as the turn's reply. Its instructions ask it to narrate first and save after,
   so the words start sooner, and for 150 to 400 words a turn in the past tense (our calls,
@@ -603,6 +606,36 @@ through them all in one local test once everything is built (see "Status").
   time. Someone who joins the cast gets a sheet Procreator writes (the owner can change it) and
   is in the scene; the cast holds 40 besides the protagonist, as setup's does.
 - One exchange at a time in a book (held in memory, so one server), as in the Suggestions chat.
+- The actors (`procreator/actor.ts`, their chats kept by `story/actors.ts`; see "Actors"). Before
+  anyone in the cast acts or speaks, Procreator cues their actor (`cue`) with what they see, hear
+  and know now, and writes their part from the answer, which comes back as the tool's result; it
+  can send an answer from the same turn back with a note on the character (`send_back`). The
+  protagonist and passing extras have no actor, and cueing someone brings them into the scene.
+- An actor's chat opens at their first cue, at that turn: the story's title, darkness and world,
+  then who they are (`actor/self.njk`: the owner's sheet, Procreator's page about them, and their
+  own side of each relationship). Never the Plan, the Threads, anyone else's page, or what's
+  hidden from them, so Procreator's instructions say to keep what's hidden from someone off their
+  page. At every cue, who they are now is checked against what they were last told, and the cue
+  starts with it when it differs (`<you_now>`); the scene goes in when it's new to them. Each
+  call sends the chat as it stands and one message more, asks for the long cache under the
+  actor's own key, and keeps the two only once the actor has answered, so a failed call leaves
+  the chat as it was. Calls are recorded as `actor`.
+- The switch "Main character and author only" is each ask's `playOthers` (false, the switch on,
+  unless said), on every ask that has Procreator write. With it off, a cue stops the turn there
+  (`finishTurn`): the turn keeps the cue (`turns.cue`), the play's stage is `cue`, and `Play.cue`
+  is the one about to act. The next turn answers it, and nothing else can be sent meanwhile:
+  either the owner's move as them (`as`, their id), which their actor is told as their own
+  (`<played>`, with nothing asked), or `.../play/actor`, a turn of the actor's own, which
+  Procreator then writes from. Hints are for the one about to act. Undoing an actor's turn gives
+  no words back for the box, and "Another reply" to it has the actor play the moment afresh.
+- Undo cuts the actors' chats back with the turn (`cutActors`), segments made at it included, so
+  a chat that opened at the turn opens afresh at the next cue.
+- An actor's compaction is past `compactAt`, as a session's. The scenes that fold are written
+  into what they remember, in their own voice (`actor/fold.njk`), and a new segment opens with
+  who they are now and that memory; the newest scenes that fit in a fifth of the limit stay word
+  for word. Only scenes that are wrapped up fold (the wrap-up saved what they established to the
+  reference, their page included), so the scene being played never does. A fold that fails
+  leaves the chat as it was.
 
 ### Later versions
 
@@ -655,9 +688,12 @@ their code, changed where we need, not rewritten to ours.
   it holds (`fieldLimit`), the asks and the answers (`FieldAsk`, `FieldSuggestion`, `BlanksAsk`,
   `BlankSuggestions`), and when suggestions start (`filledIn`, against `SUGGEST_AFTER`).
 - `src/play.ts`: play (step 6). A turn as the page shows it (`PlayTurn`: its voice, who the
-  owner played, their words, the reply, and the quiet lines after it, `Mark`), where the play
-  stands (`Stage`) and the play itself (`Play`), the asks (`MoveAsk`, `OpenAsk`), what undo and
-  hints answer (`Undone`, `Hints`), and the streamed events (`PlayEvent`).
+  owner or an actor played, their words, the reply, and the quiet lines after it, `Mark`), where
+  the play stands (`Stage`, `cue` while the owner says who plays someone) and the play itself
+  (`Play`, with who is about to act), the asks (`MoveAsk`, with `as` for a move as someone cued,
+  `OpenAsk`, and `Going` for going on, another reply and letting an actor play, each with
+  `playOthers`), what undo and hints answer (`Undone`, `Hints`), and the streamed events
+  (`PlayEvent`).
 - `src/chat.ts`: the Suggestions chat. A change exactly as it will land (`SetupChange`: a field's
   whole new text, one of the book's choices, someone new, someone removed, two untied) and making
   it (`applyChange`, which ties two first for a line's field, and is null when it doesn't fit),
@@ -759,8 +795,9 @@ A Hono API, port 8790, built like breader's server.
   and the reply, word for word, numbered through the book), `changes` and `versions` (the change
   log), `pages` (the reference: a page per subject, by title, or by character for a cast
   member's), `notes` (Procreator's memory), `relationship_history`, `session_segments` and
-  `session_messages` (each scene's session), and `calls` (each model call and the tokens it
-  used). The Suggestions chat's are `setup_chats` (an account's, with its book once there is one,
+  `session_messages` (each scene's session), `actor_segments` and `actor_messages` (each
+  actor's chat), and `calls` (each model call and the tokens it used). A turn that stopped for
+  the owner to say who plays someone keeps the cue (`turns.cue`). The Suggestions chat's are `setup_chats` (an account's, with its book once there is one,
   and the page as Procreator last saw it), `setup_chat_messages` and `setup_chat_entries`. The story's tables keep no times of their own; the change that made a row has it. A
   session is raw history like turns, only ever added to. drizzle-kit only sees this file and this
   schema.
@@ -831,6 +868,10 @@ A Hono API, port 8790, built like breader's server.
     (`segmentMessages`).
     `cutSession` is undo's side: the messages and segments of the turns from one on are marked
     undone, kept. The segment a session opens with is made at no turn, so it's never cut.
+  - `actors.ts`: an actor's chat as it's kept, as a session is: segments (each a head, who they
+    are as it told them, and what they remember after a compaction), and messages of kind `play`
+    or `fold`, each at a turn in a scene, with who they are when a message told them it changed.
+    `cutActors` is undo's side.
   - `read.ts` reads everything a book's story knows in one go (`readStory`), and `view.ts`
     turns it into what the templates take (`briefView`): the people in the scene in full (sheet
     and page) and everyone else in a line, the relationships among those present in full with
@@ -848,13 +889,17 @@ A Hono API, port 8790, built like breader's server.
     none is made while Procreator offers openings or moves (a run's `Mode`). The story's
     refusals reach the model as they are; any other failure is logged and the model is told
     it's the writer's.
-  - `play.ts`: the play tools (`set_scene`, `join_cast`, `end_scene`, `offer_openings`,
-    `offer_moves`), and what they did in a run (`Outcome`). `toolsFor` is every tool of a run.
+  - `play.ts`: the play tools (`set_scene`, `join_cast`, `cue`, `send_back`, `end_scene`,
+    `offer_openings`, `offer_moves`), and what they did in a run (`Outcome`, and `stopped`, when
+    the scene ended or a cue waits for the owner). `toolsFor` is every tool of a run.
+  - `actor.ts`: the cast's actors (see "Notes for step 6"): `cueActor`, `sendBack`, `tellActor`
+    (what the owner played them doing), and their chats' compaction.
   - `run.ts`: one exchange (`exchange`): the session sent as it stands (instructions and tool
     declarations, the head, the segment's messages) plus one message, through pi's agent loop,
     tools run one at a time, with no cap on calls or time (a stuck run is stopped by hand,
-    through its signal). Every message is kept as it ends and every call
-    recorded, so the next call sends exactly this one's start and the cache holds. It asks for
+    through its signal). It ends early once the scene ends or a cue waits for the owner. Every
+    message is kept as it ends and every call recorded, so the next call sends exactly this
+    one's start and the cache holds. It asks for
     the long cache, under the scene's id (see the caching note in "Notes for step 3"). Its
     answer has the last reply's words (a fold's summary) and all the run's words without dashes
     (a turn's narration), passed on as they stream.
@@ -874,9 +919,9 @@ A Hono API, port 8790, built like breader's server.
     if that fails), then sends the move, or an aside (hints). `askForOpenings` asks in the first
     scene's session before it begins. `addNote` adds the owner's mid scene change as a note.
 - `src/breading_ground.ts`: the one door for changes to the story (see "Notes for step 6").
-- `src/play/`: play. `play.ts` is its flows (`askOpenings`, `openStory`, `makeMove`, `goOn`,
-  `undo`, `another`, `hintsFor`, and `alone`, one exchange at a time in a book), and `view.ts`
-  the play as the page shows it (`playView`).
+- `src/play/`: play. `play.ts` is its flows (`askOpenings`, `openStory`, `makeMove`,
+  `letActorPlay`, `goOn`, `undo`, `another`, `hintsFor`, and `alone`, one exchange at a time in
+  a book), and `view.ts` the play as the page shows it (`playView`).
 - `src/suggestions/`: setup help. `view.ts` lays out the page as it stands (`setupView`:
   everyone by name, the nameless numbered, two of one name told apart, `refsOf`) and the field
   asked about (`fieldView`: where it is, what's in it, how much it holds, and `lengthFor`, how
@@ -893,7 +938,7 @@ A Hono API, port 8790, built like breader's server.
   `chat.ts` runs it (`say`, `redo`, `approve`, and `alone`, one exchange at a time), with its
   tools `propose_changes` and `revise_change`.
 - `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with what it
-  was for (narrator, author, hints, fold, or setup for setup help), the tokens the writer
+  was for (narrator, author, hints, fold, actor, or setup for setup help), the tokens the writer
   counted before sending (`counted`) and what the model says it used, cache reads included. A
   call that comes back with no answer is a `ModelError`.
 - `src/prompts/`: the prompts, as Nunjucks templates in `templates/` (`render.ts`). A template
@@ -904,7 +949,10 @@ A Hono API, port 8790, built like breader's server.
   `partials/scene.njk` turns word for word (an author note and an opening marked as such);
   `procreator/turn.njk` a turn as it's sent; `procreator/openings.njk` and
   `procreator/hints.njk` the asks for openings and moves; `procreator/compact.njk` and
-  `procreator/wrap.njk` the folds' requests. The asks come last, after the session. `suggestions/field-system.njk` and `suggestions/field.njk` are a
+  `procreator/wrap.njk` the folds' requests. The asks come last, after the session. An actor's
+  chat: `actor/system.njk` its instructions, `actor/head.njk` what a segment opens with,
+  `actor/self.njk` who they are, `actor/cue.njk` a cue, `actor/director.njk` an answer sent
+  back, and `actor/fold.njk` its compaction. `suggestions/field-system.njk` and `suggestions/field.njk` are a
   field's suggestion: the instructions with examples, then the page (`partials/setup.njk`) and
   the field last. `suggestions/blanks-system.njk` and `suggestions/blanks.njk` are the blank
   fields' suggestions: the instructions with an example, then the page and the numbered blanks
@@ -943,8 +991,8 @@ A Hono API, port 8790, built like breader's server.
   Procreator didn't make) a 409. Play, `open` only: `GET /v1/books/:id/play` (the play as the
   page shows it), `POST .../play/openings` (asks for the first scene's openings, once),
   `.../play/open` (the owner's pick or their own opening), `.../play/move` (a move or an author
-  note), `.../play/next` (on to the next scene) and `.../play/again` (another reply), each
-  streamed: the scene's heading when it's set, `finishing` while the scene before is wrapped
+  note), `.../play/next` (on to the next scene), `.../play/again` (another reply) and
+  `.../play/actor` (the one about to act is played by their actor), each streamed: the scene's heading when it's set, `finishing` while the scene before is wrapped
   up, Procreator's words, then the play, or why it couldn't go on (with the play as it stands).
   `.../play/undo` gives the play and the owner's words back, and `.../play/hints` three moves.
   What play can't do as the story stands is a 409. `routes/ai.ts` is the model an account's
@@ -983,8 +1031,9 @@ A Hono API, port 8790, built like breader's server.
   sent back, redos kept in place, the stream, approving, and each account kept to its own),
   `test/dashes.test.ts` the dashes taken out, `test/play.test.ts` play (openings, a pick or
   the owner's own, moves and notes and the quiet lines after them, scenes ending and going on,
-  undo, another reply, a turn that fails, hints) and `test/door.test.ts` breading_ground as
-  the one door.
+  undo, another reply, a turn that fails, hints) and the actors (what a chat holds and is told,
+  sending back, undo, and the switch off), `test/session.test.ts` an actor's compaction too, and
+  `test/door.test.ts` breading_ground as the one door.
 
 ### Running it locally
 
@@ -1157,7 +1206,9 @@ Decided 2026-10-06 (see "Every cast member has an actor"), built with play (step
 - **The database stays the memory.** An actor's chat is a working copy, as a scene's session
   is: undo, renames and "always so" rebuild it from the turns.
 - **Compaction works the same for each actor**, past 400k: what the folded turns established is
-  saved to their page first, and the summary becomes their own memory, in their own voice.
+  saved to their page first, and the summary becomes their own memory, in their own voice. As
+  built, only scenes already wrapped up fold, since the wrap-up is where that saving happens
+  (see "Notes for step 6").
 - **Who has one:** every cast member but the protagonist, who is the owner. Walk-ons get none; an
   actor's chat starts when someone joins the cast. With "Main character and author only" off,
   Procreator asks the owner first, and the actor plays whoever the owner doesn't.

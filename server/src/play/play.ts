@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import type { MoveAsk, OpenAsk } from '@writer/shared/play';
+import type { Going, MoveAsk, OpenAsk } from '@writer/shared/play';
 import { ModelError } from '../ai/call.ts';
 import {
   addTurn,
@@ -7,6 +7,7 @@ import {
   frameScene,
   offerOpenings,
   prepareFirstScene,
+  setActorAnswer,
   setReply,
   takeBackTurn,
   type Frame,
@@ -15,12 +16,24 @@ import {
 import type { Db } from '../db/client.ts';
 import { scenes } from '../db/schema.ts';
 import { log } from '../log.ts';
+import { cueActor, tellActor, type Moment } from '../procreator/actor.ts';
 import { askForOpenings, converse } from '../procreator/converse.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { render } from '../prompts/render.ts';
 import { castOf, namesOf, type CharacterRow } from '../story/cast.ts';
 import type { Writer } from '../story/changes.ts';
-import { newestTurn, nextScene, playingScene, sceneNow, turnsOf, type Scene, type Turn, type Voice } from '../story/scenes.ts';
+import {
+  cueOf,
+  newestTurn,
+  nextScene,
+  playingScene,
+  sceneNow,
+  turnsOf,
+  type Cue,
+  type Scene,
+  type Turn,
+  type Voice,
+} from '../story/scenes.ts';
 
 /*
  * Play (step 6): the owner lives the story a move at a time, and Procreator narrates. The story
@@ -28,6 +41,10 @@ import { newestTurn, nextScene, playingScene, sceneNow, turnsOf, type Scene, typ
  * narrated in the scene's session and streamed as it's written; a scene that ends waits for the
  * owner to go on, and until then its last move can still be taken back. Every change goes through
  * breading_ground. A turn Procreator couldn't narrate is taken back, as if it was never made.
+ *
+ * With the switch "Main character and author only" off, Procreator stops a turn when someone in
+ * the cast is about to act (a cue), and the next turn answers it: the owner plays them (a move as
+ * them, which their actor is told of), or their actor does (a turn of the actor's).
  */
 
 /** What play can't do as the story stands, in the owner's words. */
@@ -87,6 +104,25 @@ async function protagonistOf(db: Db, bookId: string): Promise<CharacterRow> {
   return protagonist;
 }
 
+/** Someone in the cast, by id, with their name as it is now. */
+async function personOf(db: Db, bookId: string, id: string): Promise<{ id: string; name: string }> {
+  const cast = await castOf(db, bookId);
+  const person = cast.find((each) => each.id === id);
+  if (!person) {
+    throw new PlayError('The one Procreator asked about isn’t in the cast any more.');
+  }
+  return { id: person.id, name: person.name };
+}
+
+/** The cue the scene's newest turn stopped at, while the owner says who plays them, or null. */
+async function pendingCue(db: Db, scene: Scene): Promise<Cue | null> {
+  const newest = await newestTurn(db, scene.id);
+  if (!newest) {
+    return null;
+  }
+  return cueOf(newest);
+}
+
 /** The scene on the page: the one being played, or the one that just ended while the next waits. */
 async function sceneOnPage(db: Db, bookId: string): Promise<Scene | null> {
   const playing = await playingScene(db, bookId);
@@ -119,6 +155,30 @@ async function turnMessage(db: Db, scene: Scene, turn: Turn): Promise<string> {
   return render('procreator/turn.njk', { voice: turn.voice, input: turn.input, played, scene: view });
 }
 
+/** A turn to make: its voice, the owner's words, who it's played as, and the cue it answers, if any. */
+interface Move {
+  voice: Voice;
+  input: string;
+  played: string | null;
+  cue: Cue | null;
+}
+
+/**
+ * A turn that answers a cue, before Procreator is sent it. When the owner played the one cued,
+ * their actor is told what they saw and did, so it's theirs; when their actor plays, it's cued, and
+ * its answer is the turn's.
+ */
+async function answerCue(ai: Procreator, scene: Scene, turn: Turn, cue: Cue): Promise<Turn> {
+  const person = await personOf(ai.db, scene.bookId, cue.who);
+  const moment: Moment = { person, scene, turnId: turn.id };
+  if (turn.voice === 'actor') {
+    const answer = await cueActor(ai, moment, cue.sees);
+    return setActorAnswer(ai.db, turn, answer);
+  }
+  await tellActor(ai, moment, cue.sees, turn.input);
+  return turn;
+}
+
 /** Takes back a turn that failed. If even that fails it's logged, since the first failure is the one to tell. */
 async function giveBack(db: Db, turn: Turn) {
   try {
@@ -128,18 +188,27 @@ async function giveBack(db: Db, turn: Turn) {
   }
 }
 
-/** A new turn, and Procreator's narration of it. A turn it couldn't narrate is taken back. */
-async function narrate(ai: Procreator, scene: Scene, voice: Voice, input: string, played: string | null, watch: Watch): Promise<Turn> {
-  const turn = await addTurn(ai.db, scene, voice, input, played);
+/**
+ * A new turn, and Procreator's narration of it. A turn it couldn't narrate is taken back. A turn
+ * that stopped for the owner to say who plays someone may have no words yet.
+ */
+async function narrate(ai: Procreator, scene: Scene, move: Move, going: Going, watch: Watch): Promise<Turn> {
+  const made = await addTurn(ai.db, scene, move.voice, move.input, move.played);
   try {
+    let turn = made;
+    if (move.cue) {
+      turn = await answerCue(ai, scene, made, move.cue);
+    }
     const text = await turnMessage(ai.db, scene, turn);
-    const answer = await converse(ai, scene, text, turn.id, { onText: watch.onText, onScene: watch.onScene });
-    if (answer.words === '') {
+    const asking = { playOthers: going.playOthers, onText: watch.onText, onScene: watch.onScene };
+    const answer = await converse(ai, scene, text, turn.id, asking);
+    const cued = answer.outcome.cued;
+    if (answer.words === '' && cued === null) {
       throw new ModelError('Procreator wrote nothing.');
     }
-    return await setReply(ai.db, turn, answer.words);
+    return await setReply(ai.db, turn, answer.words, cued);
   } catch (err) {
-    await giveBack(ai.db, turn);
+    await giveBack(ai.db, made);
     throw err;
   }
 }
@@ -200,24 +269,61 @@ export async function openStory(ai: Procreator, bookId: string, ask: OpenAsk, wa
     return frameScene(tx, owner(bookId), first, opening.frame);
   });
   watch.onScene(scene);
-  await narrate(ai, scene, 'opening', opening.text, null, watch);
+  const move: Move = { voice: 'opening', input: opening.text, played: null, cue: null };
+  await narrate(ai, scene, move, { playOthers: ask.playOthers }, watch);
+}
+
+/** The scene being played, once it has opened. */
+async function sceneInPlay(db: Db, bookId: string): Promise<Scene> {
+  const scene = await playingScene(db, bookId);
+  if (!scene) {
+    throw new PlayError('No scene is being played.');
+  }
+  if (!(await newestTurn(db, scene.id))) {
+    throw new PlayError(`Scene ${scene.number} hasn’t opened yet.`);
+  }
+  return scene;
+}
+
+/**
+ * The turn the owner's words make. While someone cued is about to act, it can only be a move as
+ * them; otherwise a move as the protagonist, or a note as the author.
+ */
+async function moveOf(db: Db, scene: Scene, ask: MoveAsk): Promise<Move> {
+  const cue = await pendingCue(db, scene);
+  if (cue) {
+    const person = await personOf(db, scene.bookId, cue.who);
+    if (ask.voice !== 'character' || ask.as !== cue.who) {
+      throw new PlayError(`${person.name} is about to act. Play ${person.name}, or let their actor.`);
+    }
+    return { voice: 'character', input: ask.text, played: cue.who, cue };
+  }
+  if (ask.voice === 'author') {
+    return { voice: 'author', input: ask.text, played: null, cue: null };
+  }
+  const protagonist = await protagonistOf(db, scene.bookId);
+  if (ask.as !== undefined && ask.as !== protagonist.id) {
+    throw new PlayError(`No one but ${protagonist.name} is about to act.`);
+  }
+  return { voice: 'character', input: ask.text, played: protagonist.id, cue: null };
 }
 
 /** The owner's move, or a note as the author, and Procreator's narration of what happens. */
 export async function makeMove(ai: Procreator, bookId: string, ask: MoveAsk, watch: Watch): Promise<void> {
-  const scene = await playingScene(ai.db, bookId);
-  if (!scene) {
-    throw new PlayError('No scene is being played.');
+  const scene = await sceneInPlay(ai.db, bookId);
+  const move = await moveOf(ai.db, scene, ask);
+  await narrate(ai, scene, move, { playOthers: ask.playOthers }, watch);
+}
+
+/** The one about to act is played by their actor this time: their answer is a turn, and Procreator writes it. */
+export async function letActorPlay(ai: Procreator, bookId: string, going: Going, watch: Watch): Promise<void> {
+  const scene = await sceneInPlay(ai.db, bookId);
+  const cue = await pendingCue(ai.db, scene);
+  if (!cue) {
+    throw new PlayError('No one is waiting for the owner to say who plays them.');
   }
-  if (!(await newestTurn(ai.db, scene.id))) {
-    throw new PlayError(`Scene ${scene.number} hasn’t opened yet.`);
-  }
-  let played: string | null = null;
-  if (ask.voice === 'character') {
-    const protagonist = await protagonistOf(ai.db, bookId);
-    played = protagonist.id;
-  }
-  await narrate(ai, scene, ask.voice, ask.text, played, watch);
+  const move: Move = { voice: 'actor', input: '', played: cue.who, cue };
+  await narrate(ai, scene, move, going, watch);
 }
 
 /**
@@ -225,7 +331,7 @@ export async function makeMove(ai: Procreator, bookId: string, ask: MoveAsk, wat
  * wrap-up, as its session opens), and Procreator opens it. A scene that began but couldn't be
  * opened is opened again.
  */
-export async function goOn(ai: Procreator, bookId: string, watch: Watch): Promise<void> {
+export async function goOn(ai: Procreator, bookId: string, going: Going, watch: Watch): Promise<void> {
   let scene = await playingScene(ai.db, bookId);
   if (scene && (await newestTurn(ai.db, scene.id))) {
     throw new PlayError(`Scene ${scene.number} is being played.`);
@@ -242,7 +348,8 @@ export async function goOn(ai: Procreator, bookId: string, watch: Watch): Promis
   }
   watch.onScene(scene);
   watch.onFinishing(scene.number - 1);
-  await narrate(ai, scene, 'opening', '', null, watch);
+  const move: Move = { voice: 'opening', input: '', played: null, cue: null };
+  await narrate(ai, scene, move, going, watch);
 }
 
 /** The newest turn of the scene on the page, and the scene. */
@@ -268,28 +375,44 @@ export async function undo(db: Db, bookId: string): Promise<Turn> {
   return turn;
 }
 
-/** Another reply to the newest turn: it's taken back, and the same move is narrated again. */
-export async function another(ai: Procreator, bookId: string, watch: Watch): Promise<void> {
+/**
+ * Another reply to the newest turn: it's taken back, and the same move is narrated again. A turn
+ * that answered a cue answers it again (the cue stands once the turn is taken back), so an actor's
+ * turn has its actor play the moment afresh.
+ */
+export async function another(ai: Procreator, bookId: string, going: Going, watch: Watch): Promise<void> {
   const { scene, turn } = await newestOnPage(ai.db, bookId);
   await takeBackTurn(ai.db, turn);
   const current = await sceneNow(ai.db, scene.id);
-  await narrate(ai, current, turn.voice as Voice, turn.input, turn.played, watch);
+  const cue = await pendingCue(ai.db, current);
+  let input = turn.input;
+  if (turn.voice === 'actor') {
+    input = '';
+  }
+  const move: Move = { voice: turn.voice as Voice, input, played: turn.played, cue };
+  await narrate(ai, current, move, going, watch);
 }
 
-/** Three moves the owner could make next, asked for in the scene's session and never sent again. */
+/**
+ * Three moves the owner could make next, asked for in the scene's session and never sent again:
+ * the protagonist's, or while someone cued is about to act, theirs.
+ */
 export async function hintsFor(ai: Procreator, bookId: string): Promise<string[]> {
-  const scene = await playingScene(ai.db, bookId);
-  if (!scene) {
-    throw new PlayError('No scene is being played.');
-  }
+  const scene = await sceneInPlay(ai.db, bookId);
   const newest = await newestTurn(ai.db, scene.id);
   if (!newest) {
     throw new PlayError(`Scene ${scene.number} hasn’t opened yet.`);
   }
-  const protagonist = await protagonistOf(ai.db, bookId);
+  const cue = cueOf(newest);
+  let who: { id: string; name: string };
+  if (cue) {
+    who = await personOf(ai.db, bookId, cue.who);
+  } else {
+    who = await protagonistOf(ai.db, bookId);
+  }
   const turns = await turnsOf(ai.db, scene.id);
-  const moved = turns.some((turn) => turn.voice === 'character');
-  const text = render('procreator/hints.njk', { who: protagonist.name, moved });
+  const moved = turns.some((turn) => turn.voice === 'character' && turn.played === who.id);
+  const text = render('procreator/hints.njk', { who: who.name, moved });
   const answer = await converse(ai, scene, text, newest.id, { mode: 'hints', kind: 'aside', role: 'hints' });
   if (!answer.outcome.moves) {
     throw new ModelError('Procreator offered no moves.');

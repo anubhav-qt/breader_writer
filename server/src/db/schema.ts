@@ -189,16 +189,22 @@ export const turns = writer.table(
     /** 1, 2, 3 and on, in the book. An undone turn keeps its number. */
     number: integer('number').notNull(),
     /**
-     * character (a move as someone in the cast), author (a note the story follows and never says)
-     * or opening (Procreator opening the scene, with the owner's pick of how in the first).
+     * character (a move as someone in the cast), author (a note the story follows and never says),
+     * opening (Procreator opening the scene, with the owner's pick of how in the first) or actor
+     * (someone's actor playing them, when the owner let it).
      */
     voice: text('voice').notNull(),
-    /** For a character's move, who the owner played: the protagonist, or someone else in the cast. */
+    /** For a character's move, who the owner played: the protagonist, or someone else in the cast. For an actor's, who it played. */
     played: uuid('played'),
-    /** The owner's words. */
+    /** The owner's words, or for an actor's turn, the actor's answer. */
     input: text('input').notNull(),
     /** The narrator's words. */
     reply: text('reply').notNull().default(''),
+    /**
+     * When Procreator stopped the turn for the owner to say who plays someone about to act: who,
+     * and what they're to know (story/scenes.ts, Cue). The next turn is that someone's part.
+     */
+    cue: jsonb('cue'),
     /** Taken back. Kept, and left out of the story. */
     undone: boolean('undone').notNull().default(false),
     createdAt: at('created_at').notNull().defaultNow(),
@@ -372,6 +378,80 @@ export const sessionMessages = writer.table(
   (t) => [uniqueIndex('session_messages_scene_seq').on(t.sceneId, t.seq)],
 );
 
+/*
+ * An actor's chat: the chat a cast member's actor plays them in, across scenes (story/actors.ts).
+ * Kept as a scene's session is: raw history, only ever added to, with what an undo cut marked
+ * undone, in segments that each open with a head.
+ */
+
+/**
+ * A stretch of an actor's chat: the message it opens with (who they are, and after a compaction
+ * what they remember), then the chat's messages from fromSeq on.
+ */
+export const actorSegments = writer.table(
+  'actor_segments',
+  {
+    id: serial(),
+    bookId: bookRef(),
+    characterId: uuid('character_id').notNull(),
+    /** 1 when the chat starts, and one more for each compaction. */
+    number: integer('number').notNull(),
+    /** The message it opens with, word for word, so every call in it starts the same. */
+    head: text('head').notNull(),
+    /** Who they are as the head told them (their sheet, page and relationships), to tell what changed since. */
+    self: text('self').notNull(),
+    /** What they remember of the chat before fromSeq, in their own voice. Empty in the first. */
+    memory: text('memory').notNull().default(''),
+    /** The first of the chat's messages sent after the head. */
+    fromSeq: integer('from_seq').notNull(),
+    /** The turn it was made at. */
+    turnId: uuid('turn_id')
+      .notNull()
+      .references(() => turns.id),
+    /** Cut away by an undo. */
+    undone: boolean('undone').notNull().default(false),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('actor_segments_character_number').on(t.bookId, t.characterId, t.number),
+    foreignKey({ columns: [t.bookId, t.characterId], foreignColumns: [characters.bookId, characters.id] }).onDelete('cascade'),
+  ],
+);
+
+/** A message of an actor's chat, as the model was sent it or sent it back. */
+export const actorMessages = writer.table(
+  'actor_messages',
+  {
+    id: serial(),
+    bookId: bookRef(),
+    characterId: uuid('character_id').notNull(),
+    /** 1, 2, 3 and on, through the chat. */
+    seq: integer('seq').notNull(),
+    /** The turn it belongs to. */
+    turnId: uuid('turn_id')
+      .notNull()
+      .references(() => turns.id),
+    /** The scene it was in. */
+    sceneId: uuid('scene_id')
+      .notNull()
+      .references(() => scenes.id),
+    /** play (a cue, a note, an answer) or fold (a compaction at work, never sent again). */
+    kind: text('kind').notNull(),
+    /** pi's message: the director's (user) or the actor's (assistant). */
+    message: jsonb('message').notNull(),
+    /** Who they are as this message told them, when it told them what changed. */
+    self: text('self'),
+    /** Cut away by an undo. */
+    undone: boolean('undone').notNull().default(false),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('actor_messages_character_seq').on(t.bookId, t.characterId, t.seq),
+    index('actor_messages_turn_idx').on(t.turnId),
+    foreignKey({ columns: [t.bookId, t.characterId], foreignColumns: [characters.bookId, characters.id] }).onDelete('cascade'),
+  ],
+);
+
 /** A call to a model, with what it was sent and what it used, so the budget can be seen. */
 export const calls = writer.table(
   'calls',
@@ -382,7 +462,7 @@ export const calls = writer.table(
     bookId: uuid('book_id').references(() => books.id, { onDelete: 'cascade' }),
     sceneId: uuid('scene_id').references(() => scenes.id),
     turnId: uuid('turn_id').references(() => turns.id),
-    /** narrator, author, hints, openings, fold or setup. */
+    /** narrator, actor, author, hints, openings, fold or setup. */
     role: text('role').notNull(),
     model: text('model').notNull(),
     thinking: text('thinking').notNull(),

@@ -3,10 +3,12 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ModelError } from '../src/ai/call.ts';
 import { modelInUse } from '../src/ai/settings.ts';
-import { calls, changes, pages, scenes, sessionMessages, sessionSegments } from '../src/db/schema.ts';
+import { actorSegments, calls, changes, pages, scenes, sessionMessages, sessionSegments } from '../src/db/schema.ts';
+import { cueActor } from '../src/procreator/actor.ts';
 import { addNote, converse } from '../src/procreator/converse.ts';
 import { compactAt, compactPrompt, cutPoint, FoldError, wrapUp, type Cut } from '../src/procreator/folds.ts';
 import type { Procreator } from '../src/procreator/run.ts';
+import { addActorMessage } from '../src/story/actors.ts';
 import { StoryError } from '../src/story/changes.ts';
 import { notesOf } from '../src/story/memory.ts';
 import { findPage } from '../src/story/pages.ts';
@@ -88,6 +90,8 @@ const TOOLS = [
   'shift_relationship',
   'set_scene',
   'join_cast',
+  'cue',
+  'send_back',
   'end_scene',
   'offer_openings',
   'offer_moves',
@@ -471,5 +475,78 @@ describe('the wrap-up', () => {
     expect(head).toContain('<scene number="1" where="The ferry" when="Dusk">\nAiko waved, and Ren waved back.\n</scene>');
     expect(head).toContain('<last_scene number="1">\n<turn number="1">\n<move by="Aiko">I wave at Ren.</move>');
     expect((await sceneNow(scene)).summary).toBe('Aiko waved, and Ren waved back.');
+  });
+});
+
+describe('an actor’s compaction', () => {
+  /**
+   * Ren's actor answered a cue in scene 1, and his chat has grown past a 20k limit there. Scene 1
+   * has ended (wrapped up, or not yet), and scene 2 is playing, a turn in.
+   */
+  async function aLongChat(replies: Reply[], wrapped: boolean) {
+    const story = await aScene();
+    const { proxy, ai } = await procreatorWith([{ text: 'I take the oars.' }, ...replies], story.userId, smallWindow(24_000, 4_000));
+    const ren = { id: story.ren.id, name: 'Ren' };
+    const first = await addTurn(db, story.scene, 'character', 'I ask Ren to row.');
+    await cueActor(ai, { person: ren, scene: story.scene, turnId: first.id }, 'Aiko asks you to row.');
+    const actor = { bookId: story.bookId, characterId: ren.id };
+    for (let n = 1; n <= 10; n += 1) {
+      const message: Message = { role: 'user', content: `Cue ${n}. ${'The river runs on. '.repeat(500)}`, timestamp: Date.now() };
+      await addActorMessage(db, actor, { kind: 'play', turnId: first.id, sceneId: story.scene.id, message, self: null });
+    }
+    await end(story.bookId, story.scene);
+    if (wrapped) {
+      await db.update(scenes).set({ summary: 'Ren rowed Aiko across.' }).where(eq(scenes.id, story.scene.id));
+    }
+    const second = await nextScene(story.bookId, 'The far bank', [story.aiko.id, ren.id]);
+    const turn = await addTurn(db, second, 'character', 'I wave at Ren.');
+    const moment = { person: ren, scene: second, turnId: turn.id };
+    return { ...story, proxy, ai, moment };
+  }
+
+  async function actorSegmentsOf(bookId: string) {
+    return db.select().from(actorSegments).where(eq(actorSegments.bookId, bookId)).orderBy(asc(actorSegments.number));
+  }
+
+  it('folds the scenes wrapped up into what they remember, and goes on from a fresh start', async () => {
+    const remembered = 'I rowed Aiko across, and said little.';
+    const { bookId, proxy, ai, moment } = await aLongChat([{ text: remembered }, { text: 'I wave back.' }], true);
+    expect(await cueActor(ai, moment, 'Aiko waves from the bank.')).toBe('I wave back.');
+    expect(proxy.asked).toHaveLength(3);
+
+    const ask = promptOf(proxy.asked[1]).user;
+    expect(ask.startsWith('<remember>')).toBe(true);
+    expect(ask).toContain('Write what Ren remembers of everything before Scene 2');
+    expect(textsOf(proxy.asked[1]).join('\n')).toContain('Cue 10.');
+
+    const segments = await actorSegmentsOf(bookId);
+    expect(segments).toHaveLength(2);
+    // Two messages of the first cue and ten more: everything folds, and the chat goes on after them.
+    expect(segments[1]).toMatchObject({ number: 2, memory: remembered, fromSeq: 13, turnId: moment.turnId });
+    const after = textsOf(proxy.asked[2]);
+    expect(after).toHaveLength(2);
+    expect(after[0]).toBe(segments[1].head);
+    expect(after[0]).toContain('<what_you_remember>');
+    expect(after[0]).toContain(remembered);
+    expect(after[1]).toContain('<scene number="2" where="The far bank"');
+    expect(after.join('\n')).not.toContain('Cue 10.');
+    const roles = await db.select({ role: calls.role }).from(calls).where(eq(calls.bookId, bookId)).orderBy(asc(calls.startedAt));
+    expect(roles.map((row) => row.role)).toEqual(['actor', 'fold', 'actor']);
+  });
+
+  it('folds nothing that isn’t wrapped up yet, and goes on as it was', async () => {
+    const { bookId, proxy, ai, moment } = await aLongChat([{ text: 'I wave back.' }], false);
+    expect(await cueActor(ai, moment, 'Aiko waves from the bank.')).toBe('I wave back.');
+    expect(proxy.asked).toHaveLength(2);
+    expect(textsOf(proxy.asked[1]).join('\n')).toContain('Cue 10.');
+    expect(await actorSegmentsOf(bookId)).toHaveLength(1);
+  });
+
+  it('goes on as it was when the fold fails', async () => {
+    const { bookId, proxy, ai, moment } = await aLongChat([{ status: 400 }, { text: 'I wave back.' }], true);
+    expect(await cueActor(ai, moment, 'Aiko waves from the bank.')).toBe('I wave back.');
+    expect(proxy.asked).toHaveLength(3);
+    expect(textsOf(proxy.asked[2]).join('\n')).toContain('Cue 10.');
+    expect(await actorSegmentsOf(bookId)).toHaveLength(1);
   });
 });

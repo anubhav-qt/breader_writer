@@ -280,9 +280,16 @@ const Shift = Type.Object({
   }),
 });
 
+/** A name as Procreator wrote it, plainly or as a link, without the link's brackets. */
+export function bareName(name: string): string {
+  const opened = name.replace(/^\s*\[\[/, '');
+  const closed = opened.replace(/\]\]\s*$/, '');
+  return closed.trim();
+}
+
 /** The id of the one person in the cast with this name, written plainly or as a link. */
 export function personNamed(cast: Cast, name: string): string {
-  const bare = name.replace(/^\s*\[\[/, '').replace(/\]\]\s*$/, '').trim();
+  const bare = bareName(name);
   const ids = cast.idsOf(bare);
   if (ids.length === 0) {
     throw new StoryError(`No one in the cast is called ${bare}. A relationship is between two people in the cast.`);

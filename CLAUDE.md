@@ -21,25 +21,26 @@ the way a breader card fills with colour as you read.
 
 ## Status
 
-Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book (its
-settings, world, cast and the relationship graph between them) on its own page, and changing it
-later. What's left of it is the owner's test. Step 3 (AI plumbing) is built: pi is forked
-(`packages/`), and the server reads the models from CLIProxyAPI and keeps each account's pick of
-model and thinking level. Procreator's memory was redesigned after the owner's review
-(2026-10-06) and rebuilt to it: a session per scene that opens with a brief built from the
-database, the reference and memory Procreator keeps with its tools, the change log, and our own
-compaction (`server/src/story/`, `server/src/procreator/`, `server/src/prompts/`). It ran end to
-end against the real model the same day (see "Notes for step 3"). Nothing plays a story yet
-(step 6), so what the owner can try of it is the model picker. Step 4 (settings) is built: in
-the model picker, the owner signs the proxy's AI accounts in and out. What's left of it is the
-owner's test, which needs the proxy's management key in `server/.env` (only the owner has it).
-Every call now asks each provider for its longest cache (see "Notes for step 3"). Step 5 (setup
-help) is under way: Procreator's faint text in setup's fields is built, was checked in the
-desktop app's browser against a stand-in API, and was tried against the real model (see "Notes
-for step 5"); what's left of it is a real run in a browser logged in to breader. The
-Suggestions chat is next. The owner has a real book set up locally that they mean to play
-through before production, so its data must survive every change (see "Running it locally").
-See "The code" below for what exists.
+The owner tests once everything is built, locally, before it goes to the ThinkPad (their call,
+2026-10-07), so no step waits on their test: each still ends with a checklist, kept for that
+pass. Step 1 (skeleton) is done and tested by the owner. Step 2 (setup) is built: making a book
+(its settings, world, cast and the relationship graph between them) on its own page, and
+changing it later. Step 3 (AI plumbing) is built: pi is forked (`packages/`), and the server
+reads the models from CLIProxyAPI and keeps each account's pick of model and thinking level.
+Procreator's memory was redesigned after the owner's review (2026-10-06) and rebuilt to it: a
+session per scene that opens with a brief built from the database, the reference and memory
+Procreator keeps with its tools, the change log, and our own compaction (`server/src/story/`,
+`server/src/procreator/`, `server/src/prompts/`). It ran end to end against the real model the
+same day (see "Notes for step 3"). Nothing plays a story yet (step 6). Step 4 (settings) is
+built: in the model picker, the owner signs the proxy's AI accounts in and out, which needs the
+proxy's management key in `server/.env` (only the owner has it). Every call now asks each
+provider for its longest cache (see "Notes for step 3"). Step 5 (setup help) is under way:
+Procreator's faint text in setup's fields is built, and since 2026-10-07 every blank field
+shows it at once (see "Notes for step 5"). It was checked in the desktop app's browser against a
+stand-in API; the field by field version was tried against the real model, the blank fields
+all at once not yet. The Suggestions chat is next. The owner has a real book set up locally
+that they mean to play through before production, so its data must survive every change (see
+"Running it locally"). See "The code" below for what exists.
 
 ### Decided
 
@@ -190,17 +191,22 @@ See "The code" below for what exists.
   it's built once and looks the same everywhere. A relationship opens the same way, as its own
   sheet.
 - **Procreator helps with setup as you fill it in.** It watches the setup page, and once the
-  first few things are filled in (so it has something to go on), clicking into any field shows
-  its suggestion for that field as faint text where you'd type, made from everything there so
-  far. Tab or the right arrow key takes it, and on a phone, which has neither, a tap on the faint
-  text does (the owner's pick, 2026-10-06); typing anything else clears it. It runs on the
-  account's model, thinking as little as the model allows, so it lands before the owner starts
-  typing (the owner's call, 2026-10-06).
+  first few things are filled in (so it has something to go on), every field still blank shows
+  its suggestion as faint text where you'd type, all at once, made together from everything
+  there so far (the owner's ask, 2026-10-07, in place of one field at a time). As the owner
+  changes things, the suggestions are made again to fit. A field with text in it shows what
+  could come next once it's clicked into. Tab or the right arrow key takes the faint text, and on
+  a phone, which has neither, a tap on it does (the owner's pick, 2026-10-06); typing anything
+  else clears it. It runs on the account's model, thinking as little as the model allows, so it
+  lands before the owner starts typing (the owner's call, 2026-10-06).
 - **Suggestions is a chat about the setup.** A Suggestions button opens a chat with Procreator:
   ask for anything, go back and forth, change your mind as often as you like. Once everything is
   agreed and you approve it, Procreator makes all the changes itself. On a laptop the chat is a
   panel beside the setup page, which stays in view, so approved changes land where the owner
   can watch them; on a phone it rises as a sheet over the page (the owner's pick, 2026-10-06).
+  The chat is kept with the book: it's where the owner left it after a reload or another day.
+  A new book's chat goes with its draft, so Clear and Start end it (the owner's pick,
+  2026-10-07).
 - **Approving is a list, and each item can be redone on its own** (the owner's design,
   2026-10-06). When the talk settles, Procreator lists every change it will make, with Approve
   under the list. Each item is exactly what it will write (a field and its new text, someone new
@@ -237,7 +243,8 @@ See "The code" below for what exists.
 
 ### Build order
 
-Each step ends working, committed, and with a short test checklist for the owner.
+Each step ends working, committed, and with a short test checklist for the owner, who works
+through them all in one local test once everything is built (see "Status").
 
 1. **Skeleton.** npm workspaces like breader's (`frontend`, `server`, `shared`). Copy breader's
    library page whole (header, gallery, key and login dialogs, tokens, fonts) and serve it under
@@ -381,25 +388,37 @@ Each step ends working, committed, and with a short test checklist for the owner
 ### Notes for step 5
 
 - A suggestion runs on the account's own model, thinking as little as the model allows
-  (`quick` in `server/src/suggestions/field.ts`), whatever level the account picked. Gemini 3 is
+  (`quick` in `server/src/suggestions/quick.ts`), whatever level the account picked. Gemini 3 is
   asked for low, and marked as a model that thinks even when the catalog can't tell (no
   management key), or pi would ask for no level and it would think at its default, high.
   Through the proxy, "minimal" is turned away (a 400), and no thinking at all (a budget of 0)
   doesn't always hold. Any other model gets the lowest level the catalog knows it takes. Nothing
   shows while it's on its way, and nothing shows when Procreator can't help (offline, or no
   answer): the field is just a field.
-- It's asked for 0.4 seconds after a field is clicked into, so tabbing past a field asks
-  nothing, and only once 3 things on the page are filled in (`SUGGEST_AFTER`, a default the
+- Nothing is suggested until 3 things on the page are filled in (`SUGGEST_AFTER`, a default the
   owner hasn't picked).
-- Typing or leaving the field clears the faint text, and the page stops waiting for it. Moving
-  the caret off the end only hides it, and switching windows keeps it. Escape clears it without
-  closing the sheet it's on.
-- Taking it types it in (`execCommand('insertText')`), so undo takes it back out. A mouse click
-  on the faint text doesn't take it (Tab and the arrow are right there, and a click near a
-  paragraph's end shouldn't take one by accident); a tap does.
-- The instructions are the same for every call, then the page as it stands, the field last. The
-  cache is asked to last long, keyed by the book, or by the account while the book isn't made.
-  Each call is recorded as `setup`.
+- The blank fields (`frontend/src/features/setup/useBlanks.ts`): every text field with nothing
+  in it, on the page and in every sheet, is asked about in one call, 1.5 seconds after the page
+  is left alone, so the suggestions fit each other. A sheet opens with its blanks shown already.
+  When the owner changes something themselves (types, adds someone, ties two), they're asked
+  for again, and the ones shown stay until the new ones land. Taking one isn't such a change
+  (the rest were made to go with it), so it asks nothing. One call is out at a time; a change
+  while it's out asks again once it's back. When Procreator can't help, what's shown stays, and
+  it isn't asked again until the owner changes something. Escape hides a field's faint text
+  until the next ones come. A click or a tap on a field nobody is writing in only puts the caret
+  there.
+- A field with text in it is asked about on its own, 0.4 seconds after it's clicked into, so
+  tabbing past it asks nothing. Typing or leaving the field clears that faint text, and the page
+  stops waiting for it. Moving the caret off the end only hides it, and switching windows keeps
+  it. Escape clears it without closing the sheet it's on.
+- Taking faint text types it in (`execCommand('insertText')`), so undo takes it back out. A
+  mouse click on the faint text doesn't take it (Tab and the arrow are right there, and a click
+  near a paragraph's end shouldn't take one by accident); a tap in the field being written in
+  does.
+- The instructions are the same for every call of a kind, then the page as it stands, the field
+  (or the numbered blanks) last. The blanks' answer fills each by its number,
+  `<fill n="3">...</fill>`. The cache is asked to last long, keyed by the book, or by the account
+  while the book isn't made. Each call is recorded as `setup`.
 - When the page stops waiting, the server stops the model call (the request's signal). Locally
   Vite's proxy doesn't pass that on, so there the call runs to the end.
 - A half-width line field (genre, tone) cuts a long suggestion off at its right edge. A paragraph
@@ -469,10 +488,11 @@ their code, changed where we need, not rewritten to ours.
   through it, and so do Procreator's suggested changes, on the page and on the server alike.
 - `src/suggestions.ts`: setup help (step 5). A setup as the page holds it while it's being
   filled in (`DraftSetup`: the title and names may still be blank), a field of it (`FieldRef`:
-  the title, a field of the world or of someone's sheet, a line's bond, or one side of a line),
-  what's in a field (`fieldText`) and how much it holds (`fieldLimit`), the ask and the answer
-  (`FieldAsk`, `FieldSuggestion`), and when suggestions start (`filledIn`, against
-  `SUGGEST_AFTER`).
+  the title, a field of the world or of someone's sheet, a line's bond, or one side of a line)
+  and its key (`fieldKey`), every field in the page's order (`everyField`) and the blank ones
+  (`blankFields`), what's in a field (`fieldText`), changing it (`withFieldText`) and how much
+  it holds (`fieldLimit`), the asks and the answers (`FieldAsk`, `FieldSuggestion`, `BlanksAsk`,
+  `BlankSuggestions`), and when suggestions start (`filledIn`, against `SUGGEST_AFTER`).
 
 ### `frontend/` (`@writer/frontend`)
 
@@ -510,10 +530,11 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   `Fields.tsx` holds the text fields and radio cards, which are breader's Add a book dialog's
   (`features/add/add.css`, kept whole from breader); `setup.css` is only what the page adds.
   `useGhost.ts` is Procreator's faint text in a field (see "Notes for step 5"): a `Field` told
-  which field of the setup it is (`field`) asks for it through `src/data/suggestions.ts`, with
-  the page as it stands from `HelpContext`, which `SetupForm` puts around the page and its
-  sheets. A field can't colour part of its own text, so the faint text is drawn in a copy of
-  the field laid over it.
+  which field of the setup it is (`field`) shows the blank fields' suggestion for it, or asks
+  for one of its own through `src/data/suggestions.ts`, with the page as it stands from
+  `HelpContext`, which `SetupForm` puts around the page and its sheets. `useBlanks.ts` asks
+  for the blank fields' suggestions, for `SetupForm` to hand on. A field can't colour part of
+  its own text, so the faint text is drawn in a copy of the field laid over it.
 - `src/features/models/ModelPicker.tsx` and `src/data/models.ts`: the header's model picker,
   for an account that can write. The chip says the model and its thinking level; it drops down
   the models (`GET /v1/settings`, asked again on each opening) and the thinking levels the
@@ -660,9 +681,11 @@ A Hono API, port 8790, built like breader's server.
     if that fails), then sends the move. `addNote` adds the owner's mid scene change as a note.
 - `src/suggestions/`: setup help. `view.ts` lays out the page as it stands (`setupView`:
   everyone by name, the nameless numbered, two of one name told apart, `refsOf`) and the field
-  asked about (`fieldView`: where it is, what's in it, how much it holds). `field.ts` makes a
-  field's suggestion (`suggestField`): one call on the account's model, thinking as little as
-  it can (`quick`). `ghost.ts` turns the answer into the faint text (`ghostFrom`): fences,
+  asked about (`fieldView`: where it is, what's in it, how much it holds, and `lengthFor`, how
+  much to suggest). `quick.ts` is their call (`askQuickly`): one ask on the account's model,
+  thinking as little as it can (`quick`). `blanks.ts` makes the suggestions for every blank
+  field at once (`suggestBlanks`, reading the answer's fills with `fillsFrom`), and `field.ts`
+  one for a field with text in it (`suggestField`). `ghost.ts` turns the answer into the faint text (`ghostFrom`): fences,
   labels and quotes around it come off, it's joined to the field's text with a space where one
   is needed, a repeat of that text is gone on from, a line field keeps to one line, and it's cut
   at a word's end to what the field holds.
@@ -678,7 +701,9 @@ A Hono API, port 8790, built like breader's server.
   marked as one); `procreator/compact.njk` and `procreator/wrap.njk` the folds' requests, which
   come last, after the session. `suggestions/field-system.njk` and `suggestions/field.njk` are a
   field's suggestion: the instructions with examples, then the page (`partials/setup.njk`) and
-  the field last. Written to the Gemini 3 guides (October 2026).
+  the field last. `suggestions/blanks-system.njk` and `suggestions/blanks.njk` are the blank
+  fields' suggestions: the instructions with an example, then the page and the numbered blanks
+  last. Written to the Gemini 3 guides (October 2026, checked again 2026-10-07).
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -699,9 +724,10 @@ A Hono API, port 8790, built like breader's server.
   out and gives those left), `POST /v1/accounts/sign-in` (starts one: the page to sign in on,
   and its state), and `GET`, `POST` and `DELETE /v1/accounts/sign-in/:state` (how it stands, the
   address it ended on, and stopping it). Without a proxy or its key they say so, and a key the
-  proxy turns away is told apart from the proxy being down. `POST /v1/suggestions/field`
-  (Procreator's faint text for a field, from the page as it stands), `open` only: a 503 while
-  the AI is offline, a 502 when the model doesn't answer, and a 400 for a field not on the page.
+  proxy turns away is told apart from the proxy being down. `POST /v1/suggestions/blanks`
+  (Procreator's faint text for every blank field, from the page as it stands) and
+  `POST /v1/suggestions/field` (for one field with text in it), `open` only: a 503 while the AI
+  is offline, a 502 when the model doesn't answer, and a 400 for a field not on the page.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
@@ -731,7 +757,8 @@ A Hono API, port 8790, built like breader's server.
   templates, `test/session.test.ts` sessions (the prefix each call keeps, what each provider is
   asked of its cache, tools, notes, undo), compaction and the wrap-up,
   `test/accounts.test.ts` the AI accounts, and `test/suggestions.test.ts` setup help (the faint
-  text made from an answer, the page's names, the thinking it asks for, and the route).
+  text made from an answer, the page's names, the blank fields and their fills, the thinking it
+  asks for, and the routes).
 
 ### Running it locally
 

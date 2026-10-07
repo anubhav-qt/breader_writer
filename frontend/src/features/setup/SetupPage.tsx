@@ -16,6 +16,7 @@ import { CharacterSheet } from './CharacterSheet';
 import { Choices, Field } from './Fields';
 import { RelationshipGraph } from './RelationshipGraph';
 import { RelationshipSheet } from './RelationshipSheet';
+import { useBlanks } from './useBlanks';
 import { HelpContext, type SetupHelp } from './useGhost';
 import '../add/add.css';
 import './setup.css';
@@ -56,6 +57,7 @@ interface FormProps {
 export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, actions, bookId }: FormProps) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [openPair, setOpenPair] = useState<[string, string] | null>(null);
+  const { blanks, dismiss } = useBlanks(setup, bookId);
 
   const pickLength = (length: Length) => {
     let pov = setup.pov;
@@ -114,8 +116,8 @@ export function SetupForm({ heading, setup, onChange, suggestPov, onPovPicked, a
   if (setup.length === 'light_novel') {
     povNotes = { [LIGHT_NOVEL_POV]: 'Light novels usually are' };
   }
-  // Every field on the page and its sheets can ask Procreator about itself, from the page as it stands.
-  const help: SetupHelp = { setup, bookId };
+  // Every field on the page and its sheets gets Procreator's faint text, from the page as it stands.
+  const help: SetupHelp = { setup, bookId, blanks, dismiss };
 
   return (
     <HelpContext value={help}>

@@ -16,13 +16,15 @@ import {
   World,
   checkPeople,
   everyone,
+  pairKey,
   type BookSetup,
 } from './book.ts';
-import { findRelationship } from './setup.ts';
+import { findRelationship, sidesInCastOrder, withCharacter, withRelationship } from './setup.ts';
 
 /*
- * Procreator's help with setup (step 5): its suggestion for the field the owner clicks into, shown
- * as faint text after what's written there.
+ * Procreator's help with setup (step 5): faint text in the setup page's fields. Once the page has
+ * a little on it, every field still blank shows a suggestion, all made together; a field with
+ * text in it shows one for what could come next when it's clicked into.
  */
 
 /** A character's sheet while it's being filled in: the name may still be blank. */
@@ -116,6 +118,29 @@ export const FieldSuggestion = z.object({
 });
 export type FieldSuggestion = z.infer<typeof FieldSuggestion>;
 
+/** POST /v1/suggestions/blanks: the page as it stands, and the book, if it's made. */
+export const BlanksAsk = z.object({
+  setup: DraftSetup,
+  bookId: z.uuid().nullable(),
+});
+export type BlanksAsk = z.infer<typeof BlanksAsk>;
+
+/** A suggestion for a blank field: what could go in it. */
+export const BlankSuggestion = z.object({
+  field: FieldRef,
+  text: z.string(),
+});
+export type BlankSuggestion = z.infer<typeof BlankSuggestion>;
+
+/**
+ * What POST /v1/suggestions/blanks answers: a suggestion for each blank field Procreator could
+ * help with, made together so they fit each other.
+ */
+export const BlankSuggestions = z.object({
+  fields: z.array(BlankSuggestion),
+});
+export type BlankSuggestions = z.infer<typeof BlankSuggestions>;
+
 /** How many things must be filled in before Procreator suggests anything: it needs something to go on. */
 export const SUGGEST_AFTER = 3;
 
@@ -167,4 +192,97 @@ export function fieldText(setup: BookSetup, field: FieldRef): string | null {
     return line.a[field.field];
   }
   return line.b[field.field];
+}
+
+/** The same key for the same field, to keep its suggestion by. */
+export function fieldKey(field: FieldRef): string {
+  if (field.kind === 'title') {
+    return 'title';
+  }
+  if (field.kind === 'world') {
+    return `world ${field.field}`;
+  }
+  if (field.kind === 'character') {
+    return `character ${field.id} ${field.field}`;
+  }
+  if (field.kind === 'bond') {
+    return `bond ${pairKey(field.a, field.b)}`;
+  }
+  return `side ${field.id} ${field.other} ${field.field}`;
+}
+
+const WORLD_ORDER: WorldField[] = ['genre', 'tone', 'setting', 'rules', 'notes'];
+const SHEET_ORDER: SheetField[] = ['name', 'who', 'personality', 'past', 'notes'];
+const SIDE_ORDER: SideField[] = ['sees', 'hides'];
+
+/** Every text field on the page, in the page's order: the title, the world, each sheet, each line. */
+export function everyField(setup: BookSetup): FieldRef[] {
+  const fields: FieldRef[] = [{ kind: 'title' }];
+  for (const field of WORLD_ORDER) {
+    fields.push({ kind: 'world', field });
+  }
+  const people = everyone(setup);
+  for (const person of people) {
+    for (const field of SHEET_ORDER) {
+      fields.push({ kind: 'character', id: person.id, field });
+    }
+  }
+  for (const line of setup.relationships) {
+    fields.push({ kind: 'bond', a: line.a.id, b: line.b.id });
+    const [first, second] = sidesInCastOrder(line, people);
+    for (const side of [first, second]) {
+      const other = otherSide(line, side.id);
+      for (const field of SIDE_ORDER) {
+        fields.push({ kind: 'side', id: side.id, other, field });
+      }
+    }
+  }
+  return fields;
+}
+
+function otherSide(line: Relationship, id: string): string {
+  if (line.a.id === id) {
+    return line.b.id;
+  }
+  return line.a.id;
+}
+
+/** Every text field on the page with nothing written in it, in the page's order. */
+export function blankFields(setup: BookSetup): FieldRef[] {
+  return everyField(setup).filter((field) => {
+    const text = fieldText(setup, field);
+    return text !== null && text.trim() === '';
+  });
+}
+
+/** The setup with a field's text changed, or null when the field isn't on the page. */
+export function withFieldText(setup: BookSetup, field: FieldRef, text: string): BookSetup | null {
+  if (field.kind === 'title') {
+    return { ...setup, title: text };
+  }
+  if (field.kind === 'world') {
+    return { ...setup, world: { ...setup.world, [field.field]: text } };
+  }
+  if (field.kind === 'character') {
+    const person = characterById(setup, field.id);
+    if (!person) {
+      return null;
+    }
+    return withCharacter(setup, { ...person, [field.field]: text });
+  }
+  if (field.kind === 'bond') {
+    const line = findRelationship(setup, field.a, field.b);
+    if (!line) {
+      return null;
+    }
+    return withRelationship(setup, { ...line, bond: text });
+  }
+  const line = findRelationship(setup, field.id, field.other);
+  if (!line) {
+    return null;
+  }
+  if (line.a.id === field.id) {
+    return withRelationship(setup, { ...line, a: { ...line.a, [field.field]: text } });
+  }
+  return withRelationship(setup, { ...line, b: { ...line.b, [field.field]: text } });
 }

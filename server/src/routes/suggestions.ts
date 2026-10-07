@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { FieldAsk, type FieldSuggestion } from '@writer/shared/suggestions';
+import { BlanksAsk, FieldAsk, type BlankSuggestion, type BlankSuggestions, type FieldSuggestion } from '@writer/shared/suggestions';
 import type { Catalog } from '../ai/catalog.ts';
 import { ModelError } from '../ai/call.ts';
 import { ProxyError } from '../ai/proxy.ts';
@@ -9,7 +9,9 @@ import type { AppEnv, Deps } from '../context.ts';
 import { requireWriter } from '../lib/access.ts';
 import { ApiError, parse, readJson } from '../lib/errors.ts';
 import { log } from '../log.ts';
-import { suggestField, type Helper } from '../suggestions/field.ts';
+import { suggestBlanks } from '../suggestions/blanks.ts';
+import { suggestField } from '../suggestions/field.ts';
+import type { Helper } from '../suggestions/quick.ts';
 
 const offline = () => new ApiError(503, 'ai_offline', 'The AI is offline, so Procreator can’t help right now.');
 const failed = () => new ApiError(502, 'ai_failed', 'Procreator didn’t answer. Try again in a moment.');
@@ -51,7 +53,28 @@ export function suggestionRoutes(deps: Deps) {
     return book.id;
   }
 
-  /** Procreator's suggestion for the field clicked into, made from the page as it stands. */
+  /** Procreator's suggestions for every blank field on the page, made together from the page as it stands. */
+  r.post('/suggestions/blanks', async (c) => {
+    const ask = parse(BlanksAsk, await readJson(c));
+    const userId = c.var.login.id;
+    const { catalog, inUse } = await modelFor(userId);
+    const bookId = await ownBookId(userId, ask.bookId);
+    const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId, signal: c.req.raw.signal };
+    let fields: BlankSuggestion[];
+    try {
+      fields = await suggestBlanks(helper, ask.setup);
+    } catch (err) {
+      if (err instanceof ModelError) {
+        log.warn({ err: err.message, model: inUse.choice.model }, 'the suggestions for blank fields failed');
+        throw failed();
+      }
+      throw err;
+    }
+    const answer: BlankSuggestions = { fields };
+    return c.json(answer);
+  });
+
+  /** Procreator's suggestion for a field with text in it, once it's clicked into, made from the page as it stands. */
   r.post('/suggestions/field', async (c) => {
     const ask = parse(FieldAsk, await readJson(c));
     const userId = c.var.login.id;

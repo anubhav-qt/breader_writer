@@ -191,11 +191,28 @@ function aboutField(setup: DraftSetup, field: FieldRef, refs: Refs): About {
   return { where: `What ${person} hides from ${other}`, holds: `Secrets, debts, what ${person} would never say to ${other}.`, size: 'long' };
 }
 
-/** The field clicked into, or null when it isn't on the page. */
+/** A field of the page, or null when it isn't on it. */
 export function fieldView(setup: DraftSetup, field: FieldRef, refs: Refs): FieldView | null {
   const text = fieldText(setup, field);
   if (text === null) {
     return null;
   }
   return { ...aboutField(setup, field, refs), max: fieldLimit(field), text };
+}
+
+/** How much to suggest for a field: by its size, and whether anything is written in it yet. */
+export function lengthFor(field: FieldView): string {
+  if (field.size === 'line') {
+    return 'a few words, on one line';
+  }
+  if (field.size === 'long' && field.text === '') {
+    return 'one to three sentences';
+  }
+  if (field.size === 'long') {
+    return 'a sentence or two, going on from where it stops';
+  }
+  if (field.text === '') {
+    return 'a few short lines';
+  }
+  return 'a line or two more';
 }

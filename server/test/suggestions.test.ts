@@ -1,9 +1,10 @@
 import { desc, eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
-import { DraftSetup } from '@writer/shared/suggestions';
+import { DraftSetup, blankFields, fieldKey, fieldText, withFieldText } from '@writer/shared/suggestions';
 import type { Catalog } from '../src/ai/catalog.ts';
 import { users } from '../src/db/breader.ts';
 import { books, calls } from '../src/db/schema.ts';
+import { fillsFrom } from '../src/suggestions/blanks.ts';
 import { ghostFrom } from '../src/suggestions/ghost.ts';
 import { refsOf } from '../src/suggestions/view.ts';
 import { account, address, deps, send, writer } from './helpers.ts';
@@ -114,6 +115,69 @@ describe('ghostFrom', () => {
     expect(ghostFrom('Mara', '   \n', 'line', 80)).toBe('');
     expect(ghostFrom('Mara', 'Mara', 'line', 80)).toBe('');
     expect(ghostFrom('', '""', 'line', 80)).toBe('');
+  });
+});
+
+describe('blankFields', () => {
+  it('lists every field with nothing in it, in the page’s order', () => {
+    const setup = DraftSetup.parse(page());
+    const keys = blankFields(setup).map(fieldKey);
+    expect(keys).toEqual([
+      'world tone',
+      'world rules',
+      'world notes',
+      `character ${MARA} past`,
+      `character ${MARA} notes`,
+      `character ${IVEN} personality`,
+      `character ${IVEN} past`,
+      `character ${IVEN} notes`,
+      `character ${NOBODY} name`,
+      `character ${NOBODY} who`,
+      `character ${NOBODY} personality`,
+      `character ${NOBODY} past`,
+      `character ${NOBODY} notes`,
+      `side ${MARA} ${IVEN} hides`,
+      `side ${IVEN} ${MARA} sees`,
+      `side ${IVEN} ${MARA} hides`,
+    ]);
+  });
+});
+
+describe('withFieldText', () => {
+  it('changes one field, wherever it is, and leaves the rest', () => {
+    const setup = DraftSetup.parse(page());
+    const titled = withFieldText(setup, { kind: 'title' }, 'Brine');
+    expect(titled?.title).toBe('Brine');
+    const toned = withFieldText(setup, { kind: 'world', field: 'tone' }, 'Wry');
+    expect(toned?.world).toEqual({ ...setup.world, tone: 'Wry' });
+    const named = withFieldText(setup, { kind: 'character', id: NOBODY, field: 'name' }, 'Oswin');
+    expect(named?.cast[1].name).toBe('Oswin');
+    expect(named?.cast[0]).toEqual(setup.cast[0]);
+    const hidden = { kind: 'side', id: IVEN, other: MARA, field: 'hides' } as const;
+    const hiding = withFieldText(setup, hidden, 'The boat.');
+    expect(hiding && fieldText(hiding, hidden)).toBe('The boat.');
+    expect(hiding?.relationships[0].a).toEqual(setup.relationships[0].a);
+    expect(setup.title).toBe('The Salt Queen');
+  });
+
+  it('is null for a field not on the page', () => {
+    const setup = DraftSetup.parse(page());
+    expect(withFieldText(setup, { kind: 'character', id: ANOTHER, field: 'past' }, 'x')).toBeNull();
+    expect(withFieldText(setup, { kind: 'bond', a: IVEN, b: NOBODY }, 'x')).toBeNull();
+  });
+});
+
+describe('fillsFrom', () => {
+  it('reads each fill by its number, keeping the first of two', () => {
+    const answer = '<fill n="1">Wry</fill>\n<fill n=\'2\'>Oswin\nTarrow</fill> <fill n="1">Again</fill>';
+    expect([...fillsFrom(answer)]).toEqual([
+      [1, 'Wry'],
+      [2, 'Oswin\nTarrow'],
+    ]);
+  });
+
+  it('finds nothing in an answer without fills', () => {
+    expect(fillsFrom('Wry and salt-stung').size).toBe(0);
   });
 });
 
@@ -247,6 +311,78 @@ describe('POST /v1/suggestions/field', () => {
     const proxy = await proxyWith([{ status: 400 }]);
     const { app, cookie } = await setUp(catalogOf(proxy));
     const r = await send(app, 'POST', '/v1/suggestions/field', cookie, { setup: page(), field, bookId: null });
+    expect(r.status).toBe(502);
+    expect(r.body.code).toBe('ai_failed');
+  });
+});
+
+describe('POST /v1/suggestions/blanks', () => {
+  it('is closed without a login, and says the AI is offline without a proxy', async () => {
+    const proxy = await proxyWith([{ text: 'Nothing.' }]);
+    const r = await send(writer({}, catalogOf(proxy)), 'POST', '/v1/suggestions/blanks', '', { setup: page(), bookId: null });
+    expect(r.status).toBe(401);
+    const none = await setUp(null);
+    const off = await send(none.app, 'POST', '/v1/suggestions/blanks', none.cookie, { setup: page(), bookId: null });
+    expect(off.status).toBe(503);
+    expect(off.body.code).toBe('ai_offline');
+  });
+
+  it('asks for every blank field, numbered, and answers with what fills each', async () => {
+    const answer = [
+      '<fill n="1">"Wry and salt-stung"</fill>',
+      '<fill n="9">Oswin\nTarrow</fill>',
+      '<fill n="14">He sold her mother’s boat.</fill>',
+      '<fill n="40">Nobody asked for this.</fill>',
+      '<fill n="2"></fill>',
+    ].join('\n');
+    const proxy = await proxyWith([{ text: answer }]);
+    const { app, cookie } = await setUp(catalogOf(proxy));
+    const r = await send(app, 'POST', '/v1/suggestions/blanks', cookie, { setup: page(), bookId: null });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({
+      fields: [
+        { field: { kind: 'world', field: 'tone' }, text: 'Wry and salt-stung' },
+        { field: { kind: 'character', id: NOBODY, field: 'name' }, text: 'Oswin Tarrow' },
+        { field: { kind: 'side', id: MARA, other: IVEN, field: 'hides' }, text: 'He sold her mother’s boat.' },
+      ],
+    });
+
+    const [asked] = proxy.asked;
+    const { system, user } = promptOf(asked);
+    expect(system.startsWith('You are Procreator.')).toBe(true);
+    expect(system).toContain('<fill n="1">');
+    expect(user.startsWith('<book>\nTitle: The Salt Queen')).toBe(true);
+    expect(user).toContain('<blank n="1">\nWhere: The world: tone\nWhat it holds: The tone, in a few words (cosy, grim, funny).\nLength: a few words, on one line\n</blank>');
+    expect(user).toContain("<blank n=\"9\">\nWhere: Unnamed 1's sheet: name");
+    expect(user).toContain('<blank n="14">\nWhere: What Mara hides from Iven\nWhat it holds: Secrets, debts, what Mara would never say to Iven.\nLength: one to three sentences');
+    expect(user).not.toContain('<blank n="17">');
+    expect(user.endsWith('Answer with a fill for each, in order.')).toBe(true);
+    expect(asked.body.generationConfig?.thinkingConfig?.thinkingLevel).toBe('LOW');
+  });
+
+  it('asks nothing when no field is blank', async () => {
+    const proxy = await proxyWith([{ text: 'Nothing.' }]);
+    const { app, cookie } = await setUp(catalogOf(proxy));
+    const full = {
+      ...page(),
+      world: { genre: 'g', tone: 't', setting: 's', rules: 'r', notes: 'n' },
+      protagonist: { id: MARA, name: 'Mara', who: 'w', personality: 'p', past: 'p', notes: 'n' },
+      cast: [],
+      relationships: [],
+    };
+    const r = await send(app, 'POST', '/v1/suggestions/blanks', cookie, { setup: full, bookId: null });
+    expect(r.body).toEqual({ fields: [] });
+    expect(proxy.asked).toHaveLength(0);
+  });
+
+  it('records the call as setup help, and says so when the model doesn’t answer', async () => {
+    const proxy = await proxyWith([{ text: '<fill n="1">Wry</fill>' }, { status: 400 }]);
+    const { app, cookie, userId } = await setUp(catalogOf(proxy));
+    const bookId = await aBook(userId);
+    await send(app, 'POST', '/v1/suggestions/blanks', cookie, { setup: page(), bookId });
+    const mine = await lastCall(userId);
+    expect(mine).toMatchObject({ role: 'setup', bookId, thinking: 'low' });
+    const r = await send(app, 'POST', '/v1/suggestions/blanks', cookie, { setup: page(), bookId });
     expect(r.status).toBe(502);
     expect(r.body.code).toBe('ai_failed');
   });

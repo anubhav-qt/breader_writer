@@ -15,13 +15,14 @@ import {
   type UIEvent,
 } from 'react';
 import type { BookSetup } from '@writer/shared/book';
-import { filledIn, SUGGEST_AFTER, type FieldAsk, type FieldRef } from '@writer/shared/suggestions';
+import { fieldKey, filledIn, SUGGEST_AFTER, type FieldAsk, type FieldRef } from '@writer/shared/suggestions';
 import { suggestFor } from '../../data/suggestions';
 
 /*
- * Procreator's suggestion in the setup field clicked into (step 5): faint text after what's
- * written there, made from everything on the page. Tab or the right arrow key takes it, and so
- * does a tap on it, since a phone has neither key. Typing anything else clears it.
+ * Procreator's faint text in a setup field (step 5), made from everything on the page. A blank
+ * field shows the suggestion made for it with all the others (useBlanks); a field with text in it
+ * gets one for what could come next once it's clicked into. Tab or the right arrow key takes it,
+ * and so does a tap on it, since a phone has neither key. Typing anything else clears it.
  *
  * A field can't colour part of its own text, so the faint text is drawn in a mirror: a copy of
  * the field's box laid over it, with the field's text invisible and the suggestion after it.
@@ -32,10 +33,17 @@ const ASK_AFTER = 400;
 
 type Box = HTMLInputElement | HTMLTextAreaElement;
 
-/** What the setup page tells its fields: the page as it stands, and the book once it's made. */
+/**
+ * What the setup page tells its fields: the page as it stands, the book once it's made, and the
+ * suggestions for its blank fields.
+ */
 export interface SetupHelp {
   setup: BookSetup;
   bookId: string | null;
+  /** The suggestion for each blank field, by fieldKey (useBlanks). */
+  blanks: Map<string, string>;
+  /** Hides a blank field's suggestion until the next ones come. */
+  dismiss: (key: string) => void;
 }
 
 /** Given by the setup page around its fields. A field anywhere else gets no suggestions. */
@@ -102,6 +110,18 @@ function fitted(value: string, text: string): string {
   return text;
 }
 
+/** The suggestion made for a blank field with all the others, as it goes after what's typed, or ''. */
+function blankSuggestion(help: SetupHelp | null, field: FieldRef | undefined, value: string): string {
+  if (!help || !field) {
+    return '';
+  }
+  const text = help.blanks.get(fieldKey(field));
+  if (text === undefined) {
+    return '';
+  }
+  return fitted(value, text);
+}
+
 /** Scrolls the mirror with the field, so the faint text stays right after the field's text. */
 function follow(box: Box, mirror: HTMLDivElement) {
   mirror.scrollTop = box.scrollTop;
@@ -133,9 +153,10 @@ function makeRoom(box: HTMLTextAreaElement, mirror: HTMLDivElement) {
 }
 
 /**
- * Procreator's faint text for a field. It's asked for when the field is clicked into, once the
- * page has enough on it to go on, and shows while the caret is at the end of the field's text.
- * Typing in the field or leaving it clears it. `max` is what the field holds.
+ * Procreator's faint text for a field. A blank field shows its suggestion whether or not it's
+ * being written in. A field with text gets one when it's clicked into, once the page has enough on
+ * it to go on, shown while the caret is at the end of the text; typing in the field or leaving it
+ * clears that one. `max` is what the field holds.
  */
 export function useGhost(field: FieldRef | undefined, value: string, max: number, onChange: (value: string) => void): Ghosting {
   const help = useContext(HelpContext);
@@ -184,8 +205,11 @@ export function useGhost(field: FieldRef | undefined, value: string, max: number
     };
   }, [asking]);
 
+  const blank = value.trim() === '';
   let shown = '';
-  if (ghost && ghost.after === value && atEnd) {
+  if (blank) {
+    shown = blankSuggestion(help, field, value);
+  } else if (ghost && ghost.after === value && atEnd) {
     shown = ghost.text;
   }
 
@@ -242,6 +266,10 @@ export function useGhost(field: FieldRef | undefined, value: string, max: number
       return;
     }
     setGhost(null);
+    // A blank field has its suggestion already, made with the others.
+    if (blank) {
+      return;
+    }
     if (filledIn(help.setup) < SUGGEST_AFTER) {
       return;
     }
@@ -280,7 +308,11 @@ export function useGhost(field: FieldRef | undefined, value: string, max: number
       e.preventDefault();
       // Only the faint text goes: the sheet the field is on stays open.
       e.stopPropagation();
-      stop();
+      if (blank && help && field) {
+        help.dismiss(fieldKey(field));
+      } else {
+        stop();
+      }
     }
   }
 
@@ -293,6 +325,13 @@ export function useGhost(field: FieldRef | undefined, value: string, max: number
       e.preventDefault();
     },
     onClick: () => {
+      // A field nobody is writing in yet shows faint text too: a click or a tap on it puts the
+      // caret there, and takes nothing.
+      const el = box.current;
+      if (el && document.activeElement !== el) {
+        el.focus();
+        return;
+      }
       // On a laptop, Tab and the arrow are right there, and a click near the end of the text
       // shouldn't take a paragraph by accident.
       if (pointer.current === 'mouse') {

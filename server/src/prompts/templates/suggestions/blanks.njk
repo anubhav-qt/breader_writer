@@ -1,0 +1,19 @@
+{#-
+  The ask for the blank fields' suggestions (suggestions/blanks.ts): the page as it stands, which
+  is the long context, so it comes first; then every blank field, numbered; then the ask, last.
+  Takes a SetupView (page) and the blanks (n, where, holds, length).
+-#}
+{% from "partials/setup.njk" import setup %}
+{{ setup(page) }}
+
+<blanks>
+{% for blank in blanks %}
+<blank n="{{ blank.n }}">
+Where: {{ blank.where }}
+What it holds: {{ blank.holds }}
+Length: {{ blank.length }}
+</blank>
+{% endfor %}
+</blanks>
+
+Suggest what could go in each blank field above, so they fit the page and each other. Answer with a fill for each, in order.

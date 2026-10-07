@@ -7,10 +7,10 @@
  */
 
 /** A run of dashes (figure, en, em, the horizontal bar) with the spaces around it. */
-const DASH_RUN = /[ \t]*[‒-―]+[ \t]*/g;
+const DASH_RUN = /[ \t]*[\u2012-\u2015]+[ \t]*/g;
 
 /** What can follow a dash at the end of a stream's words so far: the next words may change it. */
-const OPEN_END = /[ \t‒-―]*$/;
+const OPEN_END = /[ \t\u2012-\u2015]*$/;
 
 /** What opens a quote or an aside, so a dash right after it starts what's said. */
 const OPENERS = new Set(['"', '“', '‘', '(', '[']);

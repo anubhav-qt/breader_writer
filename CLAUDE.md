@@ -201,7 +201,10 @@ every change (see "Running it locally"). See "The code" below for what exists.
   spelled so). A backend file, `breading_ground`, keeps track through code of the entire
   book's state: each scene, each chapter, each character, everything. A change made in any
   place is reported to it, and from there every part that needs to change is told, and makes
-  its own change. What isn't settled yet is in "Open".
+  its own change. It's the one door for changes (the owner's pick, 2026-10-07): nothing writes
+  the story directly. Procreator's tools, the owner's edits and an approved list all ask
+  breading_ground for a change; it writes it through the change log, which keeps it for undo,
+  and then tells every part that depends on it. Built with play (step 6).
 - **Relationships are a graph.** The people are its points and their relationships its lines,
   deep enough for a long story. It replaces setup's one line per person ("how they feel about").
   A line holds a bond and two sides:
@@ -299,11 +302,6 @@ every change (see "Running it locally"). See "The code" below for what exists.
    get it limited.
 4. Whether the story's prose may use em dashes. The no-dash rule covers our own writing, and
    Gemini's prose uses them freely. Asked with the narrator's prompt (step 6).
-5. breading_ground (see "Decided"): when it's built, and how it sits with what's there now:
-   the database as the one source of truth (see "State"), the change log every change already
-   goes through (`server/src/story/changes.ts`), and the owner's changes reaching back
-   (steps 6 and 7). The owner picked building it with play (step 6); a Suggestions list's
-   approval already goes through the server for it (see "Decided").
 
 ### Build order
 

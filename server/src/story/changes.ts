@@ -297,6 +297,15 @@ export async function takeBack(tx: Tx, id: number, tag: Omit<Tag, 'bookId' | 'wh
   return back;
 }
 
+/** The changes made at a turn that still stand, by whom, newest first: what undoing the turn takes back. */
+export async function standingAt(db: Db | Tx, turnId: string, by: Who): Promise<Change[]> {
+  return db
+    .select()
+    .from(changes)
+    .where(and(eq(changes.turnId, turnId), eq(changes.by, by), isNull(changes.takenBackBy)))
+    .orderBy(desc(changes.id));
+}
+
 /** Every version a change kept, in the order it made them, for looking a change over. */
 export async function versionsOf(db: Db | Tx, changeId: number): Promise<Version[]> {
   return db.select().from(versions).where(eq(versions.changeId, changeId)).orderBy(asc(versions.id));

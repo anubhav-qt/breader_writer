@@ -1,3 +1,4 @@
+import { SCENE_WORDS } from '@writer/shared/book';
 import type { Db, Tx } from '../db/client.ts';
 import { render } from '../prompts/render.ts';
 import { castOf } from '../story/cast.ts';
@@ -15,7 +16,8 @@ import { briefView } from '../story/view.ts';
 export async function instructionsFor(db: Db | Tx, bookId: string): Promise<string> {
   const cast = await castOf(db, bookId);
   const protagonist = cast.find((character) => character.role === 'protagonist');
-  return render('procreator/system.njk', { protagonist: protagonist?.name ?? 'the protagonist' });
+  const sceneWords = SCENE_WORDS.toLocaleString('en-US');
+  return render('procreator/system.njk', { protagonist: protagonist?.name ?? 'the protagonist', sceneWords });
 }
 
 /** What a segment of the scene's session opens with: the brief, and the scene so far once there's one. */

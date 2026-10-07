@@ -100,7 +100,7 @@ describe('the brief', () => {
     const brief = await briefOf(second);
     expect(brief.lastScene?.number).toBe(1);
     expect(brief.lastScene?.turns.map((turn) => turn.input)).toEqual(['I untie the boat.', 'I push off.', 'I row.']);
-    expect(brief.lastScene?.turns[2]).toEqual({ number: 4, voice: 'character', input: 'I row.', reply: 'After: I row.' });
+    expect(brief.lastScene?.turns[2]).toEqual({ number: 4, voice: 'character', played: 'Aiko', input: 'I row.', reply: 'After: I row.' });
   });
 
   it('works out where the story stands against its length', async () => {

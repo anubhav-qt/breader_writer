@@ -1,14 +1,14 @@
 import type { AgentTool, AgentToolResult } from '@writer/pi-agent';
 import { Type } from '@writer/pi-ai';
+import { editPage, forget, remember, shiftRelationship, writePage } from '../breading_ground.ts';
 import type { Db } from '../db/client.ts';
 import { log } from '../log.ts';
 import { render } from '../prompts/render.ts';
 import { castByName, namesOf } from '../story/cast.ts';
 import { StoryError, type Writer } from '../story/changes.ts';
-import { forget, remember } from '../story/memory.ts';
 import { unlinked, type Cast } from '../story/mentions.ts';
-import { editPage, findPage, PAGE_KINDS, writePage, type Outcome, type PageKind } from '../story/pages.ts';
-import { shiftOnce, type SideShift } from '../story/relationships.ts';
+import { findPage, PAGE_KINDS, type Outcome, type PageKind } from '../story/pages.ts';
+import type { SideShift } from '../story/relationships.ts';
 import type { Scene } from '../story/scenes.ts';
 import { searchStory, type Recall } from '../story/search.ts';
 import { characterView, pageView } from '../story/view.ts';
@@ -17,21 +17,29 @@ import { characterView, pageView } from '../story/view.ts';
  * Procreator's memory tools: the reference (read_page, write_page, edit_page), recall (search),
  * its memory (remember, forget) and the relationship graph (shift_relationship). Each does one
  * thing, and pi checks its arguments against its schema before it runs. A write is one change,
- * tagged with the turn it's made at, so an undo takes it back with the turn. Results are short and
- * say what changed; a call the story turns down comes back saying how to put it right.
+ * through breading_ground, tagged with the turn it's made at, so an undo takes it back with the
+ * turn. Results are short and say what changed; a call the story turns down comes back saying how
+ * to put it right.
  *
  * Their names, descriptions and schemas are part of every call's instructions, so they stay the
  * same from call to call, or the cache misses.
  */
 
-/** Where the tools work: the scene's session, at a turn. */
+/**
+ * What a run is for, which says what its tools may do: play the story, fold it (a wrap-up or a
+ * compaction), or offer the owner openings or moves to pick from, which saves nothing.
+ */
+export type Mode = 'play' | 'fold' | 'openings' | 'hints';
+
+/** Where the tools work: the scene's session, at a turn, for one kind of run. */
 export interface ToolContext {
   db: Db;
   scene: Scene;
   turnId: string | null;
+  mode: Mode;
 }
 
-type Result = AgentToolResult<Record<string, never>>;
+export type Result = AgentToolResult<Record<string, never>>;
 
 const FAILED = "That failed on the writer's side, not because of the call. Carry on without it, and try again later if it still matters.";
 
@@ -39,7 +47,7 @@ const FAILED = "That failed on the writer's side, not because of the call. Carry
  * Runs a tool's work. The story's own refusals reach the model as they are, since they say how to
  * put the call right; anything else is the writer's fault, so it's logged and kept from the model.
  */
-async function guarded(tool: string, work: () => Promise<string>): Promise<Result> {
+export async function guarded(tool: string, work: () => Promise<string>): Promise<Result> {
   try {
     const text = await work();
     return { content: [{ type: 'text', text }], details: {} };
@@ -52,8 +60,18 @@ async function guarded(tool: string, work: () => Promise<string>): Promise<Resul
   }
 }
 
-function writerOf(context: ToolContext): Writer {
+export function writerOf(context: ToolContext): Writer {
   return { bookId: context.scene.bookId, turnId: context.turnId, by: 'agent' };
+}
+
+/** Nothing is saved while Procreator offers the owner openings or moves: the offer is all it makes. */
+function mustSave(context: ToolContext) {
+  if (context.mode === 'openings') {
+    throw new StoryError('Nothing is saved while you offer openings. Call offer_openings instead.');
+  }
+  if (context.mode === 'hints') {
+    throw new StoryError('Nothing is saved while you offer moves. Call offer_moves instead.');
+  }
 }
 
 /** Says what a write did to a page. */
@@ -121,6 +139,7 @@ function writePageTool(context: ToolContext): AgentTool<typeof WritePage> {
     parameters: WritePage,
     execute: (_id, params) =>
       guarded('write_page', async () => {
+        mustSave(context);
         const write = { title: params.title, kind: params.kind, about: params.about, body: params.body };
         const written = await context.db.transaction((tx) => writePage(tx, writerOf(context), write));
         return pageOutcome(params.title.trim(), written.outcome);
@@ -145,6 +164,7 @@ function editPageTool(context: ToolContext): AgentTool<typeof EditPage> {
     parameters: EditPage,
     execute: (_id, params) =>
       guarded('edit_page', async () => {
+        mustSave(context);
         const change = { title: params.title, find: params.find, replace: params.replace };
         const written = await context.db.transaction((tx) => editPage(tx, writerOf(context), change));
         return pageOutcome(params.title.trim(), written.outcome);
@@ -212,6 +232,7 @@ function rememberTool(context: ToolContext): AgentTool<typeof Remember> {
     parameters: Remember,
     execute: (_id, params) =>
       guarded('remember', async () => {
+        mustSave(context);
         const kept = await context.db.transaction((tx) => remember(tx, writerOf(context), params.note));
         if (!kept.made) {
           return `That's note ${kept.note.id} already, so nothing changed.`;
@@ -233,6 +254,7 @@ function forgetTool(context: ToolContext): AgentTool<typeof Forget> {
     parameters: Forget,
     execute: (_id, params) =>
       guarded('forget', async () => {
+        mustSave(context);
         await context.db.transaction((tx) => forget(tx, writerOf(context), params.note));
         return `Forgot note ${params.note}.`;
       }),
@@ -259,7 +281,7 @@ const Shift = Type.Object({
 });
 
 /** The id of the one person in the cast with this name, written plainly or as a link. */
-function personNamed(cast: Cast, name: string): string {
+export function personNamed(cast: Cast, name: string): string {
   const bare = name.replace(/^\s*\[\[/, '').replace(/\]\]\s*$/, '').trim();
   const ids = cast.idsOf(bare);
   if (ids.length === 0) {
@@ -296,6 +318,7 @@ function shiftRelationshipTool(context: ToolContext): AgentTool<typeof Shift> {
     parameters: Shift,
     execute: (_id, params) =>
       guarded('shift_relationship', async () => {
+        mustSave(context);
         const done = await context.db.transaction(async (tx) => {
           const cast = await castByName(tx, context.scene.bookId);
           const one = personNamed(cast, params.between[0]);
@@ -305,7 +328,7 @@ function shiftRelationshipTool(context: ToolContext): AgentTool<typeof Shift> {
             sides.push({ id: personNamed(cast, side.who), sees: side.sees, hides: side.hides });
           }
           const what = unlinked(params.what, cast);
-          return shiftOnce(tx, writerOf(context), context.scene.id, { one, other, bond: params.bond, sides, what });
+          return shiftRelationship(tx, writerOf(context), context.scene.id, { one, other, bond: params.bond, sides, what });
         });
         if (!done) {
           return 'That is in their history already, so nothing changed.';

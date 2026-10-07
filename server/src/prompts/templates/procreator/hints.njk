@@ -1,0 +1,11 @@
+{#-
+  The ask for hints, sent at the end of a scene's session and never sent again (play/play.ts).
+  Procreator offers three moves the owner could make next; the owner picks one to change or send.
+  The task comes last, after the session. Takes who the owner plays and whether they've made a
+  move yet in the scene.
+-#}
+<hints>
+The owner asks for help with {{ who }}'s next move. Offer three moves {{ who }} could make now, each a sentence or two of what they do or say, written the way the owner writes their moves{% if not moved %} (in the first person, present tense: "I ask her where she was that night"){% endif %}. Make them true to {{ who }} and to the scene, and different in kind: say, one bold, one careful, and one the owner might not think of.
+
+Call offer_moves with the three, and write nothing else.
+</hints>

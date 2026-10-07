@@ -17,9 +17,10 @@ import type { Scene } from './scenes.ts';
 
 /**
  * play: the story. note: the owner telling Procreator of a change mid scene. fold: a compaction or
- * a wrap-up at work, kept for the record and never sent again.
+ * a wrap-up at work. aside: hints or openings the owner asked for. Folds and asides are kept for
+ * the record and never sent again.
  */
-export type MessageKind = 'play' | 'note' | 'fold';
+export type MessageKind = 'play' | 'note' | 'fold' | 'aside';
 
 export type Segment = typeof sessionSegments.$inferSelect;
 export type SessionMessage = typeof sessionMessages.$inferSelect;

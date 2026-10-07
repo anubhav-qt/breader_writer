@@ -64,6 +64,13 @@
       "when": 1791348087262,
       "tag": "0008_setup_chats",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791354809480,
+      "tag": "0009_play",
+      "breakpoints": true
     }
   ]
 }

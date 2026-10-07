@@ -78,14 +78,27 @@ async function sceneNow(scene: Scene): Promise<Scene> {
   return now;
 }
 
-const TOOLS = ['read_page', 'write_page', 'edit_page', 'search', 'remember', 'forget', 'shift_relationship'];
+const TOOLS = [
+  'read_page',
+  'write_page',
+  'edit_page',
+  'search',
+  'remember',
+  'forget',
+  'shift_relationship',
+  'set_scene',
+  'join_cast',
+  'end_scene',
+  'offer_openings',
+  'offer_moves',
+];
 
 describe('a scene’s session', () => {
   it('opens with the brief, and keeps every message and call as it comes back', async () => {
     const { userId, scene } = await aScene();
     const { proxy, ai } = await procreatorWith([{ text: 'Ren waves back.' }], userId);
     const { turn, answer } = await play(ai, scene, 'I wave at Ren.');
-    expect(answer).toEqual({ text: 'Ren waves back.', stopReason: 'stop' });
+    expect(answer).toMatchObject({ text: 'Ren waves back.', words: 'Ren waves back.', stopReason: 'stop' });
 
     const [asked] = proxy.asked;
     expect(promptOf(asked).system.startsWith('You are Procreator.')).toBe(true);

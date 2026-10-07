@@ -9,7 +9,8 @@
     "./protocol": "./src/protocol.ts",
     "./setup": "./src/setup.ts",
     "./suggestions": "./src/suggestions.ts",
-    "./chat": "./src/chat.ts"
+    "./chat": "./src/chat.ts",
+    "./play": "./src/play.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

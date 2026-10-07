@@ -1,14 +1,20 @@
 {#-
-  Turns, word for word: the owner's move or author note, and the reply. An author note is the
-  owner speaking as the author: the story follows it and never says it.
+  Turns, word for word: the owner's move, an author note or a scene's opening, and the reply. An
+  author note is the owner speaking as the author: the story follows it and never says it.
 -#}
-{% macro turns(list, protagonist) %}
+{% macro turns(list) %}
 {% for turn in list %}
 <turn number="{{ turn.number }}">
 {% if turn.voice == 'author' %}
 <author_note>{{ turn.input }}</author_note>
+{% elif turn.voice == 'opening' %}
+{% if turn.input %}
+<scene_opens>The owner's pick of how the story opens: {{ turn.input }}</scene_opens>
 {% else %}
-<move by="{{ protagonist }}">{{ turn.input }}</move>
+<scene_opens/>
+{% endif %}
+{% else %}
+<move by="{{ turn.played }}">{{ turn.input }}</move>
 {% endif %}
 {% if turn.reply %}
 <reply>{{ turn.reply }}</reply>

@@ -1,11 +1,14 @@
-import { and, asc, eq, gt, max } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, max } from 'drizzle-orm';
 import type { Db, Tx } from '../db/client.ts';
 import { scenes, turns } from '../db/schema.ts';
 import { edit, make, StoryError, type Change } from './changes.ts';
 
 /*
  * Scenes and their turns. A book plays one scene at a time; when the place or time shifts, the
- * scene ends, folds into its summary (story/fold.ts) and is written into the book.
+ * scene ends, folds into its summary (procreator/folds.ts) and is written into the book. The scene
+ * after it is made as it ends, and waits as next until the owner goes on to it.
+ *
+ * Nothing outside the story's own modules calls these: breading_ground is the door to them.
  *
  * Turns are the story's raw history, word for word: a turn is what changes are tagged with, so
  * making one isn't a change. Rewriting one is (a reply asked for again, a rename reaching back),
@@ -15,8 +18,11 @@ import { edit, make, StoryError, type Change } from './changes.ts';
 export type Scene = typeof scenes.$inferSelect;
 export type Turn = typeof turns.$inferSelect;
 
-/** As the protagonist, or as the author: a note the story follows and never says. */
-export type Voice = 'character' | 'author';
+/**
+ * As someone in the cast, as the author (a note the story follows and never says), or Procreator
+ * opening the scene.
+ */
+export type Voice = 'character' | 'author' | 'opening';
 
 /** Where a scene opens and who is in it. */
 export interface Opening {
@@ -62,12 +68,92 @@ export async function startScene(tx: Tx, change: Change, opening: Opening): Prom
   });
 }
 
-/** Ends the scene being played. Folding it comes after (story/fold.ts). */
+/** The scene waiting for the owner to go on to it, or null. */
+export async function nextScene(db: Db | Tx, bookId: string): Promise<Scene | null> {
+  const [scene] = await db
+    .select()
+    .from(scenes)
+    .where(and(eq(scenes.bookId, bookId), eq(scenes.status, 'next')));
+  if (!scene) {
+    return null;
+  }
+  return scene;
+}
+
+/** A scene as it stands now. */
+export async function sceneNow(db: Db | Tx, id: string): Promise<Scene> {
+  const [scene] = await db.select().from(scenes).where(eq(scenes.id, id));
+  if (!scene) {
+    throw new StoryError("That scene isn't in the story.");
+  }
+  return scene;
+}
+
+/** A scene as it stands now, held until the transaction ends, so no one else changes it meanwhile. */
+export async function lockedScene(tx: Tx, id: string): Promise<Scene> {
+  const [scene] = await tx.select().from(scenes).where(eq(scenes.id, id)).for('update');
+  if (!scene) {
+    throw new StoryError("That scene isn't in the story.");
+  }
+  return scene;
+}
+
+/** Makes the book's next scene, waiting for the owner to go on to it. */
+export async function prepareScene(tx: Tx, change: Change, opening: Opening): Promise<Scene> {
+  const waiting = await nextScene(tx, change.bookId);
+  if (waiting) {
+    throw new StoryError(`Scene ${waiting.number} is waiting to begin already.`);
+  }
+  const number = (await lastSceneNumber(tx, change.bookId)) + 1;
+  return make(tx, change, scenes, {
+    bookId: change.bookId,
+    number,
+    place: opening.place,
+    time: opening.time,
+    present: opening.present,
+    status: 'next',
+  });
+}
+
+/** The scene waiting as next begins: it's the one being played. */
+export async function beginScene(tx: Tx, change: Change, scene: Scene): Promise<Scene> {
+  if (scene.status !== 'next') {
+    throw new StoryError(`Scene ${scene.number} isn't waiting to begin.`);
+  }
+  const playing = await playingScene(tx, change.bookId);
+  if (playing) {
+    throw new StoryError(`Scene ${playing.number} is still playing. End it first.`);
+  }
+  return edit(tx, change, scenes, { id: scene.id }, { status: 'playing' });
+}
+
+/** Changes where and when a scene is, who is in it, or the openings offered for it. */
+export async function reframeScene(
+  tx: Tx,
+  change: Change,
+  scene: Scene,
+  set: Partial<Pick<Scene, 'place' | 'time' | 'present' | 'openings'>>,
+): Promise<Scene> {
+  if (scene.status === 'ended') {
+    throw new StoryError(`Scene ${scene.number} has ended.`);
+  }
+  return edit(tx, change, scenes, { id: scene.id }, set);
+}
+
+/** Ends the scene being played. Folding it comes after (procreator/folds.ts). */
 export async function endScene(tx: Tx, change: Change, scene: Scene): Promise<Scene> {
   if (scene.status !== 'playing') {
     throw new StoryError(`Scene ${scene.number} has already ended.`);
   }
   return edit(tx, change, scenes, { id: scene.id }, { status: 'ended' });
+}
+
+/** Keeps an ended scene's summary. */
+export async function summarize(tx: Tx, change: Change, scene: Scene, summary: string): Promise<Scene> {
+  if (scene.status !== 'ended') {
+    throw new StoryError(`Scene ${scene.number} is still playing. End it before it's summed up.`);
+  }
+  return edit(tx, change, scenes, { id: scene.id }, { summary });
 }
 
 async function lastTurnNumber(db: Db | Tx, bookId: string): Promise<number> {
@@ -78,13 +164,33 @@ async function lastTurnNumber(db: Db | Tx, bookId: string): Promise<number> {
   return row?.last ?? 0;
 }
 
-/** The owner's move, as a new turn in the scene being played. */
-export async function addTurn(db: Db | Tx, scene: Scene, voice: Voice, input: string): Promise<Turn> {
+/** The owner's move, as a new turn in the scene being played. `played` is who they played, for a character's move. */
+export async function addTurn(db: Db | Tx, scene: Scene, voice: Voice, input: string, played: string | null = null): Promise<Turn> {
   if (scene.status !== 'playing') {
-    throw new StoryError(`Scene ${scene.number} has ended, so it takes no more turns.`);
+    throw new StoryError(`Scene ${scene.number} isn't being played, so it takes no turns.`);
   }
   const number = (await lastTurnNumber(db, scene.bookId)) + 1;
-  const [turn] = await db.insert(turns).values({ bookId: scene.bookId, sceneId: scene.id, number, voice, input }).returning();
+  const [turn] = await db.insert(turns).values({ bookId: scene.bookId, sceneId: scene.id, number, voice, played, input }).returning();
+  return turn;
+}
+
+/** Marks a turn taken back. It's kept, and left out of the story. */
+export async function markUndone(db: Db | Tx, turn: Turn): Promise<Turn> {
+  const [undone] = await db.update(turns).set({ undone: true }).where(eq(turns.id, turn.id)).returning();
+  return undone;
+}
+
+/** A scene's newest turn that still stands, or null. */
+export async function newestTurn(db: Db | Tx, sceneId: string): Promise<Turn | null> {
+  const [turn] = await db
+    .select()
+    .from(turns)
+    .where(and(eq(turns.sceneId, sceneId), eq(turns.undone, false)))
+    .orderBy(desc(turns.number))
+    .limit(1);
+  if (!turn) {
+    return null;
+  }
   return turn;
 }
 

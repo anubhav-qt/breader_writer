@@ -1,8 +1,9 @@
 import { estimateMessageTokens, type Api, type Model } from '@writer/pi-ai';
 import { and, asc, eq } from 'drizzle-orm';
+import { summarize } from '../breading_ground.ts';
 import { scenes } from '../db/schema.ts';
 import { render } from '../prompts/render.ts';
-import { edit, startChange, StoryError } from '../story/changes.ts';
+import { StoryError } from '../story/changes.ts';
 import { lastTurns } from '../story/read.ts';
 import type { Scene } from '../story/scenes.ts';
 import { currentSegment, segmentMessages, startSegment, type Numbered, type Segment } from '../story/session.ts';
@@ -170,7 +171,7 @@ export async function compact(ai: Procreator, scene: Scene, segment: Segment, tu
     return null;
   }
   const text = render('procreator/compact.njk', prompt);
-  const answer = await exchange(ai, scene, segment, { text, kind: 'fold', role: 'fold', turnId });
+  const answer = await exchange(ai, scene, segment, { text, kind: 'fold', role: 'fold', turnId, mode: 'fold' });
   const summary = summaryFrom(answer, 'scene so far');
   const head = await headFor(ai.db, scene, summary);
   return startSegment(ai.db, scene, { head, summary, fromSeq: cut.fromSeq, turnId });
@@ -199,17 +200,9 @@ export async function wrapUp(ai: Procreator, scene: Scene): Promise<Scene> {
     segment = await startSegment(ai.db, scene, { head, summary: '', fromSeq: 1, turnId: null });
   }
   const text = render('procreator/wrap.njk', { scene: scene.number });
-  const answer = await exchange(ai, scene, segment, { text, kind: 'fold', role: 'fold', turnId });
+  const answer = await exchange(ai, scene, segment, { text, kind: 'fold', role: 'fold', turnId, mode: 'fold' });
   const summary = summaryFrom(answer, `summary of scene ${scene.number}`);
-
-  return ai.db.transaction(async (tx) => {
-    const [current] = await tx.select().from(scenes).where(eq(scenes.id, scene.id)).for('update');
-    if (current.summary) {
-      return current;
-    }
-    const change = await startChange(tx, { bookId: scene.bookId, turnId, by: 'agent', what: `Wrapped up scene ${scene.number}` });
-    return edit(tx, change, scenes, { id: scene.id }, { summary });
-  });
+  return ai.db.transaction((tx) => summarize(tx, { bookId: scene.bookId, turnId, by: 'agent' }, scene, summary));
 }
 
 /** Wraps up the book's ended scenes still waiting for it, oldest first, as when a wrap-up failed. */

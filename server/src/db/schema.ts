@@ -160,14 +160,20 @@ export const scenes = writer.table(
     time: text('time').notNull().default(''),
     /** Who is in it, by character id. */
     present: uuid('present').array().notNull().default(sql`'{}'::uuid[]`),
-    /** playing, then ended. */
+    /**
+     * next (made, and waiting for the owner to go on to it), playing, then ended. The scene after
+     * one that ends waits as next, so the owner can still take back the move that ended it.
+     */
     status: text('status').notNull().default('playing'),
     /** What happened, written by its wrap-up once it has ended. Every later brief holds it. */
     summary: text('summary').notNull().default(''),
+    /** The first scene's: the openings Procreator offered the owner, each with where, when and who (Offer). */
+    openings: jsonb('openings'),
   },
   (t) => [
     uniqueIndex('scenes_book_number').on(t.bookId, t.number),
     uniqueIndex('scenes_one_playing').on(t.bookId).where(sql`status = 'playing'`),
+    uniqueIndex('scenes_one_next').on(t.bookId).where(sql`status = 'next'`),
   ],
 );
 
@@ -182,8 +188,13 @@ export const turns = writer.table(
       .references(() => scenes.id),
     /** 1, 2, 3 and on, in the book. An undone turn keeps its number. */
     number: integer('number').notNull(),
-    /** character (as the protagonist) or author (a note the story follows and never says). */
+    /**
+     * character (a move as someone in the cast), author (a note the story follows and never says)
+     * or opening (Procreator opening the scene, with the owner's pick of how in the first).
+     */
     voice: text('voice').notNull(),
+    /** For a character's move, who the owner played: the protagonist, or someone else in the cast. */
+    played: uuid('played'),
     /** The owner's words. */
     input: text('input').notNull(),
     /** The narrator's words. */
@@ -347,8 +358,9 @@ export const sessionMessages = writer.table(
     /** The turn it belongs to. */
     turnId: uuid('turn_id').references(() => turns.id),
     /**
-     * play (the story), note (the owner telling Procreator of a change mid scene) or fold (a
-     * compaction or wrap-up at work, never sent again).
+     * play (the story), note (the owner telling Procreator of a change mid scene), fold (a
+     * compaction or wrap-up at work) or aside (hints and openings asked for). Folds and asides are
+     * never sent again.
      */
     kind: text('kind').notNull(),
     /** pi's message: a user's, Procreator's (assistant) or a tool's result. */
@@ -370,7 +382,7 @@ export const calls = writer.table(
     bookId: uuid('book_id').references(() => books.id, { onDelete: 'cascade' }),
     sceneId: uuid('scene_id').references(() => scenes.id),
     turnId: uuid('turn_id').references(() => turns.id),
-    /** narrator, author, hints, fold or setup. */
+    /** narrator, author, hints, openings, fold or setup. */
     role: text('role').notNull(),
     model: text('model').notNull(),
     thinking: text('thinking').notNull(),

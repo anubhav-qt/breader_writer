@@ -40,9 +40,13 @@ shows it at once (see "Notes for step 5"). It was checked in the desktop app's b
 stand-in API; the field by field version was tried against the real model, the blank fields
 all at once not yet. The Suggestions chat is built: its server, tried against the real model
 (2026-10-07), and its panel on the setup page, which hasn't been checked in a browser yet (the
-session that built it had none). Step 5 is done once it has been. The owner has a real book
-set up locally that they mean to play through before production, so its data must survive
-every change (see "Running it locally"). See "The code" below for what exists.
+session that built it had none). Step 5 is done once it has been. Step 6 (play) is under way
+(see "Notes for step 6"): breading_ground is the one door for story changes, and play's server
+is built (the openings, moves narrated as they're written, scenes ending and going on, undo,
+another reply, hints, someone joining the cast), with its tests against a stand-in proxy. It
+hasn't been tried against the real model yet. The actors and the play page are next. The owner
+has a real book set up locally that they mean to play through before production, so its data
+must survive every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
 
@@ -376,11 +380,10 @@ through them all in one local test once everything is built (see "Status").
   now on?".
 - A relationship's history goes into the brief whole for the people in the scene.
 - Folds run on the account's own model and thinking level, as play does.
-- Nothing calls the sessions yet. Play (step 6) sends the owner's moves through `converse`, ends
-  scenes and then calls `wrapUp`, tells Procreator of the owner's mid scene changes with
-  `addNote`, and undoes turns with `cutSession` and `takeBack` of the turns' changes. How a move,
-  an author note and a note are written in the session is play's to decide; until then a message
-  is its text.
+- Play (step 6) sends the owner's moves through `converse`, wraps an ended scene up as the next
+  one's session opens, and undoes turns through breading_ground (`takeBackTurn`: `takeBack` of
+  the turn's changes and `cutSession`). It will tell Procreator of the owner's mid scene
+  changes with `addNote`. How each turn is written in the session is in "Notes for step 6".
 - A session's instructions and tools must be the same for every call in it, folds included, or
   the provider's cache misses. Play's tools join the memory tools for every run, not only for
   play's own.
@@ -562,6 +565,45 @@ through them all in one local test once everything is built (see "Status").
 - A new book's chat id is kept in its draft (`chatId`), so a chat started on a blank page keeps
   the draft, and Clear ends the chat too.
 
+### Notes for step 6
+
+- breading_ground (`server/src/breading_ground.ts`) is the one door for changes to the story:
+  every write of the story's modules (`story/`) is called from it alone, which
+  `test/door.test.ts` checks by reading every file's imports. It writes through the change log,
+  and then tells what depends on the change: so far, a turn taken back cuts the scene's session
+  back to before it. Whatever Procreator writes comes through it without dashes.
+- The first scene is made when the owner first opens the play, waiting (`next`) with everyone in
+  it, and its session opens there and then to ask for three openings (an aside, never sent
+  again). The opening's call starts the same way, so the cache holds the brief. A pick sets
+  where and when the scene opens and who is in it; with the owner's own opening, Procreator sets
+  them (`set_scene`). The openings stay with the scene, so taking the opening back shows them
+  again.
+- A turn is a move (`character`, with who the owner played in `played`), an author note, or a
+  scene's opening (`opening`: the first scene's has the owner's pick in it, a later one's is
+  empty). Each is sent as `procreator/turn.njk` lays it out.
+- The narration is everything Procreator writes in the run, reply after reply, streamed as it
+  comes and kept as the turn's reply. Its instructions ask it to narrate first and save after,
+  so the words start sooner, and for 150 to 400 words a turn in the past tense (our calls,
+  2026-10-07; the owner can change them). A turn it can't narrate (no answer, or no words) is
+  taken back whole, as if it was never made, and the stream says why.
+- Ending a scene (`end_scene`) makes the next one at once, waiting as `next` with where and when
+  it opens and who is in it, so undoing the move that ended it takes it away again. Going on
+  begins it; its session opens with the scene before wrapped up first, then Procreator opens it.
+  A later scene's opening can't be taken back, only written again ("Another reply"). If the
+  wrap-up or the opening fails, the scene stays begun with no turns, and going on again opens it.
+- Undo takes back what Procreator changed at the newest turn, and leaves what the owner changed.
+  "Another reply" is an undo and the same move sent again: the session goes as if the first
+  reply never happened.
+- Hints are an aside in the scene's session, on the protagonist: `offer_moves` with three moves,
+  and the memory tools turn writes away meanwhile. The openings are asked the same way.
+- The quiet lines after a turn are read from the change log: the characters and the
+  relationship history Procreator made at the turn, while they stand.
+- The play tools (`set_scene`, `join_cast`, `end_scene`, `offer_openings`, `offer_moves`) are in
+  every call beside the memory tools, the same each time, and each turns a call down outside its
+  time. Someone who joins the cast gets a sheet Procreator writes (the owner can change it) and
+  is in the scene; the cast holds 40 besides the protagonist, as setup's does.
+- One exchange at a time in a book (held in memory, so one server), as in the Suggestions chat.
+
 ### Later versions
 
 - Send a book straight to the breader library (v1 is an EPUB download).
@@ -612,6 +654,10 @@ their code, changed where we need, not rewritten to ours.
   (`blankFields`), what's in a field (`fieldText`), changing it (`withFieldText`) and how much
   it holds (`fieldLimit`), the asks and the answers (`FieldAsk`, `FieldSuggestion`, `BlanksAsk`,
   `BlankSuggestions`), and when suggestions start (`filledIn`, against `SUGGEST_AFTER`).
+- `src/play.ts`: play (step 6). A turn as the page shows it (`PlayTurn`: its voice, who the
+  owner played, their words, the reply, and the quiet lines after it, `Mark`), where the play
+  stands (`Stage`) and the play itself (`Play`), the asks (`MoveAsk`, `OpenAsk`), what undo and
+  hints answer (`Undone`, `Hints`), and the streamed events (`PlayEvent`).
 - `src/chat.ts`: the Suggestions chat. A change exactly as it will land (`SetupChange`: a field's
   whole new text, one of the book's choices, someone new, someone removed, two untied) and making
   it (`applyChange`, which ties two first for a line's field, and is null when it doesn't fit),
@@ -754,8 +800,10 @@ A Hono API, port 8790, built like breader's server.
     a new change of its own. A change that a later one built on waits until the later one is
     taken back, so nothing is quietly lost; a change and its take-back cancel out, and a
     take-back isn't taken back itself. Undo takes back the newest first.
-  - `scenes.ts`: starting and ending scenes, and turns. Turns are raw history: making one isn't
-    a change (changes are tagged with turns), but rewriting one is.
+  - `scenes.ts`: scenes (made waiting as `next`, begun, set, ended, summed up) and turns. Turns
+    are raw history: making one isn't a change (changes are tagged with turns), but rewriting
+    one is. `cast.ts` brings someone new into the cast (`joinCast`).
+  - Only breading_ground calls the writes in `story/` (see "Notes for step 6").
   - `mentions.ts`: in the structured text (pages, notes, relationship history) a person is
     `<@id>`, and named when it's shown. Procreator writes a person as a link, `[[Name]]`
     (`unlinked` keeps it as a mention, and turns away a name no one or more than one in the cast
@@ -779,7 +827,8 @@ A Hono API, port 8790, built like breader's server.
     can be reached without a common name pouring hundreds into the session.
   - `session.ts`: a scene's session as it's kept: segments (`startSegment`, `currentSegment`),
     each a head and the messages from its `fromSeq` on, and messages (`addMessage`) of kind
-    `play`, `note` or `fold`; a segment sends its standing play and notes (`segmentMessages`).
+    `play`, `note`, `fold` or `aside`; a segment sends its standing play and notes
+    (`segmentMessages`).
     `cutSession` is undo's side: the messages and segments of the turns from one on are marked
     undone, kept. The segment a session opens with is made at no turn, so it's never cut.
   - `read.ts` reads everything a book's story knows in one go (`readStory`), and `view.ts`
@@ -795,14 +844,20 @@ A Hono API, port 8790, built like breader's server.
     and after a compaction the scene so far).
   - `tools.ts`: the memory tools (`read_page`, `write_page`, `edit_page`, `search`,
     `remember`, `forget`, `shift_relationship`), typebox schemas checked by pi before they run.
-    Each write is one change, by the agent, at the run's turn. The story's refusals reach the
-    model as they are; any other failure is logged and the model is told it's the writer's.
+    Each write is one change, by the agent, at the run's turn, through breading_ground, and
+    none is made while Procreator offers openings or moves (a run's `Mode`). The story's
+    refusals reach the model as they are; any other failure is logged and the model is told
+    it's the writer's.
+  - `play.ts`: the play tools (`set_scene`, `join_cast`, `end_scene`, `offer_openings`,
+    `offer_moves`), and what they did in a run (`Outcome`). `toolsFor` is every tool of a run.
   - `run.ts`: one exchange (`exchange`): the session sent as it stands (instructions and tool
     declarations, the head, the segment's messages) plus one message, through pi's agent loop,
     tools run one at a time, with no cap on calls or time (a stuck run is stopped by hand,
     through its signal). Every message is kept as it ends and every call
     recorded, so the next call sends exactly this one's start and the cache holds. It asks for
-    the long cache, under the scene's id (see the caching note in "Notes for step 3").
+    the long cache, under the scene's id (see the caching note in "Notes for step 3"). Its
+    answer has the last reply's words (a fold's summary) and all the run's words without dashes
+    (a turn's narration), passed on as they stream.
     `sessionTokens` is pi's estimate: the tokens the model last said it read, plus what came
     after.
   - `folds.ts`: our compaction. `compactAt` is 400k, or the window less the longest answer when
@@ -816,7 +871,12 @@ A Hono API, port 8790, built like breader's server.
     its messages are kind `fold`, never sent again.
   - `converse.ts`: the way in for play (`converse`): opens the session if it hasn't been (with
     earlier scenes wrapped up first), compacts it if it's past its limit (and goes on as it was
-    if that fails), then sends the move. `addNote` adds the owner's mid scene change as a note.
+    if that fails), then sends the move, or an aside (hints). `askForOpenings` asks in the first
+    scene's session before it begins. `addNote` adds the owner's mid scene change as a note.
+- `src/breading_ground.ts`: the one door for changes to the story (see "Notes for step 6").
+- `src/play/`: play. `play.ts` is its flows (`askOpenings`, `openStory`, `makeMove`, `goOn`,
+  `undo`, `another`, `hintsFor`, and `alone`, one exchange at a time in a book), and `view.ts`
+  the play as the page shows it (`playView`).
 - `src/suggestions/`: setup help. `view.ts` lays out the page as it stands (`setupView`:
   everyone by name, the nameless numbered, two of one name told apart, `refsOf`) and the field
   asked about (`fieldView`: where it is, what's in it, how much it holds, and `lengthFor`, how
@@ -838,11 +898,13 @@ A Hono API, port 8790, built like breader's server.
   call that comes back with no answer is a `ModelError`.
 - `src/prompts/`: the prompts, as Nunjucks templates in `templates/` (`render.ts`). A template
   takes a typed object and only lays it out; a missing value fails the render.
-  `procreator/system.njk` is Procreator's instructions; `procreator/head.njk` the brief, in XML
-  tags, with the scene so far after a compaction; `procreator/read.njk` a page as `read_page`
-  gives it (`partials/page.njk`); `partials/scene.njk` turns word for word (an author note is
-  marked as one); `procreator/compact.njk` and `procreator/wrap.njk` the folds' requests, which
-  come last, after the session. `suggestions/field-system.njk` and `suggestions/field.njk` are a
+  `procreator/system.njk` is Procreator's instructions (play, narration, scenes, memory);
+  `procreator/head.njk` the brief, in XML tags, with the scene so far after a compaction;
+  `procreator/read.njk` a page as `read_page` gives it (`partials/page.njk`);
+  `partials/scene.njk` turns word for word (an author note and an opening marked as such);
+  `procreator/turn.njk` a turn as it's sent; `procreator/openings.njk` and
+  `procreator/hints.njk` the asks for openings and moves; `procreator/compact.njk` and
+  `procreator/wrap.njk` the folds' requests. The asks come last, after the session. `suggestions/field-system.njk` and `suggestions/field.njk` are a
   field's suggestion: the instructions with examples, then the page (`partials/setup.njk`) and
   the field last. `suggestions/blanks-system.njk` and `suggestions/blanks.njk` are the blank
   fields' suggestions: the instructions with an example, then the page and the numbered blanks
@@ -878,7 +940,15 @@ A Hono API, port 8790, built like breader's server.
   the chat given, else the book's, else a new one; streamed, see "Notes for step 5"), and
   `POST /v1/suggestions/chats/:id/redo` and `/approve` (the chat, and the changes for the page
   to land). Another account's chat is a 404, and a list that isn't open any more (or a redo
-  Procreator didn't make) a 409.
+  Procreator didn't make) a 409. Play, `open` only: `GET /v1/books/:id/play` (the play as the
+  page shows it), `POST .../play/openings` (asks for the first scene's openings, once),
+  `.../play/open` (the owner's pick or their own opening), `.../play/move` (a move or an author
+  note), `.../play/next` (on to the next scene) and `.../play/again` (another reply), each
+  streamed: the scene's heading when it's set, `finishing` while the scene before is wrapped
+  up, Procreator's words, then the play, or why it couldn't go on (with the play as it stands).
+  `.../play/undo` gives the play and the owner's words back, and `.../play/hints` three moves.
+  What play can't do as the story stands is a 409. `routes/ai.ts` is the model an account's
+  calls run on, and the 503 and 502 every route that calls Procreator gives.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
@@ -909,8 +979,12 @@ A Hono API, port 8790, built like breader's server.
   asked of its cache, tools, notes, undo), compaction and the wrap-up,
   `test/accounts.test.ts` the AI accounts, and `test/suggestions.test.ts` setup help (the faint
   text made from an answer, the page's names, the blank fields and their fills, the thinking it
-  asks for, and the routes), and `test/chat.test.ts` the Suggestions chat (lists checked and
-  sent back, redos kept in place, the stream, approving, and each account kept to its own).
+  asks for, and the routes), `test/chat.test.ts` the Suggestions chat (lists checked and
+  sent back, redos kept in place, the stream, approving, and each account kept to its own),
+  `test/dashes.test.ts` the dashes taken out, `test/play.test.ts` play (openings, a pick or
+  the owner's own, moves and notes and the quiet lines after them, scenes ending and going on,
+  undo, another reply, a turn that fails, hints) and `test/door.test.ts` breading_ground as
+  the one door.
 
 ### Running it locally
 

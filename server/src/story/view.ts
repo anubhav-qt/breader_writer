@@ -120,6 +120,8 @@ export interface IndexEntry {
 export interface TurnView {
   number: number;
   voice: Voice;
+  /** For a move, the name of who the owner played. */
+  played: string;
   input: string;
   reply: string;
 }
@@ -311,8 +313,13 @@ function relationshipView(line: RelationshipRow, story: Story, names: Map<string
   };
 }
 
-function turnView(turn: Turn): TurnView {
-  return { number: turn.number, voice: turn.voice as Voice, input: turn.input, reply: turn.reply };
+/** A turn word for word, with who the owner played by name: the protagonist, unless it says. */
+function turnView(turn: Turn, names: Map<string, string>, protagonist: string): TurnView {
+  let played = protagonist;
+  if (turn.played !== null) {
+    played = names.get(turn.played) ?? protagonist;
+  }
+  return { number: turn.number, voice: turn.voice as Voice, played, input: turn.input, reply: turn.reply };
 }
 
 /**
@@ -353,14 +360,16 @@ export function briefView(story: Story, scene: Scene, lastScene: Turn[]): BriefV
   }
 
   const earlier = story.scenes.filter((each) => each.number < scene.number);
+  const protagonist = story.characters.find((character) => character.role === 'protagonist');
+  const protagonistName = protagonist?.name ?? '';
   let lastSceneView: LastSceneView | null = null;
   if (lastScene.length > 0) {
-    lastSceneView = { number: scene.number - 1, turns: lastScene.map(turnView) };
+    const turns = lastScene.map((turn) => turnView(turn, names, protagonistName));
+    lastSceneView = { number: scene.number - 1, turns };
   }
-  const protagonist = story.characters.find((character) => character.role === 'protagonist');
 
   return {
-    protagonist: protagonist?.name ?? '',
+    protagonist: protagonistName,
     book: bookView(story.book, scene.number),
     world: {
       genre: story.world?.genre ?? '',

@@ -3,10 +3,7 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { z } from 'zod';
 import { ChatApprove, ChatRedo, ChatSay, type BookChat, type ChatEvent } from '@writer/shared/chat';
 import { BlanksAsk, FieldAsk, type BlankSuggestion, type BlankSuggestions, type FieldSuggestion } from '@writer/shared/suggestions';
-import type { Catalog } from '../ai/catalog.ts';
 import { ModelError } from '../ai/call.ts';
-import { ProxyError } from '../ai/proxy.ts';
-import { modelInUse, savedChoice, type InUse } from '../ai/settings.ts';
 import { findBook } from '../books/setup.ts';
 import type { AppEnv, Deps } from '../context.ts';
 import { requireWriter } from '../lib/access.ts';
@@ -17,9 +14,8 @@ import { alone, approve, ChatError, redo, say } from '../suggestions/chat.ts';
 import { bookChat, findChat, readChat, startChat, type ChatRow } from '../suggestions/chats.ts';
 import { suggestField } from '../suggestions/field.ts';
 import type { Helper } from '../suggestions/quick.ts';
+import { failed, modelFor } from './ai.ts';
 
-const offline = () => new ApiError(503, 'ai_offline', 'The AI is offline, so Procreator can’t help right now.');
-const failed = () => new ApiError(502, 'ai_failed', 'Procreator didn’t answer. Try again in a moment.');
 const noChat = () => new ApiError(404, 'not_found', 'There’s no such chat here.');
 
 /** Sends one of the chat's events down the stream. */
@@ -30,27 +26,6 @@ async function send(stream: SSEStreamingApi, event: ChatEvent) {
 export function suggestionRoutes(deps: Deps) {
   const r = new Hono<AppEnv>();
   r.use('/suggestions/*', requireWriter(deps));
-
-  /** The model the account's setup help runs on, or a 503 while the AI is offline. */
-  async function modelFor(userId: string): Promise<{ catalog: Catalog; inUse: InUse }> {
-    const catalog = deps.catalog;
-    if (!catalog) {
-      throw offline();
-    }
-    let inUse: InUse | null;
-    try {
-      inUse = await modelInUse(catalog, await savedChoice(deps.db, userId));
-    } catch (err) {
-      if (err instanceof ProxyError) {
-        throw offline();
-      }
-      throw err;
-    }
-    if (!inUse) {
-      throw offline();
-    }
-    return { catalog, inUse };
-  }
 
   /** The book a call is for, only if it's the account's own. */
   async function ownBookId(userId: string, bookId: string | null): Promise<string | null> {
@@ -68,7 +43,7 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/blanks', async (c) => {
     const ask = parse(BlanksAsk, await readJson(c));
     const userId = c.var.login.id;
-    const { catalog, inUse } = await modelFor(userId);
+    const { catalog, inUse } = await modelFor(deps, userId);
     const bookId = await ownBookId(userId, ask.bookId);
     const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId, signal: c.req.raw.signal };
     let fields: BlankSuggestion[];
@@ -154,7 +129,7 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/chats', async (c) => {
     const ask = parse(ChatSay, await readJson(c));
     const userId = c.var.login.id;
-    const { catalog, inUse } = await modelFor(userId);
+    const { catalog, inUse } = await modelFor(deps, userId);
     const chat = await chatToSay(userId, ask);
     const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
     return streamSSE(c, async (stream) => {
@@ -188,7 +163,7 @@ export function suggestionRoutes(deps: Deps) {
     const ask = parse(ChatRedo, await readJson(c));
     const userId = c.var.login.id;
     const chat = await ownChat(userId, c.req.param('id'));
-    const { catalog, inUse } = await modelFor(userId);
+    const { catalog, inUse } = await modelFor(deps, userId);
     const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
     try {
       const answered = await alone(chat.id, () => redo(helper, chat, ask.setup, ask.entry, ask.item, ask.notes));
@@ -222,7 +197,7 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/field', async (c) => {
     const ask = parse(FieldAsk, await readJson(c));
     const userId = c.var.login.id;
-    const { catalog, inUse } = await modelFor(userId);
+    const { catalog, inUse } = await modelFor(deps, userId);
     const bookId = await ownBookId(userId, ask.bookId);
     const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId, signal: c.req.raw.signal };
     let text: string | null;

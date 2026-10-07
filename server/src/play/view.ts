@@ -1,0 +1,184 @@
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import type { Mark, Opening, Person, Play, PlayTurn, SceneHead, Stage } from '@writer/shared/play';
+import type { Offer } from '../breading_ground.ts';
+import type { Db } from '../db/client.ts';
+import { books, changes, scenes, versions } from '../db/schema.ts';
+import { castOf, namesOf } from '../story/cast.ts';
+import { GONE, named } from '../story/mentions.ts';
+import { turnsOf, type Scene, type Turn, type Voice } from '../story/scenes.ts';
+
+/*
+ * The play as the page shows it (shared/src/play.ts): where it stands, the scene on the page with
+ * its heading and its turns, and after a turn, a quiet line for whoever joined the cast at it and
+ * each relationship that shifted, read from what Procreator changed at the turn.
+ */
+
+export function headOf(scene: Scene): SceneHead {
+  return { number: scene.number, place: scene.place, time: scene.time };
+}
+
+/** The openings offered for the first scene, as the owner reads them. */
+function openingsOf(scene: Scene): Opening[] | null {
+  if (!scene.openings) {
+    return null;
+  }
+  const offers = scene.openings as Offer[];
+  return offers.map((offer) => ({ text: offer.text, place: offer.place, time: offer.time }));
+}
+
+function nameOf(names: Map<string, string>, id: string): string {
+  return names.get(id) ?? GONE;
+}
+
+/** A row Procreator made at a turn, as a quiet line: someone joining the cast, or a relationship shifting. */
+function markOf(table: string, after: unknown, names: Map<string, string>): Mark | null {
+  if (table === 'characters') {
+    const person = after as { id: string; name: string };
+    return { kind: 'joined', id: person.id, name: names.get(person.id) ?? person.name };
+  }
+  if (table === 'relationship_history') {
+    const entry = after as { aId: string; bId: string; text: string };
+    const between = `${nameOf(names, entry.aId)} and ${nameOf(names, entry.bId)}`;
+    return { kind: 'shifted', a: entry.aId, b: entry.bId, between, text: named(entry.text, names) };
+  }
+  return null;
+}
+
+/** The quiet lines after each turn, by turn: what Procreator made at it that still stands. */
+async function marksOf(db: Db, turns: Turn[], names: Map<string, string>): Promise<Map<string, Mark[]>> {
+  const marks = new Map<string, Mark[]>();
+  if (turns.length === 0) {
+    return marks;
+  }
+  const rows = await db
+    .select({ turnId: changes.turnId, table: versions.table, after: versions.after })
+    .from(versions)
+    .innerJoin(changes, eq(changes.id, versions.changeId))
+    .where(
+      and(
+        inArray(
+          changes.turnId,
+          turns.map((turn) => turn.id),
+        ),
+        eq(changes.by, 'agent'),
+        isNull(changes.takenBackBy),
+        isNull(versions.before),
+        inArray(versions.table, ['characters', 'relationship_history']),
+      ),
+    )
+    .orderBy(asc(versions.id));
+  for (const row of rows) {
+    const mark = markOf(row.table, row.after, names);
+    if (!mark || !row.turnId) {
+      continue;
+    }
+    const list = marks.get(row.turnId) ?? [];
+    list.push(mark);
+    marks.set(row.turnId, list);
+  }
+  return marks;
+}
+
+async function turnsShown(db: Db, scene: Scene | null, names: Map<string, string>): Promise<PlayTurn[]> {
+  if (!scene) {
+    return [];
+  }
+  const turns = await turnsOf(db, scene.id);
+  const marks = await marksOf(db, turns, names);
+  return turns.map((turn) => {
+    let played: Person | null = null;
+    if (turn.played !== null) {
+      played = { id: turn.played, name: nameOf(names, turn.played) };
+    }
+    return {
+      id: turn.id,
+      number: turn.number,
+      voice: turn.voice as Voice,
+      played,
+      input: turn.input,
+      reply: turn.reply,
+      marks: marks.get(turn.id) ?? [],
+    };
+  });
+}
+
+/** Where the play stands, and which scene is on the page. */
+interface Standing {
+  stage: Stage;
+  onPage: Scene | null;
+  next: Scene | null;
+}
+
+/** A scene being played: playing once it has a turn, else waiting for its opening (the first, for the owner's pick). */
+async function standingOfPlaying(db: Db, playing: Scene): Promise<Standing> {
+  const turns = await turnsOf(db, playing.id);
+  if (turns.length > 0) {
+    return { stage: 'playing', onPage: playing, next: null };
+  }
+  if (playing.number === 1 && playing.openings) {
+    return { stage: 'openings', onPage: playing, next: null };
+  }
+  if (playing.number === 1) {
+    return { stage: 'start', onPage: playing, next: null };
+  }
+  return { stage: 'opening', onPage: playing, next: null };
+}
+
+async function standingOf(db: Db, all: Scene[]): Promise<Standing> {
+  const playing = all.find((scene) => scene.status === 'playing');
+  if (playing) {
+    return standingOfPlaying(db, playing);
+  }
+  const waiting = all.find((scene) => scene.status === 'next');
+  if (waiting && waiting.number === 1) {
+    if (waiting.openings) {
+      return { stage: 'openings', onPage: waiting, next: null };
+    }
+    return { stage: 'start', onPage: waiting, next: null };
+  }
+  if (waiting) {
+    const ended = all.find((scene) => scene.number === waiting.number - 1) ?? null;
+    return { stage: 'ended', onPage: ended, next: waiting };
+  }
+  const last = all.at(-1);
+  if (!last) {
+    return { stage: 'start', onPage: null, next: null };
+  }
+  return { stage: 'ended', onPage: last, next: null };
+}
+
+/** The play of a book as the page shows it. */
+export async function playView(db: Db, bookId: string): Promise<Play> {
+  const [book] = await db.select().from(books).where(eq(books.id, bookId));
+  const cast = await castOf(db, bookId);
+  const names = namesOf(cast);
+  const protagonist = cast.find((person) => person.role === 'protagonist');
+  if (!book || !protagonist) {
+    throw new Error(`Book ${bookId} has no protagonist.`);
+  }
+  const all = await db.select().from(scenes).where(eq(scenes.bookId, bookId)).orderBy(asc(scenes.number));
+  const standing = await standingOf(db, all);
+
+  let scene: SceneHead | null = null;
+  let openings: Opening[] | null = null;
+  if (standing.onPage) {
+    scene = headOf(standing.onPage);
+  }
+  if (standing.onPage && standing.stage === 'openings') {
+    openings = openingsOf(standing.onPage);
+  }
+  let next: SceneHead | null = null;
+  if (standing.next) {
+    next = headOf(standing.next);
+  }
+  return {
+    bookId,
+    title: book.title,
+    protagonist: { id: protagonist.id, name: protagonist.name },
+    stage: standing.stage,
+    scene,
+    openings,
+    turns: await turnsShown(db, standing.onPage, names),
+    next,
+  };
+}

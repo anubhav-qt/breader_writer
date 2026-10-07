@@ -10,8 +10,11 @@ import type { InUse } from './settings.ts';
  * included), so the budget and the cache can be seen.
  */
 
-/** What the model is asked to do. setup is the help with setup: suggestions and the Suggestions chat. */
-export type Role = 'narrator' | 'author' | 'hints' | 'fold' | 'setup';
+/**
+ * What the model is asked to do. openings are the first scene's, offered to pick from; setup is the
+ * help with setup: suggestions and the Suggestions chat.
+ */
+export type Role = 'narrator' | 'author' | 'hints' | 'openings' | 'fold' | 'setup';
 
 /** A model call that came back with no answer: the proxy down, an account out of its limits. */
 export class ModelError extends Error {}

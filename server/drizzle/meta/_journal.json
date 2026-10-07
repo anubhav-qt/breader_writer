@@ -57,6 +57,13 @@
       "when": 1791278127307,
       "tag": "0007_no_ledgers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791348087262,
+      "tag": "0008_setup_chats",
+      "breakpoints": true
     }
   ]
 }

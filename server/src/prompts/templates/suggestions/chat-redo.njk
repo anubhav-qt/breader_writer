@@ -1,0 +1,23 @@
+{#-
+  One item of Procreator's list redone in the Suggestions chat (suggestions/chat.ts): the page
+  first when it has changed since Procreator last saw it, then which item, what it is now, and the
+  owner's notes on it, last. Takes the page as text ('' when it hasn't changed), the item's number
+  from 1, the item as Procreator writes a change (change, as JSON), and the notes.
+-#}
+{% if page %}
+<page>
+{{ page }}
+</page>
+
+{% endif %}
+Redo item {{ item }} of your list, and only that item, as the owner's notes on it say. The item as it stands:
+
+<item>
+{{ change }}
+</item>
+
+<notes>
+{{ notes }}
+</notes>
+
+Answer with revise_change: a change to the same thing, redone as the notes say.

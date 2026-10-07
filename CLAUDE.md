@@ -38,7 +38,8 @@ provider for its longest cache (see "Notes for step 3"). Step 5 (setup help) is 
 Procreator's faint text in setup's fields is built, and since 2026-10-07 every blank field
 shows it at once (see "Notes for step 5"). It was checked in the desktop app's browser against a
 stand-in API; the field by field version was tried against the real model, the blank fields
-all at once not yet. The Suggestions chat is next. The owner has a real book set up locally
+all at once not yet. The Suggestions chat's server is built and was tried against the real model
+(2026-10-07); its panel on the setup page is next. The owner has a real book set up locally
 that they mean to play through before production, so its data must survive every change (see
 "Running it locally"). See "The code" below for what exists.
 
@@ -442,6 +443,39 @@ through them all in one local test once everything is built (see "Status").
     most open ones (a blank title, a blank personality, a name) still thought for 500 to 800
     tokens and took 7 to 12. No thinking at all was about as quick, but one call in four thought
     for 9 seconds anyway.
+- The Suggestions chat (`server/src/suggestions/chat.ts`) is one session, kept as the scene
+  sessions are: every message as the model was sent it, in order, only ever added to
+  (`setup_chat_messages`), so each call starts as the one before and the cache can hold it.
+  What the chat shows is kept apart (`setup_chat_entries`): the owner's words, Procreator's, and
+  its list with how it stands (open, approved or set aside). The page goes into the owner's
+  message only when it has changed since Procreator last saw it (the chat keeps it as text). It
+  runs on the account's own model and thinking level, not the quick one: this is the owner's story
+  being shaped. One exchange at a time in a chat (held in memory, so one server).
+- A list is `propose_changes`: a note for the owner and the changes, people by name. Each item
+  is checked against the page in order, as it would land, finding people by the names Procreator
+  saw first and then by the names the list gave them (naming someone renumbers the nameless after
+  them). What doesn't fit goes back to Procreator item by item, with nothing shown, as often as
+  it takes. A list that fits ends the exchange, so it costs no extra call, and its note is shown
+  (and streamed) as Procreator's words: Gemini wrote no words beside its lists otherwise.
+- Saying anything else sets the open list aside. Approving marks it approved, and the owner's
+  next words tell Procreator so. A redo restates the item as Procreator writes a change, with the
+  owner's notes, and `revise_change` has to change the same thing (the same field, choice, person
+  or line); someone added keeps their id, since the items after know them by it. The list changes
+  in place and nothing is said in the chat.
+- `POST /v1/suggestions/chats` streams server-sent events: `started` (the chat's id), `text`
+  (Procreator's words as they come), then `done` (the chat), or `error` (why, with the chat as
+  kept: the owner's words stay even when the model doesn't answer).
+- Procreator lists a change as soon as one is asked for, with its best version, instead of asking
+  first whether to: the list is where the owner agrees, and any item can be redone. It asks first
+  only when it can't tell what the owner wants. (Our call, 2026-10-07, after it asked "shall I?"
+  in the real run; the owner can change it.)
+- Tried against the real model (2026-10-07): Gemini 3.8 Flash through the owner's Antigravity, at
+  the model's own thinking (no management key), in a scratch database. Four exchanges: a list of
+  two, a new list when the owner asked for one item to change, a redo, and a name and a line for
+  someone. Each was one call, 6 to 9 seconds, except the last (36 seconds, nearly all thinking).
+  The lists fit the page and kept what each person hides. A tool result followed by the owner's
+  next words (two user turns in a row) goes through fine. Under 4,096 tokens in, so nothing
+  cached yet.
 
 ### Later versions
 
@@ -493,6 +527,11 @@ their code, changed where we need, not rewritten to ours.
   (`blankFields`), what's in a field (`fieldText`), changing it (`withFieldText`) and how much
   it holds (`fieldLimit`), the asks and the answers (`FieldAsk`, `FieldSuggestion`, `BlanksAsk`,
   `BlankSuggestions`), and when suggestions start (`filledIn`, against `SUGGEST_AFTER`).
+- `src/chat.ts`: the Suggestions chat. A change exactly as it will land (`SetupChange`: a field's
+  whole new text, one of the book's choices, someone new, someone removed, two untied) and making
+  it (`applyChange`, which ties two first for a line's field, and is null when it doesn't fit),
+  a list and how it stands (`ChangeList`), what the chat shows (`ChatEntry`, `Chat`), the asks
+  (`ChatSay`, `ChatRedo`, `ChatApprove`) and the streamed events (`ChatEvent`).
 
 ### `frontend/` (`@writer/frontend`)
 
@@ -582,7 +621,8 @@ A Hono API, port 8790, built like breader's server.
   log), `pages` (the reference: a page per subject, by title, or by character for a cast
   member's), `notes` (Procreator's memory), `relationship_history`, `session_segments` and
   `session_messages` (each scene's session), and `calls` (each model call and the tokens it
-  used). The story's tables keep no times of their own; the change that made a row has it. A
+  used). The Suggestions chat's are `setup_chats` (an account's, with its book once there is one,
+  and the page as Procreator last saw it), `setup_chat_messages` and `setup_chat_entries`. The story's tables keep no times of their own; the change that made a row has it. A
   session is raw history like turns, only ever added to. drizzle-kit only sees this file and this
   schema.
 - `src/books/setup.ts`: a book's setup in and out of those tables. Saving keeps the ids of
@@ -688,7 +728,11 @@ A Hono API, port 8790, built like breader's server.
   one for a field with text in it (`suggestField`). `ghost.ts` turns the answer into the faint text (`ghostFrom`): fences,
   labels and quotes around it come off, it's joined to the field's text with a space where one
   is needed, a repeat of that text is gone on from, a line field keeps to one line, and it's cut
-  at a word's end to what the field holds.
+  at a word's end to what the field holds. The Suggestions chat: `chats.ts` keeps it (the chat,
+  its messages and entries, the open list), `changes.ts` turns what Procreator writes into
+  changes as they'll land (`ChangeArgs`, `checkList`, `checkRedo`) and back (`argsOf`), and
+  `chat.ts` runs it (`say`, `redo`, `approve`, and `alone`, one exchange at a time), with its
+  tools `propose_changes` and `revise_change`.
 - `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with what it
   was for (narrator, author, hints, fold, or setup for setup help), the tokens the writer
   counted before sending (`counted`) and what the model says it used, cache reads included. A
@@ -703,7 +747,9 @@ A Hono API, port 8790, built like breader's server.
   field's suggestion: the instructions with examples, then the page (`partials/setup.njk`) and
   the field last. `suggestions/blanks-system.njk` and `suggestions/blanks.njk` are the blank
   fields' suggestions: the instructions with an example, then the page and the numbered blanks
-  last. Written to the Gemini 3 guides (October 2026, checked again 2026-10-07).
+  last. `suggestions/chat-system.njk` is the Suggestions chat's instructions, `chat-page.njk` the
+  page as it's sent, `chat-say.njk` the owner's words (the page first when it changed) and
+  `chat-redo.njk` a redo (the item as it stands and the owner's notes). Written to the Gemini 3 guides (October 2026, checked again 2026-10-07).
 - `src/db/breader.ts`: the columns of breader's `users` and `auth_sessions` that the writer
   reads. Breader owns and migrates them; the writer never writes to them.
 - `src/lib/login.ts`: reads breader's login. Breader's Better Auth cookie
@@ -727,7 +773,12 @@ A Hono API, port 8790, built like breader's server.
   proxy turns away is told apart from the proxy being down. `POST /v1/suggestions/blanks`
   (Procreator's faint text for every blank field, from the page as it stands) and
   `POST /v1/suggestions/field` (for one field with text in it), `open` only: a 503 while the AI
-  is offline, a 502 when the model doesn't answer, and a 400 for a field not on the page.
+  is offline, a 502 when the model doesn't answer, and a 400 for a field not on the page. The
+  Suggestions chat, `open` only: `GET /v1/suggestions/chats?book=` (a book's chat, or null),
+  `GET /v1/suggestions/chats/:id`, `POST /v1/suggestions/chats` (the owner says something, in
+  the chat given, else the book's, else a new one; streamed, see "Notes for step 5"), and
+  `POST /v1/suggestions/chats/:id/redo` and `/approve`. Another account's chat is a 404, and a
+  list that isn't open any more (or a redo Procreator didn't make) a 409.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
@@ -758,7 +809,8 @@ A Hono API, port 8790, built like breader's server.
   asked of its cache, tools, notes, undo), compaction and the wrap-up,
   `test/accounts.test.ts` the AI accounts, and `test/suggestions.test.ts` setup help (the faint
   text made from an answer, the page's names, the blank fields and their fills, the thinking it
-  asks for, and the routes).
+  asks for, and the routes), and `test/chat.test.ts` the Suggestions chat (lists checked and
+  sent back, redos kept in place, the stream, approving, and each account kept to its own).
 
 ### Running it locally
 

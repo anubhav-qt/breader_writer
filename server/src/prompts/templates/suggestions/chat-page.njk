@@ -1,0 +1,6 @@
+{#-
+  The setup page as the Suggestions chat sends it (suggestions/chat.ts), kept as text so it's sent
+  again only once it has changed. Takes a SetupView (page).
+-#}
+{% from "partials/setup.njk" import setup %}
+{{ setup(page) }}

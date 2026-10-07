@@ -389,3 +389,61 @@ export const calls = writer.table(
   },
   (t) => [index('calls_book_idx').on(t.bookId, t.startedAt), index('calls_user_idx').on(t.userId, t.startedAt)],
 );
+
+/*
+ * Setup help's Suggestions chat (suggestions/chat.ts): talking the setup over with Procreator. It's
+ * kept with the book, or while the book isn't made, with its draft in the owner's browser. Its
+ * messages are kept as the model was sent them, so each call sends the same start as the one
+ * before; its entries are what the chat shows. Like a scene's session, it's only ever added to,
+ * except a list's items and how it stands, which change in place as the owner has an item redone
+ * or approves it.
+ */
+
+/** A Suggestions chat: a book's, or a new book's while it's a draft. */
+export const setupChats = writer.table(
+  'setup_chats',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** The breader account it's with (its Better Auth user id). */
+    userId: text('user_id').notNull(),
+    /** The book, or null for one not made yet. */
+    bookId: uuid('book_id').references(() => books.id, { onDelete: 'cascade' }),
+    /** The page as Procreator was last sent it, so it's sent again only once it has changed. */
+    page: text('page').notNull().default(''),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('setup_chats_book_idx').on(t.userId, t.bookId, t.createdAt)],
+);
+
+/** A message of a Suggestions chat, as the model was sent it or sent it back, in order. */
+export const setupChatMessages = writer.table(
+  'setup_chat_messages',
+  {
+    id: serial(),
+    chatId: uuid('chat_id')
+      .notNull()
+      .references(() => setupChats.id, { onDelete: 'cascade' }),
+    /** pi's message: the owner's (user), Procreator's (assistant) or a tool's result. */
+    message: jsonb('message').notNull(),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('setup_chat_messages_chat_idx').on(t.chatId, t.id)],
+);
+
+/** What a Suggestions chat shows, in order: the owner's words, and Procreator's with its list. */
+export const setupChatEntries = writer.table(
+  'setup_chat_entries',
+  {
+    id: serial(),
+    chatId: uuid('chat_id')
+      .notNull()
+      .references(() => setupChats.id, { onDelete: 'cascade' }),
+    /** owner or procreator. */
+    by: text('by').notNull(),
+    text: text('text').notNull(),
+    /** Procreator's list of changes, if it made one: its items and how it stands (ChangeList). */
+    list: jsonb('list'),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('setup_chat_entries_chat_idx').on(t.chatId, t.id)],
+);

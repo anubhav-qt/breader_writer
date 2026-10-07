@@ -1,0 +1,19 @@
+{#-
+  The owner saying something in the Suggestions chat (suggestions/chat.ts): the page first when
+  it has changed since Procreator last saw it, which is the long context; then whether its last
+  list was approved; then the owner's words, last. Takes the page as text ('' when it hasn't
+  changed), approved, and the owner's text.
+-#}
+{% if page %}
+<page>
+{{ page }}
+</page>
+
+{% endif %}
+{% if approved %}
+The owner approved your last list, and it's on the page now.
+
+{% endif %}
+<owner>
+{{ text }}
+</owner>

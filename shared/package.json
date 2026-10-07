@@ -8,7 +8,8 @@
     "./book": "./src/book.ts",
     "./protocol": "./src/protocol.ts",
     "./setup": "./src/setup.ts",
-    "./suggestions": "./src/suggestions.ts"
+    "./suggestions": "./src/suggestions.ts",
+    "./chat": "./src/chat.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

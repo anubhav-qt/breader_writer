@@ -202,12 +202,12 @@ export function suggestionRoutes(deps: Deps) {
     }
   });
 
-  /** The owner approves the open list, which lands on the page. Answers with the chat. */
+  /** The owner approves the open list. Answers with the chat and the changes for the page to land. */
   r.post('/suggestions/chats/:id/approve', async (c) => {
     const ask = parse(ChatApprove, await readJson(c));
     const chat = await ownChat(c.var.login.id, c.req.param('id'));
     try {
-      const answered = await approve(deps, chat, ask.entry);
+      const answered = await approve(deps, chat, ask.entry, ask.setup);
       return c.json(answered);
     } catch (err) {
       const problem = chatProblem(err);

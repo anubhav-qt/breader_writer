@@ -1,11 +1,11 @@
 import { runAgentLoop, type AgentContext, type AgentEvent, type AgentLoopConfig, type AgentMessage, type AgentTool, type AgentToolResult } from '@writer/pi-agent';
 import { streamSimple, toToolDeclaration, Type, type AssistantMessage, type Message, type SystemMessage, type UserMessage } from '@writer/pi-ai';
 import type { BookSetup } from '@writer/shared/book';
-import type { Chat, ChangeList, SetupChange } from '@writer/shared/chat';
+import type { Chat, ChatApproved, ChangeList, SetupChange } from '@writer/shared/chat';
 import type { DraftSetup } from '@writer/shared/suggestions';
 import { counted, ModelError, recordCall, textOf, thinkingOf, type CallTag, type Sent } from '../ai/call.ts';
 import { render } from '../prompts/render.ts';
-import { ChangeArgs, argsOf, checkList, checkRedo } from './changes.ts';
+import { ChangeArgs, argsOf, checkList, checkRedo, stillFitting } from './changes.ts';
 import {
   addChatMessage,
   addEntry,
@@ -326,14 +326,18 @@ export async function redo(helper: Helper, chat: ChatRow, setup: DraftSetup, ent
   return readChat(helper.db, chat);
 }
 
-/** The owner approves the open list: it's on the page now. Answers with the chat as it stands. */
-export async function approve(helper: Pick<Helper, 'db'>, chat: ChatRow, entryId: number): Promise<Chat> {
+/**
+ * The owner approves the open list. Answers with the chat as it stands, and the changes for the
+ * page to land: the list's items that still fit the page as it stands now.
+ */
+export async function approve(helper: Pick<Helper, 'db'>, chat: ChatRow, entryId: number, setup: DraftSetup): Promise<ChatApproved> {
   const open = await openList(helper.db, chat.id);
   if (!open || open.entryId !== entryId) {
     throw new ChatError('That list isn’t open any more.');
   }
   await setList(helper.db, entryId, { ...open.list, state: 'approved' });
-  return readChat(helper.db, chat);
+  const changes = stillFitting(setup, open.list.items);
+  return { chat: await readChat(helper.db, chat), changes };
 }
 
 /** The chats Procreator is answering in now: one exchange at a time in each. */

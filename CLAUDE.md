@@ -216,6 +216,9 @@ that they mean to play through before production, so its data must survive every
   that item, send it, and Procreator redoes only that item, in place. Nothing else on the screen
   changes, and the list doesn't move up or down. Saying something else in the chat makes a new
   list, which replaces the old one. Once approved, the changes land on the page one by one.
+  Approve goes through the server, which answers with the changes to land: the list's items
+  that still fit the page as it stands. That's where breading_ground comes in, once it's built
+  (the owner's pick, 2026-10-07: the seam now, breading_ground with play).
   In the chat, the owner's words sit in a soft grey bubble on the right, and Procreator's run
   plainly across the panel, lists included (the owner's pick, 2026-10-06). The Suggestions
   button sits at the right of the page's heading ("New book", or the book's title), on the
@@ -240,7 +243,8 @@ that they mean to play through before production, so its data must survive every
 5. breading_ground (see "Decided"): when it's built, and how it sits with what's there now:
    the database as the one source of truth (see "State"), the change log every change already
    goes through (`server/src/story/changes.ts`), and the owner's changes reaching back
-   (steps 6 and 7).
+   (steps 6 and 7). The owner picked building it with play (step 6); a Suggestions list's
+   approval already goes through the server for it (see "Decided").
 
 ### Build order
 
@@ -458,10 +462,13 @@ through them all in one local test once everything is built (see "Status").
   it takes. A list that fits ends the exchange, so it costs no extra call, and its note is shown
   (and streamed) as Procreator's words: Gemini wrote no words beside its lists otherwise.
 - Saying anything else sets the open list aside. Approving marks it approved, and the owner's
-  next words tell Procreator so. A redo restates the item as Procreator writes a change, with the
-  owner's notes, and `revise_change` has to change the same thing (the same field, choice, person
-  or line); someone added keeps their id, since the items after know them by it. The list changes
-  in place and nothing is said in the chat.
+  next words tell Procreator so. Approving sends the page as it stands and answers with the chat
+  and the changes for the page to land: the list's items that still fit it, in order
+  (`stillFitting`), since the owner may have changed the page after the list was made. A redo
+  restates the item as Procreator writes a change, with the owner's notes, and `revise_change`
+  has to change the same thing (the same field, choice, person or line); someone added keeps
+  their id, since the items after know them by it. The list changes in place and nothing is said
+  in the chat.
 - `POST /v1/suggestions/chats` streams server-sent events: `started` (the chat's id), `text`
   (Procreator's words as they come), then `done` (the chat), or `error` (why, with the chat as
   kept: the owner's words stay even when the model doesn't answer).
@@ -531,7 +538,8 @@ their code, changed where we need, not rewritten to ours.
   whole new text, one of the book's choices, someone new, someone removed, two untied) and making
   it (`applyChange`, which ties two first for a line's field, and is null when it doesn't fit),
   a list and how it stands (`ChangeList`), what the chat shows (`ChatEntry`, `Chat`), the asks
-  (`ChatSay`, `ChatRedo`, `ChatApprove`) and the streamed events (`ChatEvent`).
+  (`ChatSay`, `ChatRedo`, `ChatApprove`), what approving answers (`ChatApproved`: the chat and
+  the changes to land), and the streamed events (`ChatEvent`).
 
 ### `frontend/` (`@writer/frontend`)
 
@@ -731,6 +739,7 @@ A Hono API, port 8790, built like breader's server.
   at a word's end to what the field holds. The Suggestions chat: `chats.ts` keeps it (the chat,
   its messages and entries, the open list), `changes.ts` turns what Procreator writes into
   changes as they'll land (`ChangeArgs`, `checkList`, `checkRedo`) and back (`argsOf`), and
+  keeps a list's items that still fit the page (`stillFitting`), and
   `chat.ts` runs it (`say`, `redo`, `approve`, and `alone`, one exchange at a time), with its
   tools `propose_changes` and `revise_change`.
 - `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with what it
@@ -777,8 +786,9 @@ A Hono API, port 8790, built like breader's server.
   Suggestions chat, `open` only: `GET /v1/suggestions/chats?book=` (a book's chat, or null),
   `GET /v1/suggestions/chats/:id`, `POST /v1/suggestions/chats` (the owner says something, in
   the chat given, else the book's, else a new one; streamed, see "Notes for step 5"), and
-  `POST /v1/suggestions/chats/:id/redo` and `/approve`. Another account's chat is a 404, and a
-  list that isn't open any more (or a redo Procreator didn't make) a 409.
+  `POST /v1/suggestions/chats/:id/redo` and `/approve` (the chat, and the changes for the page
+  to land). Another account's chat is a 404, and a list that isn't open any more (or a redo
+  Procreator didn't make) a 409.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under

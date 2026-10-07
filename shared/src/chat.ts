@@ -172,11 +172,23 @@ export const ChatRedo = z.object({
 });
 export type ChatRedo = z.infer<typeof ChatRedo>;
 
-/** POST /v1/suggestions/chats/:id/approve: the list the owner approves. */
+/** POST /v1/suggestions/chats/:id/approve: the list the owner approves, and the page as it stands. */
 export const ChatApprove = z.object({
   entry: z.number().int(),
+  setup: DraftSetup,
 });
 export type ChatApprove = z.infer<typeof ChatApprove>;
+
+/**
+ * What approving answers: the chat, and the changes for the page to land, in turn. Those are the
+ * list's items that still fit the page (the owner may have changed it since). It's the server's to
+ * say, so breading_ground can come between once it's built (see CLAUDE.md).
+ */
+export const ChatApproved = z.object({
+  chat: Chat,
+  changes: z.array(SetupChange),
+});
+export type ChatApproved = z.infer<typeof ChatApproved>;
 
 /**
  * What POST /v1/suggestions/chats streams, as server-sent events: Procreator's words as it writes

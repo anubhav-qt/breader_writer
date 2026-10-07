@@ -630,10 +630,12 @@ describe('the list, redone and approved', () => {
 
   it('approves the list once, and tells Procreator so with the owner’s next words', async () => {
     const { proxy, app, cookie, chat, entry } = await withList([{ text: 'Glad you like it.' }]);
-    const r = await send(app, 'POST', `/v1/suggestions/chats/${chat.id}/approve`, cookie, { entry });
+    const r = await send(app, 'POST', `/v1/suggestions/chats/${chat.id}/approve`, cookie, { entry, setup: page() });
     expect(r.status).toBe(200);
-    expect(listEntry(r.body).list.state).toBe('approved');
-    const twice = await send(app, 'POST', `/v1/suggestions/chats/${chat.id}/approve`, cookie, { entry });
+    expect(listEntry(r.body.chat).list.state).toBe('approved');
+    // The page lands what the server says to.
+    expect(r.body.changes).toEqual(listEntry(chat).list.items);
+    const twice = await send(app, 'POST', `/v1/suggestions/chats/${chat.id}/approve`, cookie, { entry, setup: page() });
     expect(twice.status).toBe(409);
 
     const approved = { ...page(), world: { ...page().world, tone: 'Wry' } };
@@ -648,12 +650,21 @@ describe('the list, redone and approved', () => {
     expect(promptOf(proxy.asked[2]).user).toBe('<owner>\nMore?\n</owner>');
   });
 
+  it('lands only what still fits the page, which the owner may have changed since', async () => {
+    const { app, cookie, chat, entry } = await withList([]);
+    // Iven has left the page since the list was made.
+    const changed = { ...page(), cast: [page().cast[1]], relationships: [] };
+    const r = await send(app, 'POST', `/v1/suggestions/chats/${chat.id}/approve`, cookie, { entry, setup: changed });
+    expect(r.status).toBe(200);
+    expect(r.body.changes).toEqual([{ kind: 'field', field: { kind: 'world', field: 'tone' }, text: 'Wry' }]);
+  });
+
   it('keeps another account out of the list', async () => {
     const { chat, entry } = await withList([]);
     const email = address('chat');
     const cookie = await account(email, true);
     const theirs = writer({ WRITER_EMAILS: [email] }, null);
-    const r = await send(theirs, 'POST', `/v1/suggestions/chats/${chat.id}/approve`, cookie, { entry });
+    const r = await send(theirs, 'POST', `/v1/suggestions/chats/${chat.id}/approve`, cookie, { entry, setup: page() });
     expect(r.status).toBe(404);
   });
 });

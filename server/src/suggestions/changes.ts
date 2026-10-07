@@ -330,6 +330,20 @@ export function checkList(list: ChangeArgs[], original: BookSetup): Checked {
   return { ok: true, items };
 }
 
+/** The items of a list that still fit the page, landed one after another, in order. */
+export function stillFitting(page: BookSetup, items: SetupChange[]): SetupChange[] {
+  let changed = page;
+  const fitting: SetupChange[] = [];
+  for (const item of items) {
+    const after = applyChange(changed, item);
+    if (after) {
+      changed = after;
+      fitting.push(item);
+    }
+  }
+  return fitting;
+}
+
 /** The page with a list's items landed, as many of them as still fit. */
 export function landed(page: BookSetup, items: SetupChange[]): BookSetup {
   let changed = page;

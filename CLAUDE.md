@@ -54,7 +54,8 @@ every change (see "Running it locally"). See "The code" below for what exists.
   (setup's fields, the play box, sheets), the writer goes past breader: a better, richer text
   editor and input area, and a typeface that makes writing feel and look good in place of
   Dongle. The specifics are asked screen by screen. On the setup page (its fields, the
-  Suggestions chat and the Writer's notes) it's Literata (the owner's pick, 2026-10-06).
+  Suggestions chat and the Writer's notes) it's Literata (the owner's pick, 2026-10-06), and in
+  play too: its prose and the box for a move (the owner's pick, 2026-10-07).
 - Accounts: the same key and login system as breader.
 - Each book's card has a progress bar for how much of the book has been written.
 - **The book is written scene by scene.** When a scene wraps (the place or time shifts), that
@@ -104,20 +105,70 @@ every change (see "Running it locally"). See "The code" below for what exists.
   emails (`WRITER_EMAILS`), each with a confirmed address. Everyone else can see the writer, with
   a quiet note that it's invite only. A key on its own isn't enough to play, since a key has no
   email.
+- **The play reads like a book page** (the owner's pick, 2026-10-07). Procreator's narration
+  flows as prose in one centred column, like a reader, and the owner's moves sit between its
+  paragraphs as quiet italic lines. The box for a move is pinned at the bottom of the screen,
+  always in view, and the prose scrolls above it (the owner's pick, 2026-10-07). The page holds
+  only the scene being played, under its heading. When it wraps, the page starts fresh under
+  the next scene's heading, and earlier scenes are read in the book (the owner's pick,
+  2026-10-07, knowing the scene that just ended is gone from the play before the book has it).
+  The narration comes in word by word as Procreator writes it, as the Suggestions chat's does;
+  until its first words, while it thinks or asks the actors, a quiet line says it's working
+  (the owner's pick, 2026-10-07). The scene's heading is its number ("Scene 4") over where and
+  when it takes place ("Harrowgate hall, the morning after the fire"), from what the story keeps
+  about the scene, with no title made up for it (the owner's pick, 2026-10-07). When Procreator
+  ends a scene, its last words finish, then a quiet line says "End of Scene 4. It's going into
+  the book.", with "On to Scene 5" under it. Until the owner goes on, the box waits and undo
+  still works, so the move that ended the scene can be taken back (and the wrap-up waits for
+  it); going on clears the page for the next scene's heading and opening (the owner's pick,
+  2026-10-07).
+- **A story opens from three openings** (the owner's pick, 2026-10-07). After Start, the play
+  shows Scene 1's page with three short openings from Procreator (a line or two each) and the
+  box set to "as the author". The owner picks one or writes their own, and Procreator writes
+  that opening in full.
+- **The play's top bar** (the owner's pick, 2026-10-07): an arrow back to the library on the left,
+  then the book's title in place of the logo; on the right, undo, Story, Notes, Book (with its new
+  scene mark) and the model chip. On a phone the buttons are icons and the title is cut short.
+- **The story is a panel away mid story** (the owner's pick, 2026-10-07). A Story button in the
+  play's top bar opens a panel beside the play on a laptop, or a sheet over it on a phone, as the
+  Suggestions chat does. It holds the book's settings and the world at the top, then the cast as
+  cards, then the relationship graph, all setup's own pieces, and a card or a line opens its sheet
+  over the page. A book's card in the library opens its play, and setup's page is only for making a
+  book. When someone joins the cast or a relationship shifts, a quiet line in the interface font
+  marks it in the page where it happened ("Corwin joins the cast", "Mara and Ines: trust broken"),
+  and tapping it opens that sheet (the owner's pick, 2026-10-07). The book never has them.
+- **Procreator's notes have a panel of their own** (the owner's pick, 2026-10-07). A Notes
+  button beside Story opens a panel the same way, with the reference's pages by kind (places,
+  groups, things, lore, and the story's Plan, Threads and Timeline), each opening as a sheet
+  over the page, and Procreator's memory, each note editable in place. A character's page is in
+  their sheet, below the owner's. Plan and Threads say where the story is going, so opening one
+  first asks "This is where Procreator means to take the story. Read it?" (the owner's pick,
+  2026-10-07); once open, they read and edit like any page.
 - **Your turn is free text, with hints on tap.** One box where you write what you do and say in
   your own words. A tap shows 3 possible moves when you're stuck; otherwise nothing is suggested.
-- **You can play more than the main character.** Above the box is a toggle, "Main character and
-  author only", on by default: you play the protagonist and write author notes. Turned off,
-  Procreator asks you each time another character is about to act whether you want to play them
-  this time, and if you don't, their actor does (see "Every cast member has an actor").
+  They show as quiet lines just above the box, and tapping one puts it in the box to change
+  before sending; nothing is sent until the owner sends it (the owner's pick, 2026-10-07).
+- **You can play more than the main character.** A switch, "Main character and author only", is on
+  by default: you play the protagonist and write author notes. Turned off, Procreator asks you each
+  time another character is about to act whether you want to play them this time, and if you don't,
+  their actor does (see "Every cast member has an actor"). The pinned box asks it ("Ines is about
+  to act. Play her?", with "Play Ines" and "Her actor plays"), and playing them switches the box's
+  chip to "as Ines" for that move, so the page stays prose (the owner's pick, 2026-10-07). The
+  switch is in the box's bottom row, with Hints on its left and Send on the right, so nothing sits
+  above the box but the hints when they're shown (the owner's pick, 2026-10-07).
 - **Author notes come from a toggle on the box.** One tap switches it from "as <protagonist>" to
   "as the author" ("skip to the next morning", "make the storm worse"). The story follows the
-  note without the character saying it, and the book never mentions it.
+  note without the character saying it, and the book never mentions it. The toggle is a chip at
+  the box's top left; as the author, the box turns quieter, grey and italic (the owner's pick,
+  2026-10-07). On the page a note shows while Procreator answers it, then folds away into a
+  small mark between the paragraphs, which a tap opens again (the owner's pick, 2026-10-07).
 - **Undo works until the scene is written.** While a scene is being played you can take back
   your last turns, or ask for a different reply to the same move. Once the scene is written into
   the book it's settled, so the book and the play never disagree. Only a change to the story's
   facts reaches back into it (see "Changing the past"), and that rewrites the play and the book
-  together.
+  together. An undo arrow in the play's top bar takes back one turn a tap and puts the owner's
+  words back in the box, and "Another reply" sits under the newest reply (the owner's pick,
+  2026-10-07), so the page itself stays prose.
 - **A character starts as a few fields plus notes:** name, who they are, personality, past, and
   a free notes box. Only the name is required; the AI can fill any blank. How they relate to the
   others is in the relationship graph.
@@ -140,7 +191,10 @@ every change (see "Running it locally"). See "The code" below for what exists.
   - **A rename always reaches back.** The new name is the name from the first page.
   - **Anything else asks: "Always so, or from now on?"** (a habit, a personality, a past, a
     relationship, the world). Always so rewrites the past to match. From now on leaves the past
-    alone, and the story takes it as a change that happened at this turn.
+    alone, and the story takes it as a change that happened at this turn. Once a sheet has
+    changed, its Save becomes two buttons, "From now on" and "Always so", each with a short
+    line under it saying what it does; a rename alone shows plain Save (the owner's pick,
+    2026-10-07).
 
   How it works is in "Changing the past" below.
 - **breading_ground keeps track of the whole book** (the owner's, 2026-10-06; the name is
@@ -231,9 +285,10 @@ every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Open (ask the owner one at a time, in roughly this order)
 
-1. Design direction for each new screen (setup's suggestions, play, cast sheets), asked when
-   we reach it. The library and the book view start as copies of breader's pages;
-   where the owner writes, the writer goes past breader (see "Writing gets a feel of its own").
+1. Design direction for each new screen, asked when we reach it. Setup's suggestions and play
+   have theirs (see "Decided"). The library and the book view start as copies of breader's
+   pages; where the owner writes, the writer goes past breader (see "Writing gets a feel of its
+   own").
 2. Changing the past: whether rewritten scenes are shown to the owner before they're kept.
    Asked when we reach it (step 7).
 3. Bringing your own AI (step 9): how a writer's own key or sign-in is kept and used

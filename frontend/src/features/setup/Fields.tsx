@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { LONG_LIMIT, NOTES_LIMIT, SHORT_LIMIT } from '@writer/shared/book';
 import type { FieldRef } from '@writer/shared/suggestions';
 import type { Choice } from '../../data/setup';
+import { fieldSpot, useGlowing } from './landing';
 import { useGhost } from './useGhost';
 
 /*
@@ -35,6 +36,12 @@ export function Field({ label, value, onChange, size = 'line', placeholder, max,
     limit = max;
   }
   const ghost = useGhost(field, value, limit, onChange);
+  // Where an approved change to this field lands (see landing.ts).
+  let spot: string | undefined;
+  if (field) {
+    spot = fieldSpot(field);
+  }
+  const landing = useGlowing(spot);
 
   const changed = (next: string) => {
     ghost.typed();
@@ -95,8 +102,13 @@ export function Field({ label, value, onChange, size = 'line', placeholder, max,
     );
   }
 
+  let wrapClass = 'setup-field';
+  if (landing) {
+    wrapClass += ' is-landing';
+  }
+
   return (
-    <div className="setup-field">
+    <div className={wrapClass} data-land={spot}>
       <label className="add-label" htmlFor={id}>{label}</label>
       {/* Always wrapped, so the field isn't made anew when faint text comes and goes. */}
       <div className="ghost-wrap">
@@ -114,13 +126,20 @@ interface ChoicesProps<T extends string> {
   onPick: (id: T) => void;
   /** A line under a choice, like a suggestion. */
   notes?: Partial<Record<T, string>>;
+  /** Where an approved change to this choice lands (see landing.ts). */
+  spot?: string;
 }
 
 /** One of a few, as breader's radio cards. */
-export function Choices<T extends string>({ label, choices, value, onPick, notes }: ChoicesProps<T>) {
+export function Choices<T extends string>({ label, choices, value, onPick, notes, spot }: ChoicesProps<T>) {
   const id = useId();
+  const landing = useGlowing(spot);
+  let wrapClass = 'setup-field';
+  if (landing) {
+    wrapClass += ' is-landing';
+  }
   return (
-    <div className="setup-field">
+    <div className={wrapClass} data-land={spot}>
       <div className="add-label" id={id}>{label}</div>
       <div className="add-choices setup-choices" role="radiogroup" aria-labelledby={id}>
         {choices.map((choice) => {

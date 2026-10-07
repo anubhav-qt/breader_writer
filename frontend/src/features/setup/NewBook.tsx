@@ -19,7 +19,7 @@ function startingDraft(color: string): Draft {
   if (saved) {
     return saved;
   }
-  return { setup: blankSetup(color), povChosen: false };
+  return { setup: blankSetup(color), povChosen: false, chatId: null };
 }
 
 /** Setting up a new book. What's typed is kept in this browser until the book is started. */
@@ -35,7 +35,8 @@ export function NewBook({ color, onMade, onClose }: Props) {
     if (!typed) {
       return;
     }
-    if (isBlank(draft.setup)) {
+    // A chat started on a blank page is kept, so the draft is too.
+    if (isBlank(draft.setup) && !draft.chatId) {
       clearDraft();
     } else {
       writeDraft(draft);
@@ -48,6 +49,10 @@ export function NewBook({ color, onMade, onClose }: Props) {
     setDraft((d) => ({ ...d, setup }));
   };
   const povPicked = () => setDraft((d) => ({ ...d, povChosen: true }));
+  const chatStarted = (chatId: string) => {
+    setTyped(true);
+    setDraft((d) => ({ ...d, chatId }));
+  };
 
   const start = async () => {
     setBusy(true);
@@ -65,9 +70,14 @@ export function NewBook({ color, onMade, onClose }: Props) {
   const clear = () => {
     setClearing(false);
     clearDraft();
-    setDraft({ setup: blankSetup(color), povChosen: false });
+    setDraft({ setup: blankSetup(color), povChosen: false, chatId: null });
   };
 
+  // A chat is something to clear too, even on a blank page.
+  let canClear = !isBlank(draft.setup);
+  if (draft.chatId) {
+    canClear = true;
+  }
   const needed = missing(draft.setup);
   let note = null;
   if (error) {
@@ -85,10 +95,12 @@ export function NewBook({ color, onMade, onClose }: Props) {
         suggestPov={!draft.povChosen}
         onPovPicked={povPicked}
         bookId={null}
+        chatId={draft.chatId}
+        onChatStarted={chatStarted}
         actions={
           <>
             {note}
-            {!isBlank(draft.setup) && (
+            {canClear && (
               <button type="button" className="btn btn-ghost" onClick={() => setClearing(true)}>Clear</button>
             )}
             <button type="button" className="btn btn-primary setup-go" disabled={needed !== null || busy} onClick={() => void start()}>
@@ -102,7 +114,7 @@ export function NewBook({ color, onMade, onClose }: Props) {
           <ConfirmDialog
             key="clear"
             title="Clear this book?"
-            text="Everything typed for it goes, the cast too."
+            text="Everything typed for it goes, the cast and the Suggestions chat too."
             go="Clear"
             stay="Keep it"
             onGo={clear}

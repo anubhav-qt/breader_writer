@@ -1,0 +1,99 @@
+/*
+ * The Suggestions chat: a panel beside the setup page on a laptop, a sheet over it on a phone. Its
+ * head, buttons, chips, boxes and spinner are the dialogs' and Add a book's; this is only what
+ * they lack. The talk and the Writer's notes are Literata, as the setup's fields are. Rules that
+ * change another file's class double a class, so they win whichever file loads first.
+ */
+.chat { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.modal-head.chat-head { flex: none; margin: 0; padding: 14px 14px 10px 22px; }
+
+.chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 8px 22px 22px;
+}
+.chat-empty { margin: auto 0; font: 16px/1.6 var(--serif); color: var(--ink-2); }
+.add-busy.chat-busy { padding: 2px 0; }
+
+/* The owner's words on the right, Procreator's plainly across. */
+.chat-owner {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 9px 14px;
+  border-radius: 16px;
+  background: var(--fill);
+  font: 16px/1.5 var(--serif);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-procreator { display: grid; gap: 10px; font: 16px/1.6 var(--serif); }
+.chat-procreator p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* A list: each item as it will land, with its Writer's notes, then Approve or how it ended. */
+.chat-list { display: grid; margin-top: 4px; transition: opacity 200ms ease; }
+.chat-list.is-set-aside { opacity: 0.45; }
+.chat-items { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.chat-item { display: grid; justify-items: start; gap: 6px; padding: 12px 0 14px; border-bottom: 1px solid var(--line); }
+.chat-item .add-label { margin: 0; }
+.chat-item-text { margin: 0; font: 16px/1.5 var(--serif); white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-details { display: grid; gap: 8px; margin: 4px 0 0; }
+.chat-details div { display: grid; gap: 4px; }
+.chat-details dd { margin: 0; font: 15px/1.5 var(--serif); color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Lined up with the item's text, as a ghost button has no edge of its own. */
+.btn.chat-notes-open { height: 30px; padding: 0 10px; margin: 2px 0 0 -10px; font-size: 12.5px; }
+.chat-notes { justify-self: stretch; display: grid; gap: 8px; }
+.add-text.chat-notes-box { height: auto; min-height: 76px; max-height: 240px; field-sizing: content; resize: none; font: 15px/1.5 var(--serif); }
+.chat-notes-actions { display: flex; justify-content: flex-end; }
+.chat-notes-actions .btn { height: 34px; }
+.chat-list-end { display: flex; justify-content: flex-end; padding-top: 12px; }
+.chip.chat-state { display: inline-flex; align-items: center; gap: 5px; }
+.chat-state svg { width: 12px; height: 12px; }
+
+.setup-note.chat-error { flex: none; margin: 0; padding: 0 22px 10px; }
+
+/* Where the owner says something: a box that grows as it's written in, and Send. */
+.chat-say { flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+.add-text.chat-box {
+  flex: 1;
+  height: auto;
+  min-height: 44px;
+  max-height: 200px;
+  field-sizing: content;
+  resize: none;
+  padding: 9px 12px;
+  font: 16px/1.5 var(--serif);
+}
+.chat-say .btn { height: 44px; }
+
+/* On a laptop: a panel on the right, level with the page's bar, and the page makes room for it. */
+.chat-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: 420px;
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+}
+.chat-panel .modal-head.chat-head { height: 76px; padding: 0 20px 0 22px; }
+.setup-page:has(.chat-panel) { margin-right: 420px; }
+
+/* On a phone: a sheet rising from the bottom, over a scrim, under any dialog opened from the page. */
+.chat-sheet-root { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.chat-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  height: min(88dvh, 820px);
+  background: var(--paper);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 0 0 1px var(--line), var(--float-shadow);
+  outline: none;
+}
+.chat-sheet .chat-say { padding-bottom: max(16px, env(safe-area-inset-bottom)); }

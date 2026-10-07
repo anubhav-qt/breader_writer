@@ -26,3 +26,6 @@ export const IconMore = (p: P) => (
 export const IconStar = (p: P) => (
   <svg {...base} strokeWidth={1.8} {...p}><path d="m12 3.8 2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8Z" /></svg>
 );
+export const IconChat = (p: P) => (
+  <svg {...base} strokeWidth={1.9} {...p}><path d="M6.5 4.5h11a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-5.2L8 20.5v-3.5H6.5a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3Z" /></svg>
+);

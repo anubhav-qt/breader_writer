@@ -67,12 +67,80 @@ async function request<T>(base: Base, method: string, path: string, body?: unkno
 
   const data = await res.json().catch(() => null);
   if (res.ok) return data as T;
+  throw failureFrom(res.status, data, base);
+}
+
+/** The error an answer that isn't ok stands for, from its status and its body. */
+function failureFrom(status: number, data: { code?: string; message?: string } | null, base: Base): Error {
   // An error without the server's own code came from something in front of it: Cloudflare while
   // the tunnel is down, or the dev server's proxy while the API isn't running.
-  if (!data?.code && res.status >= 500) throw new OfflineError(base);
+  if (!data?.code && status >= 500) return new OfflineError(base);
   const code = data?.code ?? 'error';
-  const message = data?.message ?? `The server answered ${res.status}.`;
-  throw new ApiError(res.status, code, message);
+  const message = data?.message ?? `The server answered ${status}.`;
+  return new ApiError(status, code, message);
+}
+
+/** Hands on each whole server-sent event in what's come so far, and gives back what's left. */
+function takeEvents(received: string, onData: (data: unknown) => void): string {
+  const events = received.split('\n\n');
+  // The last part is an event still on its way, or nothing.
+  const rest = events.pop() ?? '';
+  for (const event of events) {
+    const lines: string[] = [];
+    for (const line of event.split('\n')) {
+      if (line.startsWith('data:')) {
+        lines.push(line.slice('data:'.length).trimStart());
+      }
+    }
+    if (lines.length > 0) {
+      onData(JSON.parse(lines.join('\n')));
+    }
+  }
+  return rest;
+}
+
+/**
+ * A POST to the writer's API whose answer streams back as server-sent events: each event's data
+ * goes to onData as it comes. There's no time limit, since the model may think a long while;
+ * `signal` stops it. It fails as a request does before the stream starts, and with OfflineError
+ * if the stream breaks off.
+ */
+export async function streamEvents(path: string, body: unknown, onData: (data: unknown) => void, signal: AbortSignal): Promise<void> {
+  if (navigator.onLine === false) throw new OfflineError('writer');
+  const init: RequestInit = {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+    body: JSON.stringify(body),
+    signal,
+  };
+  let res: Response;
+  try {
+    res = await fetch(BASES.writer + path, init);
+  } catch (e) {
+    if (signal.aborted) throw e;
+    throw new OfflineError('writer');
+  }
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => null);
+    throw failureFrom(res.status, data, 'writer');
+  }
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let received = '';
+  while (true) {
+    let chunk;
+    try {
+      chunk = await reader.read();
+    } catch (e) {
+      if (signal.aborted) throw e;
+      throw new OfflineError('writer');
+    }
+    if (chunk.done) {
+      return;
+    }
+    received = takeEvents(received + chunk.value, onData);
+  }
 }
 
 function client(base: Base) {

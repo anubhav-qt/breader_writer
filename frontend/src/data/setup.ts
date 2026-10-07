@@ -111,6 +111,8 @@ const Draft = z.object({
   }),
   /** Whether the owner picked the point of view themselves, so a length doesn't change it. */
   povChosen: z.boolean(),
+  /** The Suggestions chat about it, once there is one: it goes with the draft (see CLAUDE.md). */
+  chatId: z.uuid().nullable().default(null),
 });
 export type Draft = z.infer<typeof Draft>;
 

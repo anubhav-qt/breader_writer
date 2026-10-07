@@ -38,10 +38,11 @@ provider for its longest cache (see "Notes for step 3"). Step 5 (setup help) is 
 Procreator's faint text in setup's fields is built, and since 2026-10-07 every blank field
 shows it at once (see "Notes for step 5"). It was checked in the desktop app's browser against a
 stand-in API; the field by field version was tried against the real model, the blank fields
-all at once not yet. The Suggestions chat's server is built and was tried against the real model
-(2026-10-07); its panel on the setup page is next. The owner has a real book set up locally
-that they mean to play through before production, so its data must survive every change (see
-"Running it locally"). See "The code" below for what exists.
+all at once not yet. The Suggestions chat is built: its server, tried against the real model
+(2026-10-07), and its panel on the setup page, which hasn't been checked in a browser yet (the
+session that built it had none). Step 5 is done once it has been. The owner has a real book
+set up locally that they mean to play through before production, so its data must survive
+every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
 
@@ -215,7 +216,10 @@ that they mean to play through before production, so its data must survive every
   "Writer's notes": write what should change about just
   that item, send it, and Procreator redoes only that item, in place. Nothing else on the screen
   changes, and the list doesn't move up or down. Saying something else in the chat makes a new
-  list, which replaces the old one. Once approved, the changes land on the page one by one.
+  list, which replaces the old one. Once approved, the changes land on the page in turn: each
+  lands whole, about half a second after the one before, with a soft glow on its field, card or
+  line, and the page scrolls to follow (the owner's pick, 2026-10-07, "Glow in turn"). They're
+  as if the owner typed them, so a book's wait for Save.
   Approve goes through the server, which answers with the changes to land: the list's items
   that still fit the page as it stands. That's where breading_ground comes in, once it's built
   (the owner's pick, 2026-10-07: the seam now, breading_ground with play).
@@ -483,6 +487,29 @@ through them all in one local test once everything is built (see "Status").
   The lists fit the page and kept what each person hides. A tool result followed by the owner's
   next words (two user turns in a row) goes through fine. Under 4,096 tokens in, so nothing
   cached yet.
+- The chat's panel (`SuggestionsChat.tsx`) was built 2026-10-07 in a session with no browser, so
+  it was checked only by the typecheck and by reading it against its CSS. At 1100px and wider
+  it's a panel fixed on the right, 420px, and the page makes room for it
+  (`.setup-page:has(.chat-panel)`); it isn't modal, so the page goes on working beside it.
+  Narrower, it's a sheet rising over the page, a dialog that Escape closes once it's the last
+  one open. `SetupForm` holds the chat (`useChat`), so closing the panel doesn't stop an answer.
+  The log keeps to its end as words come in, but not on a redo or an approval, so a list never
+  moves. Enter sends, and Shift and Enter starts a new line; words the server never took go back
+  in the box. Errors show under the log, in view whatever failed.
+- The Suggestions button has a column of its own beside the page's (`.setup-rail`), and sticks
+  at the heading's height from the start, so it stays in view and never moves or covers
+  anything. A phone shows only its icon, in a column 40px wide.
+- Landing (`landing.ts`): `SetupForm` makes each change in turn on the page as the one before
+  left it (`applyChange` on a ref of the setup, since a new book's page takes a whole setup),
+  lights where it went for 1.4 seconds, scrolls there, and waits 650ms before the next. The
+  places are marked with `data-land` and a key (`spotsOf`): a field, a choice, someone's card,
+  the cast, the graph and each of its lines. A change to a sheet's field lights the card or line
+  it belongs to, and the field too if its sheet is open. The glow is a ring drawn over the place
+  (an `::after`, or a heavier stroke over a line), so the place's own look is left alone. On a
+  phone the sheet closes first. An approved point of view counts as the owner's own pick, so
+  picking Light novel afterwards doesn't change it.
+- A new book's chat id is kept in its draft (`chatId`), so a chat started on a blank page keeps
+  the draft, and Clear ends the chat too.
 
 ### Later versions
 
@@ -556,7 +583,9 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
 - `src/lib/api.ts`: two servers. The writer's API (`VITE_API_URL`, default `/writer/api` on the
   app's own address; the dev server proxies it to port 8790) and breader's (`VITE_BREADER_API_URL`,
   default `https://api.breader.site`) for logging in. A writer API that can't be reached throws
-  `OfflineError`. A request can be given up on (`signal`).
+  `OfflineError`. A request can be given up on (`signal`). `streamEvents` is a POST whose answer
+  streams back as server-sent events (the Suggestions chat), with no time limit.
+- `src/lib/useMedia.ts`: whether a media query matches, kept up to date as the window changes.
 - `src/lib/account.ts`: the account, its access and whether it's the owner, from `/v1/me`,
   remembered under `writer.me.v1`. Logging in, signing up, Google, reset links and logging out
   all go to breader's Better Auth; reset and confirm links open breader. While the server is
@@ -564,9 +593,11 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
 - `src/data/books.ts`: a book as its card shows it, its length's name, and how much is written
   (words written over the goal, 0 to 1).
 - `src/data/setup.ts`: a setup while it's being made: the choices' names and descriptions,
-  blank sheets, what's still missing, the draft kept in this browser (and turning an old draft's
-  feelings into relationships), and the server calls. Changing the cast and the graph is
-  shared's (`shared/src/setup.ts`).
+  blank sheets, what's still missing, the draft kept in this browser (with its Suggestions
+  chat's id, and turning an old draft's feelings into relationships), and the server calls.
+  Changing the cast and the graph is shared's (`shared/src/setup.ts`).
+- `src/data/chat.ts`: the Suggestions chat's server calls, and an item of a list as the chat
+  shows it (`itemView`: where it lands, its text, and someone new's sheet).
 - `src/features/setup/`: the setup page. `SetupPage.tsx` is the page (the book, the world, the
   cast as cards, the relationships); `NewBook.tsx` starts a book from it and `EditSetup.tsx`
   changes one. `CharacterSheet.tsx` is a character's sheet over the page, and
@@ -582,6 +613,9 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   `HelpContext`, which `SetupForm` puts around the page and its sheets. `useBlanks.ts` asks
   for the blank fields' suggestions, for `SetupForm` to hand on. A field can't colour part of
   its own text, so the faint text is drawn in a copy of the field laid over it.
+  `useChat.ts` holds the Suggestions chat for `SetupForm`, and `SuggestionsChat.tsx` shows it,
+  beside the page or over it (`chat.css`); `landing.ts` is how an approved list lands on the
+  page (see "Notes for step 5").
 - `src/features/models/ModelPicker.tsx` and `src/data/models.ts`: the header's model picker,
   for an account that can write. The chip says the model and its thinking level; it drops down
   the models (`GET /v1/settings`, asked again on each opening) and the thinking levels the

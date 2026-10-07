@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { motion } from 'motion/react';
 import { RELATIONSHIP_LIMIT, pairKey, type Character, type Relationship } from '@writer/shared/book';
 import { sidesInCastOrder } from '@writer/shared/setup';
 import { springs } from '../../lib/springs';
 import { layOut, type Box, type Dot, type Point } from './graphLayout';
+import { GRAPH_SPOT, GlowContext, lineSpot } from './landing';
 
 interface Props {
   /** Everyone in the cast, the protagonist first. */
@@ -107,6 +108,8 @@ export function RelationshipGraph({ people, protagonistId, relationships, onOpen
   // The line under the pointer or keyboard focus, by its pair key, to show its bond.
   const [pointed, setPointed] = useState<string | null>(null);
   const placed = useRef(new Map<string, Point>());
+  // Where approved changes are landing (see landing.ts).
+  const glowing = useContext(GlowContext);
 
   const dots: Dot[] = people.map((person) => ({ id: person.id, label: nameOf(person, protagonistId) }));
   const pairs: [string, string][] = relationships.map((relationship) => [relationship.a.id, relationship.b.id]);
@@ -162,6 +165,10 @@ export function RelationshipGraph({ people, protagonistId, relationships, onOpen
   if (pick) {
     svgClass += ' is-picking';
   }
+  let boxClass = 'graph';
+  if (glowing.has(GRAPH_SPOT)) {
+    boxClass += ' is-landing';
+  }
 
   const drawn: Drawn[] = [];
   for (const relationship of relationships) {
@@ -173,13 +180,18 @@ export function RelationshipGraph({ people, protagonistId, relationships, onOpen
     const key = pairKey(relationship.a.id, relationship.b.id);
     const [first, second] = sidesInCastOrder(relationship, people);
     const touchesPick = pick === relationship.a.id || pick === relationship.b.id;
+    const spot = lineSpot(relationship.a.id, relationship.b.id);
+    const landing = glowing.has(spot);
     drawn.push({
       key,
       relationship,
       from,
       to,
       label: `${names.get(first.id)} and ${names.get(second.id)}`,
-      lit: touchesPick || pointed === key,
+      // A line a change is landing on is lit, so its bond shows too.
+      lit: touchesPick || pointed === key || landing,
+      spot,
+      landing,
     });
   }
   // Bonds are drawn last, over the names, for the lines that are lit.
@@ -187,7 +199,7 @@ export function RelationshipGraph({ people, protagonistId, relationships, onOpen
 
   return (
     <div className="graph-wrap">
-      <div className="graph" ref={boxRef} style={{ height }}>
+      <div className={boxClass} ref={boxRef} style={{ height }} data-land={GRAPH_SPOT}>
         {width > 0 && (
           <svg
             className={svgClass}
@@ -248,8 +260,11 @@ interface Drawn {
   to: Point;
   /** The two names, in cast order. */
   label: string;
-  /** Whether it's one of the picked person's lines, or under the pointer. */
+  /** Whether it's one of the picked person's lines, under the pointer, or landing. */
   lit: boolean;
+  /** Where an approved change to it lands (see landing.ts), and whether one is now. */
+  spot: string;
+  landing: boolean;
 }
 
 function middleOf(line: Drawn): Point {
@@ -269,6 +284,9 @@ function Line({ line, onPoint, onOpen }: LineProps) {
   if (line.lit) {
     className += ' is-lit';
   }
+  if (line.landing) {
+    className += ' is-landing';
+  }
   let ariaLabel = line.label;
   if (line.relationship.bond) {
     ariaLabel += `: ${line.relationship.bond}`;
@@ -279,6 +297,7 @@ function Line({ line, onPoint, onOpen }: LineProps) {
       role="button"
       tabIndex={0}
       aria-label={ariaLabel}
+      data-land={line.spot}
       onClick={(event) => {
         event.stopPropagation();
         onOpen();
@@ -291,6 +310,7 @@ function Line({ line, onPoint, onOpen }: LineProps) {
     >
       <motion.line className="graph-line-hit" initial={false} animate={ends} transition={springs.smooth} />
       <motion.line className="graph-line-ink" initial={false} animate={ends} transition={springs.smooth} />
+      <motion.line className="graph-line-glow" initial={false} animate={ends} transition={springs.smooth} />
     </g>
   );
 }

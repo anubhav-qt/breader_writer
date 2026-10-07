@@ -1,6 +1,7 @@
 /*
- * The setup page: one column, top to bottom. Its fields and radio cards are breader's Add a book
- * dialog's (features/add/add.css); this is only what the page adds around them.
+ * The setup page: one column, top to bottom, with the Suggestions button in a narrow one beside
+ * it. Its fields and radio cards are breader's Add a book dialog's (features/add/add.css); this is
+ * only what the page adds around them.
  */
 .setup-page { height: 100dvh; overflow-y: auto; }
 .setup-bar {
@@ -16,13 +17,20 @@
 }
 
 .setup {
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 12px 24px 120px;
   display: grid;
-  gap: 48px;
+  grid-template-columns: minmax(0, 632px) auto;
+  justify-content: center;
+  column-gap: 24px;
+  padding: 12px 24px 120px;
 }
-.setup-waiting { min-height: 50dvh; place-content: center; text-align: center; }
+.setup-column { display: grid; align-content: start; gap: 48px; min-width: 0; }
+.setup-waiting { grid-template-columns: minmax(0, 632px); min-height: 50dvh; place-content: center; text-align: center; }
+/*
+ * The Suggestions button stays in view as the page scrolls, level with the heading from the start
+ * (the bar's 76px, the page's 12px, and half of what the 56px heading is taller than it), so it
+ * never moves. Its column runs the page's length, and nothing else is in it.
+ */
+.setup-ask { position: sticky; top: 93px; margin-top: 5px; }
 .setup-heading {
   margin: 0;
   font-family: var(--read);
@@ -154,8 +162,13 @@
 
 @media (max-width: 720px) {
   .setup-bar { height: 64px; padding: 0 16px; }
-  .setup { padding: 4px 16px 96px; gap: 40px; }
+  .setup { grid-template-columns: minmax(0, 1fr) 40px; column-gap: 8px; padding: 4px 16px 96px; }
+  .setup-column { gap: 40px; }
+  .setup-waiting { grid-template-columns: minmax(0, 1fr); }
   .setup-heading { font-size: 46px; }
+  /* Only the icon on a phone, level with the shorter heading under the shorter bar. */
+  .btn.setup-ask { top: 68px; margin-top: 0; width: 40px; padding: 0; }
+  .setup-ask-label { display: none; }
   .setup-choices { grid-template-columns: minmax(0, 1fr); }
   .setup-pair { grid-template-columns: minmax(0, 1fr); }
   .cast { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -184,3 +197,39 @@
 }
 .setup-field .ghost-mirror.add-input { white-space: pre; }
 .ghost-text { color: var(--ink-2); pointer-events: auto; cursor: text; }
+
+/*
+ * Approved changes landing (landing.ts): a soft ring where each one lands, quick to light and slow
+ * to fade. It's drawn over the place, so it leaves the place's own look and transitions alone.
+ * Black and white, as the rest of the interface.
+ */
+.cast,
+.cast-card,
+.add-choice { position: relative; }
+.ghost-wrap::after,
+.cast-card::after,
+.add-choice::after,
+.cast::after,
+.graph::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 6px var(--accent-soft);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 700ms ease;
+}
+.ghost-wrap::after { border-radius: 10px; }
+.cast::after { inset: -6px; border-radius: 18px; }
+/* The graph clips what's outside it, so its ring is inside. */
+.graph::after { box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 6px var(--accent-soft); }
+.setup-field.is-landing .ghost-wrap::after,
+.setup-field.is-landing .add-choice.is-on::after,
+.cast-card.is-landing::after,
+.cast.is-landing::after,
+.graph.is-landing::after { opacity: 1; transition-duration: 120ms; }
+
+/* A line in the graph: a heavier stroke over its own. */
+.graph-line-glow { stroke: var(--ink); stroke-width: 4px; opacity: 0; pointer-events: none; transition: opacity 700ms ease; }
+.graph-line.is-landing .graph-line-glow { opacity: 1; transition-duration: 120ms; }

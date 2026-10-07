@@ -300,8 +300,6 @@ every change (see "Running it locally"). See "The code" below for what exists.
    step 7). A risk to keep in view: subscription sign-ins like Antigravity are generally for
    their holder's own use, so serving every writer's first chapter through the owner's could
    get it limited.
-4. Whether the story's prose may use em dashes. The no-dash rule covers our own writing, and
-   Gemini's prose uses them freely. Asked with the narrator's prompt (step 6).
 
 ### Build order
 
@@ -400,7 +398,7 @@ through them all in one local test once everything is built (see "Status").
     proxy or the writer (see the caching note below): Antigravity's backend reported none.
   - Without `CLIPROXY_MANAGEMENT_KEY` the catalog knows no thinking levels and takes the window
     as 128k, so compaction would start at 96k instead of 400k. The key comes from the owner.
-  - Its prose uses em dashes (see "Open").
+  - Its prose uses em dashes, which the story may not (see "Writing").
 - Caching, checked against CLIProxyAPI 8.0.5's source (2026-10-06). Every exchange asks for the
   long cache (`cacheRetention: 'long'`) under the scene's id (`sessionId`), since the owner
   often takes longer than five minutes over a move:
@@ -498,7 +496,7 @@ through them all in one local test once everything is built (see "Status").
   - Each took 7 to 16 seconds, nearly all of it thinking: 400 to 1,400 tokens out for 10 to 60
     words shown. About 960 tokens go in, under Gemini's 4,096 token minimum, so nothing is
     cached.
-  - One answer used an em dash (see "Open", 4).
+  - One answer used an em dash, which setup help may not (see "Writing").
   - Giving up stopped the call within half a second.
   - Thinking low, the same twelve fields again: most took 3 to 6 seconds, as good as before. The
     most open ones (a blank title, a blank personality, a name) still thought for 500 to 800
@@ -743,6 +741,11 @@ A Hono API, port 8790, built like breader's server.
   - `settings.ts` decides the model an account's story runs on (`modelInUse`): its choice while
     an account serves it, else the default, else the first; its thinking moves to the nearest
     level the model takes.
+  - `dashes.ts`: no dashes in anything Procreator writes (see "Writing"). Its instructions say
+    so, and what it writes passes through `undashed` anyway (`Undasher` for streamed words,
+    holding a dash back until the next words show what it becomes): a comma between words, an
+    ellipsis where speech breaks off, a hyphen in a range of numbers, nothing at the start of a
+    line or a quote. Setup help's faint text, the chat's words and a list's texts go through it.
 - `src/story/`: the story's memory.
   - `changes.ts` is the change log. A change (`startChange`) is tagged with who made it (the
     owner or the agent) and the turn it came from, and every row it touches goes through
@@ -1211,7 +1214,8 @@ Decided 2026-10-06 (see "Every cast member has an actor"), built with play (step
 ### Writing
 
 - **No em dashes or en dashes, anywhere:** code, comments, UI copy, docs, commits, PRs. Use a
-  comma, a colon, parentheses or a new sentence.
+  comma, a colon, parentheses or a new sentence. That holds for everything Procreator writes
+  too: the story, the book, setup's faint text and the chat (the owner's call, 2026-10-07).
 
 ### Commits and PRs
 

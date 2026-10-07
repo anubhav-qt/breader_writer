@@ -116,6 +116,11 @@ describe('ghostFrom', () => {
     expect(ghostFrom('Mara', 'Mara', 'line', 80)).toBe('');
     expect(ghostFrom('', '""', 'line', 80)).toBe('');
   });
+
+  it('turns any dash into what fits in its place, as everything Procreator writes', () => {
+    expect(ghostFrom('', 'Wry\u2014and salt-stung', 'line', 200)).toBe('Wry, and salt-stung');
+    expect(ghostFrom('Stubborn', 'and proud \u2014 too proud', 'long', 4000)).toBe(' and proud, too proud');
+  });
 });
 
 describe('blankFields', () => {

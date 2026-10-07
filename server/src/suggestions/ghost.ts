@@ -1,10 +1,11 @@
+import { undashed } from '../ai/dashes.ts';
 import type { FieldSize } from './view.ts';
 
 /*
  * Turning the model's answer into the faint text a field shows after what's written in it: only
  * the words to add, joined to the text the way they'd be typed, and no more than the field holds.
  * Models wrap and label their answers now and then, and sometimes start by repeating the text, so
- * all of that comes off first.
+ * all of that comes off first, and any dash too (see ai/dashes.ts).
  */
 
 /** Punctuation that closes what comes before it, so it follows the text with no space. */
@@ -89,7 +90,7 @@ function capped(ghost: string, room: number): string {
  */
 export function ghostFrom(written: string, answer: string, size: FieldSize, max: number): string {
   const startsNewLine = /^[ \t]*\n/.test(answer);
-  let text = cleaned(answer);
+  let text = undashed(cleaned(answer));
   if (size === 'line') {
     text = text.replace(/\s+/g, ' ');
   }

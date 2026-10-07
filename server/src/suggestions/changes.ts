@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Type, type Static } from '@writer/pi-ai';
 import { Darkness, Length, NAME_LIMIT, Pov, everyone, pairKey, type BookSetup, type Character } from '@writer/shared/book';
 import { applyChange, type SetupChange } from '@writer/shared/chat';
+import { undashed } from '../ai/dashes.ts';
 import { fieldKey, fieldLimit, type FieldRef, type SheetField, type SideField, type WorldField } from '@writer/shared/suggestions';
 import { refsOf } from './view.ts';
 
@@ -138,7 +139,7 @@ function needText(args: ChangeArgs): string {
   if (args.text === undefined) {
     throw new Problem("set needs the field's new text.");
   }
-  return args.text.trim();
+  return undashed(args.text.trim());
 }
 
 function fitsField(field: FieldRef, text: string, what: string): string {
@@ -219,7 +220,7 @@ function sheetText(text: string | undefined, field: SheetField, id: string): str
   if (text === undefined) {
     return '';
   }
-  const trimmed = text.trim();
+  const trimmed = undashed(text.trim());
   return fitsField({ kind: 'character', id, field }, trimmed, `a sheet's ${field}`);
 }
 

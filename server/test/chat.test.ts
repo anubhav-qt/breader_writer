@@ -437,6 +437,24 @@ describe('POST /v1/suggestions/chats', () => {
     expect(byId.body).toEqual(chat);
   });
 
+  it('turns any dash in its words or its list into what fits in its place', async () => {
+    const changes: ChangeArgs[] = [
+      { kind: 'set', field: 'tone', text: 'Wry\u2014salt-stung' },
+      { kind: 'add', person: 'Oswin', sheet: { who: 'A smuggler \u2014 retired' } },
+    ];
+    const proxy = await proxyWith([proposing(changes, 'Two changes\u2014small ones.', 'Here\u2014')]);
+    const { app, cookie, userId } = await setUp(catalogOf(proxy));
+    const bookId = await aBook(userId);
+    const r = await say(app, cookie, { bookId, text: 'Go on' });
+
+    expect(streamedText(r.events)).toBe('Here…\n\nTwo changes, small ones.');
+    const chat = chatOf(r.events);
+    const { list } = listEntry(chat);
+    expect(chat.entries[1].text).toBe('Here…\n\nTwo changes, small ones.');
+    expect(list.items[0]).toMatchObject({ kind: 'field', text: 'Wry, salt-stung' });
+    expect(list.items[1]).toMatchObject({ kind: 'add', person: { name: 'Oswin', who: 'A smuggler, retired' } });
+  });
+
   it('goes on in the book’s chat, sets an open list aside, and sends the page only once it changed', async () => {
     const proxy = await proxyWith([
       proposing([{ kind: 'set', field: 'tone', text: 'Wry' }], 'Wry, then.', 'Wry it is.'),

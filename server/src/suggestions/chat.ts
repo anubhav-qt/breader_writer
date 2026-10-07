@@ -4,6 +4,7 @@ import type { BookSetup } from '@writer/shared/book';
 import type { Chat, ChatApproved, ChangeList, SetupChange } from '@writer/shared/chat';
 import type { DraftSetup } from '@writer/shared/suggestions';
 import { counted, ModelError, recordCall, textOf, thinkingOf, type CallTag, type Sent } from '../ai/call.ts';
+import { undashed, Undasher } from '../ai/dashes.ts';
 import { render } from '../prompts/render.ts';
 import { ChangeArgs, argsOf, checkList, checkRedo, stillFitting } from './changes.ts';
 import {
@@ -136,6 +137,8 @@ class Keeper {
   private readonly texts: string[] = [];
   /** Whether the reply being written has passed any words on yet. */
   private started = false;
+  /** The reply's words without dashes, as they stream (see ai/dashes.ts). */
+  private readonly undasher = new Undasher();
   private readonly helper: Helper;
   private readonly chat: ChatRow;
   private readonly onText: (delta: string) => void;
@@ -168,7 +171,8 @@ class Keeper {
       return;
     }
     this.last = message;
-    const text = textOf(message).trim();
+    this.pass(this.undasher.flush());
+    const text = undashed(textOf(message).trim());
     if (text !== '') {
       this.texts.push(text);
     }
@@ -177,22 +181,30 @@ class Keeper {
     await recordCall(this.helper.db, tag, this.helper.inUse, sent, message);
   }
 
-  /** Passes Procreator's words on as they come, a blank line between one reply and the next. */
+  /** Passes Procreator's words on as they come. */
   private stream(event: Extract<AgentEvent, { type: 'message_update' }>) {
     const update = event.assistantMessageEvent;
     if (update.type !== 'text_delta') {
+      return;
+    }
+    this.pass(this.undasher.push(update.delta));
+  }
+
+  /** Passes words of the reply being written on, a blank line between one reply and the next. */
+  private pass(words: string) {
+    if (words === '') {
       return;
     }
     if (!this.started && this.texts.length > 0) {
       this.onText('\n\n');
     }
     this.started = true;
-    this.onText(update.delta);
+    this.onText(words);
   }
 
   /** Words Procreator gave a tool to show (a list's note), as if it had written them. */
   add(text: string) {
-    const words = text.trim();
+    const words = undashed(text.trim());
     if (words === '') {
       return;
     }

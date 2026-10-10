@@ -294,7 +294,7 @@ function findCharacter(setup: BookSetup, id: string | null): Character | undefin
   return everyone(setup).find((character) => character.id === id);
 }
 
-function CastCard({ character, plays, onOpen }: { character: Character; plays: boolean; onOpen: () => void }) {
+export function CastCard({ character, plays, onOpen }: { character: Character; plays: boolean; onOpen: () => void }) {
   const name = character.name.trim();
   let nameText = name;
   if (!name && plays) {

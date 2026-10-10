@@ -379,7 +379,7 @@ function whatOf(story: Story, edit: StoryEdit, played: boolean, reaching: Reachi
     if (rename) {
       return `Renamed ${rename.was} ${rename.now}`;
     }
-    return `Changed ${names.get(edit.character.id) ?? 'someone'}'s sheet`;
+    return `Changed ${names.get(edit.character.id) ?? 'someone'}’s sheet`;
   }
   if (edit.kind === 'join') {
     return `${edit.character.name.trim()} joined the cast`;

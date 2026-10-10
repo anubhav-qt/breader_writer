@@ -1,7 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { AnimatePresence } from 'motion/react';
 import type { Mark, Opening, Person, Play, PlayTurn, SceneHead } from '@writer/shared/play';
-import { IconBack, IconClose, IconUndo } from '../../components/icons';
+import { IconBack, IconClose, IconPeople, IconUndo } from '../../components/icons';
+import { useMedia } from '../../lib/useMedia';
 import { ModelPicker } from '../models/ModelPicker';
+import { StoryPanel } from '../story/StoryPanel';
+import { SavingLine, StorySheets, passagesText } from '../story/StorySheets';
+import { useStory, type StoryState } from '../story/useStory';
 import { MoveBox, type Draft } from './MoveBox';
 import { newestOf, usePlay, type Pending, type PlayState } from './usePlay';
 import '../add/add.css';
@@ -24,6 +29,9 @@ interface Props {
 /** How near the end the owner has to be for the page to keep to the end as words come in. */
 const NEAR_END = 120;
 
+/** Wide enough for the Story panel to sit beside the play instead of over it. */
+const WIDE = '(min-width: 1100px)';
+
 const BLANK_DRAFT: Draft = { text: '', voice: 'character' };
 
 /** The owner's words put back in the box, before anything typed there since. */
@@ -35,10 +43,38 @@ function withWordsBack(words: string, box: string): string {
 }
 
 export function PlayPage({ bookId, owner, onClose }: Props) {
-  const state = usePlay(bookId);
+  // The story's changes and the play's moves wait for each other: one exchange at a time in a book.
+  const refreshPlay = useRef<() => Promise<void>>(async () => {});
+  const story = useStory(bookId, () => void refreshPlay.current());
+  const state = usePlay(bookId, story.saving !== null);
+  refreshPlay.current = state.refresh;
   const [draft, setDraft] = useState<Draft>(BLANK_DRAFT);
   const [playingCue, setPlayingCue] = useState(false);
+  const [storyOpen, setStoryOpen] = useState(false);
+  const wide = useMedia(WIDE);
   const play = state.play;
+  const writing = state.pending !== null || state.asking !== null;
+
+  // The story is read again as the panel or a sheet opens, and whenever the play changed.
+  const showing = storyOpen || story.opened !== null;
+  useEffect(() => {
+    if (showing) {
+      void story.reload();
+    }
+    // reload is made anew each render; what matters is what's showing and the play.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showing, play]);
+
+  /** A quiet line in the page opens what it's about: someone's sheet, a line's, or what a rewrite changed. */
+  const openMark = (mark: Mark) => {
+    if (mark.kind === 'joined') {
+      story.open({ kind: 'person', id: mark.id });
+    } else if (mark.kind === 'shifted') {
+      story.open({ kind: 'line', a: mark.a, b: mark.b });
+    } else {
+      story.open({ kind: 'rewrite', change: mark.change });
+    }
+  };
 
   // A cue is asked about afresh each time someone is about to act.
   const cueId = play?.cue?.id ?? null;
@@ -115,15 +151,24 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
           >
             <IconUndo /> <span className="play-tool-label">Undo</span>
           </button>
+          <button
+            type="button"
+            className="btn btn-ghost play-tool"
+            aria-label="Story"
+            aria-expanded={storyOpen}
+            onClick={() => setStoryOpen(!storyOpen)}
+          >
+            <IconPeople /> <span className="play-tool-label">Story</span>
+          </button>
           <ModelPicker owner={owner} />
         </div>
       </header>
 
-      <PageBody state={state} />
+      <PageBody state={state} onMark={openMark} />
 
       <footer className="play-foot">
         <div className="play-foot-inner">
-          <Foot state={state} onHint={(move) => setDraft({ text: move, voice: 'character' })} />
+          <Foot state={state} story={story} showing={showing} onHint={(move) => setDraft({ text: move, voice: 'character' })} />
           {play && (
             <MoveBox
               stage={play.stage}
@@ -144,6 +189,13 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
           )}
         </div>
       </footer>
+
+      <AnimatePresence>
+        {storyOpen && (
+          <StoryPanel key={wide ? 'panel' : 'sheet'} state={story} wide={wide} held={writing} onClose={() => setStoryOpen(false)} />
+        )}
+      </AnimatePresence>
+      <StorySheets state={story} bookId={bookId} held={writing} />
     </div>
   );
 }
@@ -164,10 +216,26 @@ function canUndo(state: PlayState): boolean {
   return true;
 }
 
-/** What's above the box: why something failed, the hints, or Procreator thinking of them. */
-function Foot({ state, onHint }: { state: PlayState; onHint: (move: string) => void }) {
+interface FootProps {
+  state: PlayState;
+  story: StoryState;
+  /** Whether the Story panel or a sheet is open, and says how a change stands itself. */
+  showing: boolean;
+  onHint: (move: string) => void;
+}
+
+/** What's above the box: why something failed, a change to the story on its way, the hints, or Procreator thinking of them. */
+function Foot({ state, story, showing, onHint }: FootProps) {
   let error = null;
-  if (state.error) {
+  if (story.saving) {
+    error = <SavingLine saving={story.saving} />;
+  } else if (story.error && !showing) {
+    error = (
+      <p className="play-error" role="alert">
+        {story.error}
+      </p>
+    );
+  } else if (state.error) {
     error = (
       <p className="play-error" role="alert">
         {state.error}
@@ -202,7 +270,7 @@ function Foot({ state, onHint }: { state: PlayState; onHint: (move: string) => v
 }
 
 /** The scrolling page: the scene's heading and its turns, and what Procreator is writing now. */
-function PageBody({ state }: { state: PlayState }) {
+function PageBody({ state, onMark }: { state: PlayState; onMark: (mark: Mark) => void }) {
   const scrollRef = useRef<HTMLElement>(null);
   const nearEnd = useRef(true);
   const pending = state.pending;
@@ -247,7 +315,7 @@ function PageBody({ state }: { state: PlayState }) {
   if (state.loaded.state === 'failed') {
     content = <p className="play-error play-failed">{state.loaded.message}</p>;
   } else if (play) {
-    content = <ScenePage play={play} state={state} />;
+    content = <ScenePage play={play} state={state} onMark={onMark} />;
   }
 
   return (
@@ -258,7 +326,7 @@ function PageBody({ state }: { state: PlayState }) {
 }
 
 /** The scene on the page: its heading, its turns, and what's under them as the play stands. */
-function ScenePage({ play, state }: { play: Play; state: PlayState }) {
+function ScenePage({ play, state, onMark }: { play: Play; state: PlayState; onMark: (mark: Mark) => void }) {
   const pending = state.pending;
 
   // Going on: the page starts fresh under the next scene's heading.
@@ -317,6 +385,7 @@ function ScenePage({ play, state }: { play: Play; state: PlayState }) {
           protagonist={play.protagonist}
           again={canAgain && turn === newest}
           onAgain={() => void state.again()}
+          onMark={onMark}
         />
       ))}
       {under}
@@ -435,15 +504,24 @@ function InputView({ voice, input, played, protagonist, folded }: {
   return <NoteMark label={label} text={input} />;
 }
 
-/** A quiet line for someone joining the cast, or a relationship shifting (the owner's pick, 2026-10-07). */
-function MarkLine({ mark }: { mark: Mark }) {
+/**
+ * A quiet line for someone joining the cast or a relationship shifting, and a tap opens that sheet
+ * (the owner's pick, 2026-10-07); or for a rewrite of the past, and a tap shows each passage before
+ * and after (the owner's pick, 2026-10-11).
+ */
+function MarkLine({ mark, onOpen }: { mark: Mark; onOpen: (mark: Mark) => void }) {
+  let text = '';
   if (mark.kind === 'joined') {
-    return <p className="play-mark">{mark.name} joins the cast</p>;
+    text = `${mark.name} joins the cast`;
+  } else if (mark.kind === 'shifted') {
+    text = `${mark.between}: ${mark.text}`;
+  } else {
+    text = `${mark.what}: ${passagesText(mark.count)} rewritten`;
   }
   return (
-    <p className="play-mark">
-      {mark.between}: {mark.text}
-    </p>
+    <button type="button" className="play-mark" onClick={() => onOpen(mark)}>
+      {text}
+    </button>
   );
 }
 
@@ -453,15 +531,16 @@ interface TurnProps {
   /** Whether "Another reply" sits under it: the newest reply, while nothing is being written. */
   again: boolean;
   onAgain: () => void;
+  onMark: (mark: Mark) => void;
 }
 
-function TurnView({ turn, protagonist, again, onAgain }: TurnProps) {
+function TurnView({ turn, protagonist, again, onAgain, onMark }: TurnProps) {
   return (
     <section className="play-turn">
       <InputView voice={turn.voice} input={turn.input} played={turn.played} protagonist={protagonist} folded />
       <Prose text={turn.reply} />
       {turn.marks.map((mark, index) => (
-        <MarkLine key={index} mark={mark} />
+        <MarkLine key={index} mark={mark} onOpen={onMark} />
       ))}
       {again && (
         <button type="button" className="btn btn-ghost play-again" onClick={onAgain}>

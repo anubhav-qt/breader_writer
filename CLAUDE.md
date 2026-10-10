@@ -52,8 +52,9 @@ another reply, a scene's end and going on), checked in headless Chrome against a
 shows, and every change setup can make, held from now on and told to Procreator, or reaching back
 (a rename, "Always so"), rewritten into what was played by Procreator and kept at once, with the
 sessions and the actors' chats started again from it. Neither has met the real model yet. The
-Story and Notes panels are next. The owner has a real book set up locally that they mean to play through before production, so its data
-must survive every change (see "Running it locally"). See "The code" below for what exists.
+Story panel is built on it (2026-10-11), checked in headless Chrome against a stand-in API; the
+Notes panel is next. The owner has a real book set up locally that they mean to play through
+before production, so its data must survive every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
 
@@ -671,8 +672,27 @@ through them all in one local test once everything is built (see "Status").
     picked opening nowhere (it's offered again). An actor's turn gives nothing back.
   - Leaving the page stops what Procreator is writing, which takes the move back, as closing the
     Suggestions chat's page does.
-  - Story, Notes and Book join the top bar with what they open (the panels next, the book in
-    step 7).
+  - Story is in the top bar after undo; Notes and Book join it with what they open (the Notes
+    panel next, the book in step 7).
+- The Story panel (`frontend/src/features/story/`), as the owner's picks have it (see "The story
+  is a panel away mid story"). Our calls where they didn't say (the owner can change them):
+  - Before anything is played, everything saves plainly, and removing or untying doesn't ask:
+    there's no past.
+  - Tying two who aren't tied is a change like any line's: their sheet opens blank, says
+    "Saving ties them", and asks how far back it reaches. Closing it leaves them untied.
+  - "From now on" is the dark button and "Always so" the quiet one, the same in a sheet, the
+    panel's end and the ask before removing or untying.
+  - Closing a sheet with changes that weren't saved asks first, as leaving setup does. The
+    panel's end has Discard beside its Save.
+  - Procreator's page about someone shows below their sheet, to read; editing it is the Notes
+    panel's. Fields mid story have no faint text: setup help is setup's.
+  - A change on its way holds the play: the box, undo and hints wait, and the line above the box
+    says how far a rewrite has got ("Procreator is rewriting what was played, part 2 of 3").
+    Closing the panel or the sheet doesn't stop it; leaving the page does, and nothing is kept.
+  - The story is read again whenever the panel or a sheet opens and whenever the play changes.
+  - The quiet lines in the page are buttons: someone joining opens their sheet, a relationship
+    shifting opens the line's, and a rewrite ("Renamed Ren Renji: 3 passages rewritten") opens
+    each passage where it is, before (grey) and after.
 - The owner's edits mid story (`ownerEdit` in breading_ground, `POST /v1/books/:id/story/edits`):
   someone's sheet, someone new (`join`), someone leaving (`leave`), a line tied or changed, two
   untied, or the book's choices and world together (`book`), each with how far it reaches
@@ -867,13 +887,22 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   the server last said it, and while Procreator writes, what was sent and its words so far
   (`Pending`): a move shows at once, its narration comes in word by word, and a move that fails
   puts the play back as the server answers and the owner's words back in the box.
-  `PlayPage.tsx` is the page: the top bar (back, the title, undo, the model picker), the scene
+  `PlayPage.tsx` is the page: the top bar (back, the title, undo, Story, the model picker), the scene
   under its heading with its turns (moves as quiet italic lines, notes folded into marks, the
   quiet lines for the cast and relationships, "Another reply" under the newest), what's under
   them as the play stands (the openings, a scene's end and "On to Scene 5"), and the hints and
   errors above the box. The page keeps to its end as words come in, unless the owner scrolled
   up. `MoveBox.tsx` is the pinned box, or its ask while someone cued is about to act. `play.css`
   is only what the library's buttons, chips and switch and Add a book's cards and spinner lack.
+- `src/data/story.ts` and `src/features/story/`: the Story panel (see "Notes for step 6").
+  `useStory.ts` holds the story as the server last said it, the sheet open over the page and a
+  change on its way, for the play page, so closing the panel doesn't stop a change and the quiet
+  lines can open a sheet. `StoryPanel.tsx` is the panel (beside the play, or the Suggestions
+  chat's sheet over it on a phone): setup's fields, cast cards and graph, and the panel's end.
+  `StorySheets.tsx` is the sheets over the page, setup's own `CharacterSheet` and
+  `RelationshipSheet` given a footer of their own (`footer`), held until saved, the ask before
+  removing or untying, and what a rewrite changed. `reach.ts` says how a change saves (plainly,
+  or asking "From now on" or "Always so"). `story.css` is only what setup's and the chat's lack.
 - `src/features/models/ModelPicker.tsx` and `src/data/models.ts`: the header's model picker,
   for an account that can write. The chip says the model and its thinking level; it drops down
   the models (`GET /v1/settings`, asked again on each opening) and the thinking levels the

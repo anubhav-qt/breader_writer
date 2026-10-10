@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Character, Relationship, Side } from '@writer/shared/book';
 import { IconTrash } from '../../components/icons';
 import { Modal } from '../../components/Modal';
@@ -12,10 +13,12 @@ interface Props {
   onChange: (relationship: Relationship) => void;
   onUntie: () => void;
   onClose: () => void;
+  /** Mid story: what goes under the fields in place of setup's line and buttons (see features/story/). */
+  footer?: ReactNode;
 }
 
 /** A name as it reads inside a sentence, like "How Mara sees Ilse". */
-function nameIn(people: Character[], id: string, protagonistId: string): string {
+export function nameIn(people: Character[], id: string, protagonistId: string): string {
   const person = people.find((someone) => someone.id === id);
   if (!person) {
     return 'someone';
@@ -45,7 +48,7 @@ function isBlank(relationship: Relationship): boolean {
  * one's side. Changes apply as they're typed. They come in cast order, the one the owner plays
  * first.
  */
-export function RelationshipSheet({ relationship, people, protagonistId, onChange, onUntie, onClose }: Props) {
+export function RelationshipSheet({ relationship, people, protagonistId, onChange, onUntie, onClose, footer }: Props) {
   const [first, second] = sidesInCastOrder(relationship, people);
   const firstName = nameIn(people, first.id, protagonistId);
   const secondName = nameIn(people, second.id, protagonistId);
@@ -72,13 +75,17 @@ export function RelationshipSheet({ relationship, people, protagonistId, onChang
         />
         <SideFields side={first} name={firstName} otherId={second.id} otherName={secondName} onChange={setSide} />
         <SideFields side={second} name={secondName} otherId={first.id} otherName={firstName} onChange={setSide} />
-        <p className="add-found">Only the tie is needed. The story fills in the rest.</p>
-        <div className="add-actions sheet-actions">
-          <button type="button" className="btn btn-ghost sheet-remove" onClick={onUntie}>
-            <IconTrash /> Untie
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
-        </div>
+        {footer ?? (
+          <>
+            <p className="add-found">Only the tie is needed. The story fills in the rest.</p>
+            <div className="add-actions sheet-actions">
+              <button type="button" className="btn btn-ghost sheet-remove" onClick={onUntie}>
+                <IconTrash /> Untie
+              </button>
+              <button type="button" className="btn btn-primary" onClick={onClose}>Done</button>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

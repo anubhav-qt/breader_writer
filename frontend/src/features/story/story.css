@@ -1,0 +1,66 @@
+/*
+ * The Story panel and its sheets mid story. The panel is the Suggestions chat's (chat.css), and
+ * what's in it is setup's own (setup.css, add.css): this is only what they lack. Rules that change
+ * another file's class double a class, so they win whichever file loads first.
+ */
+
+/* The play makes room for the panel beside it, as the setup page does for the chat. */
+.play:has(.chat-panel) { margin-right: 420px; }
+
+.story-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 36px;
+  padding: 8px 22px 28px;
+}
+.add-busy.story-loading { padding: 8px 22px; }
+.setup-note.story-error { margin: 0; text-align: left; }
+
+/* Narrower than setup's page: the choices one to a row, and the cards two. */
+.story .setup-choices { grid-template-columns: minmax(0, 1fr); }
+.cast.story-cast { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.story-cast .cast-card { min-height: 92px; }
+
+/* The panel's end, once the book or the world has changed: Save, or the two ways to save it. */
+.story-end { flex: none; display: grid; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid var(--line); }
+.story-end-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chat-sheet .story-end { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+
+/* "From now on" and "Always so", each with what it does under it. */
+.reach { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.reach-option { display: grid; align-content: start; gap: 7px; }
+.reach-option .btn { width: 100%; }
+.reach-line { margin: 0; font: var(--ui-w) 11.5px/1.4 var(--ui); color: var(--ink-2); }
+
+.add-busy.story-saving { padding: 2px 0; }
+
+/* Procreator's page about someone, below the owner's sheet: read here, edited in the Notes panel. */
+.story-page { padding-top: 14px; border-top: 1px solid var(--line); }
+.story-page-text { font: 16px/1.6 var(--serif); color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* What a rewrite changed: each passage where it is, before and after. */
+.rewrite-passage { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.rewrite-passage .add-label { margin: 0; }
+.rewrite-text { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.rewrite-text p { margin: 0; font: 16px/1.55 var(--serif); white-space: pre-wrap; overflow-wrap: anywhere; }
+.rewrite-text.is-before p { color: var(--ink-2); }
+.rewrite-tag { font: var(--ui-w) 11px/1 var(--ui); color: var(--ink-2); }
+
+/* A quiet line in the play's page that opens what it's about. */
+button.play-mark {
+  display: block;
+  margin: 1em 0 1em -8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  text-align: left;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+button.play-mark:hover { background: var(--fill); color: var(--ink); }
+
+@media (max-width: 520px) {
+  .reach { grid-template-columns: minmax(0, 1fr); }
+}

@@ -214,7 +214,7 @@ describe('a change from now on', () => {
     expect(r.status).toBe(200);
     expect(r.body.setup.cast[0]).toMatchObject({ name: 'Ren', personality: 'Afraid of the dark' });
 
-    const made = await changeWhat(bookId, 'Changed Ren\'s sheet');
+    const made = await changeWhat(bookId, 'Changed Ren’s sheet');
     expect(made).toMatchObject({ by: 'owner', why: 'from now on', turnId: await newestTurnId(bookId) });
     const [note] = await notesIn(bookId);
     // Made at no turn, so an undo never cuts it.
@@ -238,7 +238,7 @@ describe('a change from now on', () => {
     expect(undone.status).toBe(200);
 
     expect((await personOf(bookId, ren.id)).past).toBe('Lost his father to the river');
-    const made = await changeWhat(bookId, 'Changed Ren\'s sheet');
+    const made = await changeWhat(bookId, 'Changed Ren’s sheet');
     expect(made.takenBackBy).toBeNull();
     const notes = await notesIn(bookId);
     expect(notes.map((note) => note.undone)).toEqual([false]);
@@ -252,7 +252,7 @@ describe('a change from now on', () => {
     const r = await change(app, cookie, bookId, { kind: 'sheet', character: ren });
     expect(r.status).toBe(200);
     expect(await notesIn(bookId)).toEqual([]);
-    expect(await changeWhat(bookId, 'Changed Ren\'s sheet')).toBeUndefined();
+    expect(await changeWhat(bookId, 'Changed Ren’s sheet')).toBeUndefined();
   });
 
   it('takes someone out of the cast and the scene, keeping their sheet, their lines and their history', async () => {
@@ -466,7 +466,7 @@ describe('a change that reaches back', () => {
     expect((await personOf(bookId, ren.id)).past).toBe('A smuggler');
     const [opening] = await standingTurns(bookId);
     expect(opening.reply).toBe('The river is cold. Ren knows it from his smuggling nights.');
-    const [made, rewrote] = await changesWhat(bookId, 'Changed Ren\'s sheet');
+    const [made, rewrote] = await changesWhat(bookId, 'Changed Ren’s sheet');
     expect(made.why).toBe('always so');
     expect(rewrote.why).toBe(REWROTE);
     // Always so is no news to Procreator: the story always said so.

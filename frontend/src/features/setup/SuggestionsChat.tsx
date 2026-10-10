@@ -45,11 +45,18 @@ export function SuggestionsChat({ state, setup, wide, onApprove, onClose }: Prop
       </motion.aside>
     );
   }
-  return <ChatSheet onClose={onClose}>{body}</ChatSheet>;
+  return (
+    <ChatSheet label="Suggestions" onClose={onClose}>
+      {body}
+    </ChatSheet>
+  );
 }
 
-/** The chat as a sheet over the page, rising from the bottom. Escape closes it, as it does a dialog. */
-function ChatSheet({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+/**
+ * A panel's sheet over the page on a phone, rising from the bottom. Escape closes it, as it does a
+ * dialog. The Story panel's is this one too.
+ */
+export function ChatSheet({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -82,7 +89,7 @@ function ChatSheet({ onClose, children }: { onClose: () => void; children: React
         className="chat-sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="Suggestions"
+        aria-label={label}
         tabIndex={-1}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}

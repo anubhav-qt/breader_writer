@@ -59,7 +59,8 @@ function blankPending(voice: Voice, played: Person | null, input: string, scene:
   return { voice, played, input, scene, fresh: false, finishing: null, reply: '', redoing: null };
 }
 
-export function usePlay(bookId: string) {
+/** `held` is the Story panel's change on its way: nothing else can be sent meanwhile. */
+export function usePlay(bookId: string, held = false) {
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
   const [play, setPlay] = useState<Play | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -292,7 +293,7 @@ export function usePlay(bookId: string) {
   };
 
   let busy = false;
-  if (pending !== null || asking !== null) {
+  if (pending !== null || asking !== null || held) {
     busy = true;
   }
 
@@ -314,6 +315,7 @@ export function usePlay(bookId: string) {
     undo,
     askForOpenings,
     askForHints,
+    refresh,
     hideHints: () => setHints(null),
     changePlayOthers,
   };

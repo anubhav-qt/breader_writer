@@ -29,3 +29,4 @@ export const IconStar = (p: P) => (
 export const IconChat = (p: P) => (
   <svg {...base} strokeWidth={1.9} {...p}><path d="M6.5 4.5h11a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-5.2L8 20.5v-3.5H6.5a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3Z" /></svg>
 );
+export const IconUndo = (p: P) => (<svg {...base} strokeWidth={1.9} {...p}><path d="M9 14 4.5 9.5 9 5" /><path d="M4.5 9.5H15a4.5 4.5 0 0 1 0 9h-3" /></svg>);

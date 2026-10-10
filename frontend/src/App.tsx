@@ -38,6 +38,7 @@ function writeParam(name: string, value: string, fallback: string) {
 // The setup pages load when they're first opened, so the library doesn't wait for them.
 const NewBook = lazy(() => import('./features/setup/NewBook').then((m) => ({ default: m.NewBook })));
 const EditSetup = lazy(() => import('./features/setup/EditSetup').then((m) => ({ default: m.EditSetup })));
+const PlayPage = lazy(() => import('./features/play/PlayPage').then((m) => ({ default: m.PlayPage })));
 
 /** What Google adds to the address when it sends the owner back. */
 const RETURN_PARAMS = ['login', 'error'];
@@ -167,13 +168,13 @@ export default function App() {
   }, [say]);
   const newBook = useCallback(() => go({ page: 'new' }), []);
   const toLibrary = useCallback(() => go({ page: 'library' }), []);
-  // Playing comes in a later step; until then a card opens what its book was set up with.
-  const onOpen = useCallback((b: Book) => go({ page: 'setup', bookId: b.id }), []);
+  // A card opens its book's play.
+  const onOpen = useCallback((b: Book) => go({ page: 'play', bookId: b.id }), []);
+  // Start opens the new book's play, where Procreator offers three openings.
   const onMade = useCallback((card: BookCard) => {
     setBooks((list) => putFirst(list, card));
-    go({ page: 'library' });
-    say(`Made “${card.title}”.`);
-  }, [say]);
+    go({ page: 'play', bookId: card.id });
+  }, []);
   const onSaved = useCallback((card: BookCard) => {
     setBooks((list) => putFirst(list, card));
     go({ page: 'library' });
@@ -188,12 +189,14 @@ export default function App() {
     onNew = newBook;
   }
 
-  // Setting up a book is for accounts that can write; anyone else sees the library and its note.
+  // Playing and setting up a book are for accounts that can write; anyone else sees the library and its note.
   const canWrite = account.me?.access === 'open';
   let page: ReactNode;
   if (route.page === 'new' && canWrite) {
     const given = (books ?? []).map((b) => b.color);
     page = <NewBook color={pickColor(given)} onMade={onMade} onClose={toLibrary} />;
+  } else if (route.page === 'play' && canWrite) {
+    page = <PlayPage key={route.bookId} bookId={route.bookId} owner={account.me?.owner === true} onClose={toLibrary} />;
   } else if (route.page === 'setup' && canWrite) {
     page = <EditSetup key={route.bookId} bookId={route.bookId} onSaved={onSaved} onClose={toLibrary} />;
   } else {

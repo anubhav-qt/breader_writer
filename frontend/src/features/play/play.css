@@ -1,0 +1,139 @@
+/*
+ * The play: a bar, the page scrolling under it, and the box pinned at the bottom. The prose is
+ * Literata in one centred column, as wide as breader's reader keeps a page (620px of text); the
+ * interface around it is Doto. Buttons, chips, the switch, the spinner and the opening cards are
+ * the library's and Add a book's; this is only what they lack.
+ */
+.play { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; }
+
+/* The bar: back to the library, the book's title in place of the logo, then the tools. */
+.play-bar { height: 76px; display: flex; align-items: center; gap: 10px; padding: 0 24px 0 20px; }
+.modal-close.play-back { flex: none; width: 38px; height: 38px; }
+.modal-close.play-back svg { width: 22px; height: 22px; }
+.play-title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--read);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.play-actions { position: relative; flex: none; margin-left: auto; display: flex; align-items: center; gap: 4px; }
+
+/* The page. */
+.play-scroll { overflow-y: auto; overscroll-behavior: contain; }
+.play-page { width: 620px; max-width: calc(100% - 48px); margin: 0 auto; padding: 28px 0 40px; font: 20px/1.65 var(--serif); }
+.play-failed { margin-top: 20dvh; text-align: center; }
+
+.play-head { display: grid; gap: 10px; margin-bottom: 32px; }
+.play-head-number { font: var(--ui-w) 13px/1 var(--ui); color: var(--ink-2); }
+.play-head-where { margin: 0; font: 600 28px/1.25 var(--serif); text-wrap: balance; }
+
+/* Procreator's prose, as a book sets it: paragraphs indented, not spaced. */
+.play-prose p { margin: 0; text-wrap: pretty; overflow-wrap: break-word; }
+.play-prose p + p { text-indent: 1.5em; }
+
+/* The owner's move: a quiet italic line between the paragraphs. */
+.play-move { margin: 1.1em 0; font-style: italic; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: break-word; }
+.chip.play-as { margin-right: 10px; font-style: normal; vertical-align: 0.2em; }
+
+/* A note as the author: in full while Procreator answers it, then a small mark that opens it. */
+.play-note { margin: 1.1em 0; font-size: 17px; font-style: italic; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: break-word; }
+.play-note-wrap { margin: 1em 0; }
+.play-note-wrap .play-note { margin: 0.5em 0 0; }
+.chip.play-note-mark { cursor: pointer; transition: color 140ms ease, background-color 140ms ease; }
+.chip.play-note-mark:hover,
+.chip.play-note-mark[aria-expanded="true"] { color: var(--ink); background: var(--line); }
+
+/* Someone joining the cast, or a relationship shifting, where it happened. */
+.play-mark { margin: 1em 0; font: var(--ui-w) 12.5px/1.45 var(--ui); color: var(--ink-2); }
+
+.btn.play-again { height: 32px; margin: 0.8em 0 0 -12px; padding: 0 12px; font-size: 12.5px; }
+.add-busy.play-working { padding: 14px 0; }
+.play-turn + .play-turn { margin-top: 1.1em; }
+
+/* Lines in the interface's voice: the openings' ask, a scene's end. */
+.play-quiet { margin: 0; font: var(--ui-w) 13px/1.5 var(--ui); color: var(--ink-2); }
+.play-end { display: grid; justify-items: center; gap: 16px; margin-top: 2.6em; text-align: center; }
+.btn.play-on { height: 46px; padding: 0 22px; border-radius: 14px; font-size: 14.5px; }
+
+/* The openings offered: Add a book's cards, each a line or two of Literata. */
+.play-openings { display: grid; gap: 14px; }
+.add-choice.play-opening { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.add-choice.play-opening:disabled { opacity: 0.5; }
+.play-opening-text { font: 18px/1.5 var(--serif); }
+.play-opening-where { font: var(--ui-w) 11.5px/1.3 var(--ui); color: var(--ink-2); }
+
+/* Under the page: why something failed, the hints, and the box, its words in line with the prose. */
+.play-foot { padding: 0 24px 20px; }
+.play-foot-inner { width: 650px; max-width: 100%; margin: 0 auto; display: grid; gap: 8px; }
+.play-error { margin: 0; font: var(--ui-w) 12.5px/1.45 var(--ui); color: var(--danger); }
+
+/* The hints: quiet lines just above the box; a tap puts one in it. */
+.play-hints { display: flex; align-items: flex-start; gap: 4px; }
+.play-hints-list { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.play-hint {
+  padding: 6px 10px;
+  border-radius: 9px;
+  text-align: left;
+  font: italic 16px/1.45 var(--serif);
+  color: var(--ink-2);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.play-hint:hover { background: var(--fill); color: var(--ink); }
+.modal-close.play-hints-close { flex: none; }
+
+/* The box: a field holding the chip, the words and a row of controls. */
+.play-box {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--canvas);
+  transition: border-color 140ms ease, background-color 160ms ease;
+}
+.play-box:focus-within { border-color: var(--accent); }
+.play-box-top { display: flex; }
+button.chip.play-voice { cursor: pointer; transition: color 140ms ease, background-color 140ms ease; }
+button.chip.play-voice:hover:not(:disabled) { color: var(--ink); background: var(--line); }
+.play-box.is-author .chip.play-voice { background: var(--line); }
+.play-box-text {
+  width: 100%;
+  min-height: 56px;
+  max-height: 32dvh;
+  field-sizing: content;
+  resize: none;
+  border: 0;
+  outline: none;
+  padding: 4px 2px;
+  background: transparent;
+  font: 18px/1.5 var(--serif);
+}
+.play-box-text:disabled { cursor: not-allowed; }
+/* As the author the box turns quieter, grey and italic (the owner's pick, 2026-10-07). */
+.play-box.is-author { background: var(--fill); }
+.play-box.is-author .play-box-text { font-style: italic; color: var(--ink-2); }
+.play-box-row { display: flex; align-items: center; gap: 10px; }
+.btn.play-hints-btn { height: 34px; margin-left: -6px; padding: 0 10px; font-size: 13px; }
+.play-switch { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; font: var(--ui-w) 12px/1.25 var(--ui); color: var(--ink-2); }
+.btn.play-send { margin-left: auto; height: 38px; }
+
+/* Someone about to act: the box asks who plays them. */
+.play-cue { gap: 12px; padding: 14px 14px 12px; }
+.play-cue-text { margin: 0; font: 18px/1.4 var(--serif); }
+.play-cue-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+/* Phones: the bar's buttons are icons, the title is cut short, and everything sits closer. */
+@media (max-width: 720px) {
+  .play-bar { height: 64px; gap: 6px; padding: 0 12px 0 8px; }
+  .play-title { font-size: 28px; }
+  .play-tool-label { display: none; }
+  .btn.play-tool { width: 40px; padding: 0; }
+  .play-page { max-width: calc(100% - 32px); padding-top: 16px; font-size: 19px; }
+  .play-head-where { font-size: 24px; }
+  .play-foot { padding: 0 10px max(10px, env(safe-area-inset-bottom)); }
+}

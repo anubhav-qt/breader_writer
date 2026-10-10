@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
  *
  *   /writer/                      the library
  *   /writer/new                   setting up a new book
+ *   /writer/books/<id>            playing a book
  *   /writer/books/<id>/setup      what a book was set up with
  *
  * Moving between them changes the address without loading the page again, so the back button
@@ -13,6 +14,7 @@ import { useEffect, useState } from 'react';
 export type Route =
   | { page: 'library' }
   | { page: 'new' }
+  | { page: 'play'; bookId: string }
   | { page: 'setup'; bookId: string };
 
 const BASE = import.meta.env.BASE_URL;
@@ -26,6 +28,9 @@ export function routeFrom(pathname: string): Route {
   if (parts.length === 1 && parts[0] === 'new') {
     return { page: 'new' };
   }
+  if (parts.length === 2 && parts[0] === 'books') {
+    return { page: 'play', bookId: parts[1] };
+  }
   if (parts.length === 3 && parts[0] === 'books' && parts[2] === 'setup') {
     return { page: 'setup', bookId: parts[1] };
   }
@@ -35,6 +40,9 @@ export function routeFrom(pathname: string): Route {
 export function pathOf(route: Route): string {
   if (route.page === 'new') {
     return `${BASE}new`;
+  }
+  if (route.page === 'play') {
+    return `${BASE}books/${route.bookId}`;
   }
   if (route.page === 'setup') {
     return `${BASE}books/${route.bookId}/setup`;

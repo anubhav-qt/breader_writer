@@ -46,7 +46,9 @@ is built (the openings, moves narrated as they're written, scenes ending and goi
 another reply, hints, someone joining the cast), and so are the cast's actors (cues, sending an
 answer back, the owner playing others with the switch off, each actor's chat and its
 compaction), with their tests against a stand-in proxy. Neither has been tried against the real
-model yet. The play page is next. The owner
+model yet. The play page is built (the prose, the pinned box, openings, cues, hints, undo,
+another reply, a scene's end and going on), checked in headless Chrome against a stand-in API
+(2026-10-11). The Story and Notes panels, and the owner's edits mid story, are next. The owner
 has a real book set up locally that they mean to play through before production, so its data
 must survive every change (see "Running it locally"). See "The code" below for what exists.
 
@@ -356,8 +358,10 @@ through them all in one local test once everything is built (see "Status").
 
 ### Notes for step 2
 
-- Until playing exists (step 6), a card opens its book's setup page, to look over and change.
-  Nothing changes until Save, and leaving with changes asks first.
+- A book's setup page (`books/<id>/setup`) is for looking over and changing what it was set up
+  with. Nothing changes until Save, and leaving with changes asks first. Since the play page, no
+  card opens it: it's only at its address until the Story panel can change a book mid story,
+  which replaces it.
 - A new book's setup is kept in this browser as it's typed (`writer.draft.v1`), so closing the
   page loses nothing. Start makes the book and clears it; Clear empties it.
 - Picking Light novel switches the point of view to first person, and back, until the owner picks
@@ -636,6 +640,25 @@ through them all in one local test once everything is built (see "Status").
   for word. Only scenes that are wrapped up fold (the wrap-up saved what they established to the
   reference, their page included), so the scene being played never does. A fold that fails
   leaves the chat as it was.
+- The play page (`frontend/src/features/play/`) is a book's own address, `/writer/books/<id>`.
+  A card opens it, and so does Start. A first scene with no openings asks for them as the page
+  opens (once; after a failure the owner asks again). Our calls where the owner's picks didn't
+  say (the owner can change them):
+  - One tap on an opening opens the story with it, since undo brings the openings back.
+  - After a note as the author is sent, the box goes back to the owner's character.
+  - Sheets hold no pronouns, so the cue's ask is "Ines is about to act.", with "Ines's actor
+    plays" and "Play Ines". Tapping the "as Ines" chip asks again.
+  - A move as someone other than the protagonist shows "as Ines" before it on the page.
+  - The first scene's opening shows as a folded "Opening" mark, as an author's note does; a later
+    scene's opening has no words of the owner's, so nothing.
+  - The switch is kept in this browser for each book (`writer.playOthers.v1`), on unless the
+    owner turned it off.
+  - Undo puts a note back as the author, an opening of the owner's own back in the box, and a
+    picked opening nowhere (it's offered again). An actor's turn gives nothing back.
+  - Leaving the page stops what Procreator is writing, which takes the move back, as closing the
+    Suggestions chat's page does.
+  - Story, Notes and Book join the top bar with what they open (the panels next, the book in
+    step 7).
 
 ### Later versions
 
@@ -709,10 +732,12 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
 - `src/App.tsx`: the page the address is on. The library asks the writer's server who is logged
   in, then shows the books, or a quiet note in their place: log in, confirm your email, invite
   only, offline, or no books yet (with New book). New book is in the header once there are books.
-  A card opens its setup. The setup pages load on first use (`lazy`), and only for an account
-  that can write; anyone else gets the library and its note.
-- `src/lib/route.ts`: the pages by address under `/writer/`: the library, `new`, and
-  `books/<id>/setup`. Moving between them uses the history, so back and links work.
+  A card opens its book's play, and Start opens the new book's. The play and setup pages load
+  on first use (`lazy`), and only for an account that can write; anyone else gets the library
+  and its note.
+- `src/lib/route.ts`: the pages by address under `/writer/`: the library, `new`, a book's play
+  (`books/<id>`) and its setup (`books/<id>/setup`). Moving between them uses the history, so
+  back and links work.
 - `src/lib/api.ts`: two servers. The writer's API (`VITE_API_URL`, default `/writer/api` on the
   app's own address; the dev server proxies it to port 8790) and breader's (`VITE_BREADER_API_URL`,
   default `https://api.breader.site`) for logging in. A writer API that can't be reached throws
@@ -749,6 +774,19 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   `useChat.ts` holds the Suggestions chat for `SetupForm`, and `SuggestionsChat.tsx` shows it,
   beside the page or over it (`chat.css`); `landing.ts` is how an approved list lands on the
   page (see "Notes for step 5").
+- `src/data/play.ts`: play's server calls (the play, the openings and hints, a move and the rest
+  streamed, undo), and the switch "Main character and author only" as this browser keeps it.
+- `src/features/play/`: the play page (see "Notes for step 6"). `usePlay.ts` holds the play as
+  the server last said it, and while Procreator writes, what was sent and its words so far
+  (`Pending`): a move shows at once, its narration comes in word by word, and a move that fails
+  puts the play back as the server answers and the owner's words back in the box.
+  `PlayPage.tsx` is the page: the top bar (back, the title, undo, the model picker), the scene
+  under its heading with its turns (moves as quiet italic lines, notes folded into marks, the
+  quiet lines for the cast and relationships, "Another reply" under the newest), what's under
+  them as the play stands (the openings, a scene's end and "On to Scene 5"), and the hints and
+  errors above the box. The page keeps to its end as words come in, unless the owner scrolled
+  up. `MoveBox.tsx` is the pinned box, or its ask while someone cued is about to act. `play.css`
+  is only what the library's buttons, chips and switch and Add a book's cards and spinner lack.
 - `src/features/models/ModelPicker.tsx` and `src/data/models.ts`: the header's model picker,
   for an account that can write. The chip says the model and its thinking level; it drops down
   the models (`GET /v1/settings`, asked again on each opening) and the thinking levels the
@@ -1061,7 +1099,11 @@ writer reads that login. Only the writer's own tables are local.
    `local.breader.site` (`ERR_BLOCKED_BY_CLIENT`), so it never sees a breader login. Check the
    UI there against a stand-in for the writer's API: a small Node server on port 8790 (with the
    real `api` stopped) that answers `/v1/me` as an invited writer, `/v1/books`, `/v1/settings`
-   and whatever is being checked, started from a `launch.json` entry that isn't committed.
+   and whatever is being checked, started from a `launch.json` entry that isn't committed. A
+   session without the desktop app (the VS Code extension) checks it the same way in headless
+   Chrome: `playwright-core` installed in the session's scratchpad, driving
+   `/Applications/Google Chrome.app` with `--ignore-certificate-errors`, and the screenshots read
+   back. The preview bar covers the bottom of the page there, so hide `.pv` for screenshots.
 
 **The owner's local book is real.** Before a migration that changes what's stored, dump the
 `writer` schema into `.backups/` (gitignored, since it holds book text), try the migration on a

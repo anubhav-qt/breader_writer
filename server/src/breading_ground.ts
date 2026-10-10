@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
+import type { Api, Model } from '@writer/pi-ai';
 import type { Reach, StoryEdit } from '@writer/shared/story';
 import { undashed } from './ai/dashes.ts';
 import type { Db, Tx } from './db/client.ts';
 import { books } from './db/schema.ts';
-import { castOf, joinCast as castJoin, standingOf, type CharacterRow, type Newcomer } from './story/cast.ts';
+import { castByName, castOf, joinCast as castJoin, standingOf, type CharacterRow, type Newcomer } from './story/cast.ts';
 import { standingAt, startChange, StoryError, takeBack, type Change, type Writer } from './story/changes.ts';
 import { forget as forgetNote, remember as rememberNote, type Note } from './story/memory.ts';
 import { editPage as pageEdit, writePage as pageWrite, type PageEdit, type PageWrite, type Written } from './story/pages.ts';
@@ -32,7 +33,10 @@ import {
 import { headFor } from './procreator/brief.ts';
 import { render } from './prompts/render.ts';
 import { cutActors } from './story/actors.ts';
-import { changeNoteView } from './story/edits.ts';
+import { changeNoteView, type ChangeNoteView } from './story/edits.ts';
+import { rewritePassage } from './story/passages.ts';
+import { copiesOf, restartCopies } from './procreator/rebuild.ts';
+import type { Rewritten } from './procreator/rewrite.ts';
 import { readStory, type Story } from './story/read.ts';
 import { addMessage, currentSegment, cutSession, nextSeq, startSegment } from './story/session.ts';
 import {
@@ -269,7 +273,15 @@ export async function setActorAnswer(db: Db, turn: Turn, answer: string): Promis
 export async function takeBackTurn(db: Db, turn: Turn): Promise<void> {
   await db.transaction(async (tx) => {
     for (const change of await standingAt(tx, turn.id, 'agent')) {
-      await takeBack(tx, change.id, { turnId: turn.id, by: 'owner' });
+      try {
+        await takeBack(tx, change.id, { turnId: turn.id, by: 'owner' });
+      } catch (err) {
+        // Undo takes back the newest turn, so a later change in its way is one the owner made since.
+        if (err instanceof StoryError) {
+          throw new StoryError('Something you changed in the story since builds on what this turn did, so it can’t be taken back.');
+        }
+        throw err;
+      }
     }
     await markUndone(tx, turn);
     await cutSession(tx, turn.sceneId, turn.number);
@@ -279,27 +291,101 @@ export async function takeBackTurn(db: Db, turn: Turn): Promise<void> {
 
 // The owner's changes mid story, from the Story panel.
 
-/** Whether the change renames someone: a rename always reaches back. */
-export function renames(story: Story, edit: StoryEdit): boolean {
+/** A sheet's name as the cast would keep it. */
+function spacedName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ');
+}
+
+/** A name the change gives someone in place of the one they had. */
+export interface Rename {
+  id: string;
+  was: string;
+  now: string;
+}
+
+/** The rename a change makes, if it makes one: a rename always reaches back. */
+export function renameOf(story: Story, edit: StoryEdit): Rename | null {
   if (edit.kind !== 'sheet') {
-    return false;
+    return null;
   }
   const before = story.characters.find((each) => each.id === edit.character.id);
   if (!before) {
-    return false;
+    return null;
   }
-  const name = edit.character.name.trim().replace(/\s+/g, ' ');
-  return name !== before.name;
+  const name = spacedName(edit.character.name);
+  if (name === '' || name === before.name) {
+    return null;
+  }
+  return { id: before.id, was: before.name, now: name };
 }
 
-/** What a change is, in a few words, for the change log. */
-function whatOf(story: Story, edit: StoryEdit, played: boolean): string {
+/** The change with the name left as it was: what of it holds from now on beside a rename. */
+function withoutRename(story: Story, edit: StoryEdit): StoryEdit {
+  const rename = renameOf(story, edit);
+  if (!rename || edit.kind !== 'sheet') {
+    return edit;
+  }
+  return { kind: 'sheet', character: { ...edit.character, name: rename.was } };
+}
+
+/**
+ * Whether the rest of the change can reach back: the book's title and length never do (the pacing
+ * follows a length from now on), nor someone joining, who joins from now on.
+ */
+function canReachBack(story: Story, edit: StoryEdit): boolean {
+  if (edit.kind === 'join') {
+    return false;
+  }
+  if (edit.kind !== 'book') {
+    return changeNoteView(story, withoutRename(story, edit)).changed.length > 0;
+  }
+  const choices = edit.book;
+  const world = story.world ?? { genre: '', tone: '', setting: '', rules: '', notes: '' };
+  if (choices.pov !== story.book.pov || choices.darkness !== story.book.darkness) {
+    return true;
+  }
+  const fields = ['genre', 'tone', 'setting', 'rules', 'notes'] as const;
+  return fields.some((field) => choices.world[field].trim() !== world[field].trim());
+}
+
+/** What of a change reaches back into what was played: the rename it makes, and whether the rest holds always so. */
+export interface Reaching {
+  rename: Rename | null;
+  always: boolean;
+}
+
+/** What of the change reaches back, or null when none of it does, as before anything is played. */
+export function reachingOf(story: Story, edit: StoryEdit, reach: Reach, played: boolean): Reaching | null {
+  if (!played) {
+    return null;
+  }
+  const rename = renameOf(story, edit);
+  const always = reach === 'always' && canReachBack(story, edit);
+  if (!rename && !always) {
+    return null;
+  }
+  return { rename, always };
+}
+
+/** What a change is, in a few words, for the change log and the quiet line a rewrite leaves. */
+function whatOf(story: Story, edit: StoryEdit, played: boolean, reaching: Reaching | null): string {
   const names = new Map(story.characters.map((person) => [person.id, person.name]));
   if (edit.kind === 'sheet') {
+    const rename = renameOf(story, edit);
+    const rest = changeNoteView(story, withoutRename(story, edit)).changed.length > 0;
+    if (rename && rest) {
+      return `Renamed ${rename.was} ${rename.now}, and changed the sheet`;
+    }
+    if (rename) {
+      return `Renamed ${rename.was} ${rename.now}`;
+    }
     return `Changed ${names.get(edit.character.id) ?? 'someone'}'s sheet`;
   }
   if (edit.kind === 'join') {
     return `${edit.character.name.trim()} joined the cast`;
+  }
+  if (edit.kind === 'leave' && reaching?.always) {
+    return `Wrote ${names.get(edit.id) ?? 'someone'} out of the story`;
   }
   if (edit.kind === 'leave' && played) {
     return `${names.get(edit.id) ?? 'Someone'} left the story`;
@@ -316,23 +402,38 @@ function whatOf(story: Story, edit: StoryEdit, played: boolean): string {
   return 'Changed the book';
 }
 
+/** Why the owner made it, as the change log keeps it. */
+function whyOf(reach: Reach, reaching: Reaching | null): string {
+  if (reach === 'always') {
+    return 'always so';
+  }
+  if (reaching?.rename) {
+    return 'renamed, and the rest from now on';
+  }
+  return 'from now on';
+}
+
+/** The change log's why for the passages a change rewrote, which the play's quiet lines look for. */
+export const REWROTE = 'rewrote the past';
+
 /**
- * Makes the change. Before anything is played there's no past to keep, so someone leaving is taken
- * out altogether and an untied line takes its history with it.
+ * Makes the change. Before anything is played there's no past to keep, and always so writes the
+ * past again, so someone leaving is taken out altogether and an untied line takes its history with
+ * it. From now on, they stay in what happened.
  */
-async function applyEdit(tx: Tx, change: Change, edit: StoryEdit, played: boolean) {
+async function applyEdit(tx: Tx, change: Change, edit: StoryEdit, keepsPast: boolean) {
   if (edit.kind === 'sheet') {
     await changeSheet(tx, change, edit.character);
   } else if (edit.kind === 'join') {
     await addPerson(tx, change, edit.character);
-  } else if (edit.kind === 'leave' && played) {
+  } else if (edit.kind === 'leave' && keepsPast) {
     await leaveCast(tx, change, edit.id);
   } else if (edit.kind === 'leave') {
     await removePerson(tx, change, edit.id);
   } else if (edit.kind === 'line') {
     await changeLine(tx, change, edit.relationship);
   } else if (edit.kind === 'untie') {
-    await untie(tx, change, edit.a, edit.b, !played);
+    await untie(tx, change, edit.a, edit.b, !keepsPast);
   } else {
     const { world, ...choices } = edit.book;
     await changeBook(tx, change, choices);
@@ -360,45 +461,89 @@ async function freshBrief(tx: Tx, scene: Scene) {
   await startSegment(tx, scene, { head, summary: '', fromSeq, turnId: null });
 }
 
+/** Tells Procreator of a change that holds from now on: a note at the end of the session of the scene ahead. */
+async function tellProcreator(tx: Tx, bookId: string, note: ChangeNoteView) {
+  const scene = await sceneAhead(tx, bookId);
+  if (!scene || note.changed.length === 0) {
+    return;
+  }
+  // Made at no turn, so an undo of the newest turn leaves it, as it leaves the change.
+  const text = render('procreator/change.njk', note);
+  await addMessage(tx, scene, 'note', null, { role: 'user', content: text, timestamp: Date.now() });
+}
+
+/** The passages Procreator rewrote for a change that reaches back, and the model whose words the restarted sessions hold. */
+export interface Rewrite {
+  passages: Rewritten[];
+  model: Model<Api>;
+}
+
+/** What a change that reached back rewrote: the change that keeps the passages (null when none needed it), and how many. */
+export interface Rewrote {
+  change: number | null;
+  count: number;
+}
+
 /**
  * The owner changes the story mid play (step 6): a sheet, someone new, someone leaving, a line,
  * two untied, or the book's choices and world. It's tagged as the owner's at the newest turn, so
- * an undo of that turn leaves it standing. From now on, Procreator is told with a note at the end
- * of the scene's session; before anything is played, the session starts afresh instead.
+ * an undo of that turn leaves it standing.
+ *
+ * - Before anything is played, the session (if the first scene's has opened) starts afresh.
+ * - From now on, Procreator is told with a note at the end of the scene's session.
+ * - When it reaches back (a rename, or always so), the passages Procreator rewrote are kept as
+ *   another change, and every session and actor's chat that will be sent again starts afresh
+ *   from the story as it now reads. Answers with what it rewrote.
  */
-export async function ownerEdit(db: Db, bookId: string, edit: StoryEdit, reach: Reach): Promise<void> {
+export async function ownerEdit(db: Db, bookId: string, edit: StoryEdit, reach: Reach, rewrite: Rewrite | null = null): Promise<Rewrote | null> {
   const newest = await newestInBook(db, bookId);
   const played = newest !== null;
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const before = await readStory(tx, bookId);
-    if (played && (reach === 'always' || renames(before, edit))) {
-      throw new StoryError('Changing what was already played comes with the next update. Save it from now on, without a new name.');
+    const reaching = reachingOf(before, edit, reach, played);
+    if (reaching && !rewrite) {
+      throw new Error('A change that reaches back is kept with what Procreator rewrote for it.');
     }
     const note = changeNoteView(before, edit);
     if (note.changed.length === 0) {
-      return;
+      return null;
     }
     let turnId: string | null = null;
     if (newest) {
       turnId = newest.id;
     }
-    let why = 'from now on';
-    if (reach === 'always') {
-      why = 'always so';
-    }
-    const change = await startChange(tx, { bookId, turnId, by: 'owner', what: whatOf(before, edit, played), why });
-    await applyEdit(tx, change, edit, played);
+    const what = whatOf(before, edit, played, reaching);
+    const change = await startChange(tx, { bookId, turnId, by: 'owner', what, why: whyOf(reach, reaching) });
+    const keepsPast = played && !reaching?.always;
+    await applyEdit(tx, change, edit, keepsPast);
 
-    const scene = await sceneAhead(tx, bookId);
-    if (!scene) {
-      return;
-    }
     if (!played) {
-      await freshBrief(tx, scene);
-      return;
+      const scene = await sceneAhead(tx, bookId);
+      if (scene) {
+        await freshBrief(tx, scene);
+      }
+      return null;
     }
-    // Made at no turn, so an undo of the newest turn leaves it, as it leaves the change.
-    const text = render('procreator/change.njk', note);
-    await addMessage(tx, scene, 'note', null, { role: 'user', content: text, timestamp: Date.now() });
+    if (!reaching || !rewrite) {
+      await tellProcreator(tx, bookId, note);
+      return null;
+    }
+
+    const cast = await castByName(tx, bookId);
+    const own = rewrite.passages.filter((each) => each.passage.spot.kind === 'story');
+    let rewrote: Rewrote = { change: null, count: 0 };
+    if (own.length > 0) {
+      const rewriting = await startChange(tx, { bookId, turnId, by: 'owner', what, why: REWROTE });
+      for (const each of own) {
+        await rewritePassage(tx, rewriting, each.passage, each.text, cast);
+      }
+      rewrote = { change: rewriting.id, count: own.length };
+    }
+    await restartCopies(tx, bookId, rewrite.model, copiesOf(rewrite.passages));
+    if (!reaching.always) {
+      // Beside a rename, the rest of the sheet holds from now on.
+      await tellProcreator(tx, bookId, changeNoteView(before, withoutRename(before, edit)));
+    }
+    return rewrote;
   });
 }

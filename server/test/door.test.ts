@@ -33,6 +33,7 @@ const WRITES: Record<string, string[]> = {
   ],
   'story/session.ts': ['cutSession'],
   'story/actors.ts': ['cutActors'],
+  'story/passages.ts': ['rewritePassage'],
 };
 
 function sourceFiles(dir: string): string[] {

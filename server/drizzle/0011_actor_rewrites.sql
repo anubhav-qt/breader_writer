@@ -1,0 +1,1 @@
+ALTER TABLE "writer"."actor_segments" ALTER COLUMN "turn_id" DROP NOT NULL;

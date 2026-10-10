@@ -1,15 +1,15 @@
 import { SCENE_WORDS } from '@writer/shared/book';
 import type { Db, Tx } from '../db/client.ts';
 import { render } from '../prompts/render.ts';
-import { castOf } from '../story/cast.ts';
+import { castOf, namesOf } from '../story/cast.ts';
 import { readStory } from '../story/read.ts';
-import { turnsOf, type Scene, type Turn } from '../story/scenes.ts';
+import { sceneNow, turnsOf, type Scene, type Turn } from '../story/scenes.ts';
 import { briefView } from '../story/view.ts';
 
 /*
- * What Procreator reads before anything else in a scene's session: its instructions, and the head
- * a segment opens with (the brief, and after a compaction the scene so far), both built from the
- * story as it stands.
+ * What Procreator reads in a scene's session: its instructions, the head a segment opens with (the
+ * brief, and after a compaction the scene so far), both built from the story as it stands, and
+ * each turn as it's sent.
  */
 
 /** Procreator's instructions for a book's sessions. */
@@ -32,4 +32,23 @@ export async function headFor(db: Db | Tx, scene: Scene, summary: string): Promi
   }
   const view = briefView(story, current, lastScene);
   return render('procreator/head.njk', { ...view, summary });
+}
+
+/** A turn as Procreator is sent it (prompts/templates/procreator/turn.njk). */
+export async function turnMessage(db: Db | Tx, scene: Scene, turn: Turn): Promise<string> {
+  const names = namesOf(await castOf(db, scene.bookId));
+  let played = '';
+  if (turn.played !== null) {
+    played = names.get(turn.played) ?? '';
+  }
+  const current = await sceneNow(db, scene.id);
+  const present: string[] = [];
+  for (const id of current.present) {
+    const name = names.get(id);
+    if (name !== undefined) {
+      present.push(name);
+    }
+  }
+  const view = { number: current.number, place: current.place, time: current.time, present };
+  return render('procreator/turn.njk', { voice: turn.voice, input: turn.input, played, scene: view });
 }

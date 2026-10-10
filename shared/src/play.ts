@@ -29,10 +29,12 @@ export type SceneHead = z.infer<typeof SceneHead>;
 export const Opening = z.object({ text: z.string(), place: z.string(), time: z.string() });
 export type Opening = z.infer<typeof Opening>;
 
-/** Someone joining the cast, or a relationship shifting: a quiet line in the page after the turn it happened at. */
+/** Someone joining the cast, a relationship shifting, or a rewrite of the past: a quiet line in the page after the turn it happened at. */
 export const Mark = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('joined'), id: Id, name: z.string() }),
   z.object({ kind: z.literal('shifted'), a: Id, b: Id, between: z.string(), text: z.string() }),
+  /** The owner's change reached back here: what it was, and how many passages it rewrote, listed by the change. */
+  z.object({ kind: z.literal('rewrote'), change: z.number().int(), what: z.string(), count: z.number().int() }),
 ]);
 export type Mark = z.infer<typeof Mark>;
 

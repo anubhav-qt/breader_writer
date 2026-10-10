@@ -17,10 +17,11 @@ import type { Db } from '../db/client.ts';
 import { scenes } from '../db/schema.ts';
 import { log } from '../log.ts';
 import { cueActor, tellActor, type Moment } from '../procreator/actor.ts';
+import { turnMessage } from '../procreator/brief.ts';
 import { askForOpenings, converse } from '../procreator/converse.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { render } from '../prompts/render.ts';
-import { castOf, namesOf, standingOf, type CharacterRow } from '../story/cast.ts';
+import { castOf, standingOf, type CharacterRow } from '../story/cast.ts';
 import type { Writer } from '../story/changes.ts';
 import {
   cueOf,
@@ -134,25 +135,6 @@ async function sceneOnPage(db: Db, bookId: string): Promise<Scene | null> {
     return null;
   }
   return sceneNumbered(db, bookId, waiting.number - 1);
-}
-
-/** A turn as Procreator is sent it (prompts/templates/procreator/turn.njk). */
-async function turnMessage(db: Db, scene: Scene, turn: Turn): Promise<string> {
-  const names = namesOf(await castOf(db, scene.bookId));
-  let played = '';
-  if (turn.played !== null) {
-    played = names.get(turn.played) ?? '';
-  }
-  const current = await sceneNow(db, scene.id);
-  const present: string[] = [];
-  for (const id of current.present) {
-    const name = names.get(id);
-    if (name !== undefined) {
-      present.push(name);
-    }
-  }
-  const view = { number: current.number, place: current.place, time: current.time, present };
-  return render('procreator/turn.njk', { voice: turn.voice, input: turn.input, played, scene: view });
 }
 
 /** A turn to make: its voice, the owner's words, who it's played as, and the cue it answers, if any. */

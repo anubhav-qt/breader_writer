@@ -404,10 +404,11 @@ export const actorSegments = writer.table(
     memory: text('memory').notNull().default(''),
     /** The first of the chat's messages sent after the head. */
     fromSeq: integer('from_seq').notNull(),
-    /** The turn it was made at. */
-    turnId: uuid('turn_id')
-      .notNull()
-      .references(() => turns.id),
+    /**
+     * The turn it was made at, so an undo past it cuts it. Null when a rewrite of the past made it
+     * (an owner's "always so" or a rename): it holds the rewritten chat, and an undo leaves it.
+     */
+    turnId: uuid('turn_id').references(() => turns.id),
     /** Cut away by an undo. */
     undone: boolean('undone').notNull().default(false),
     createdAt: at('created_at').notNull().defaultNow(),

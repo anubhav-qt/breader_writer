@@ -6,7 +6,8 @@ import { BookSetup, Character, Darkness, Id, Length, Pov, Relationship, TITLE_LI
  * anything setup can (the owner's picks, 2026-10-11): someone's sheet, someone new, someone
  * leaving, a line, two untied, and the book's own choices and world at the panel's end. Every
  * change but a rename, a title or a length asks how far back it reaches (see CLAUDE.md, "A change
- * can reach back to the start").
+ * can reach back to the start"). One that reaches back is rewritten into what was played at once,
+ * and listed after (the owner's pick, 2026-10-11).
  */
 
 /**
@@ -58,3 +59,37 @@ export const StoryView = z.object({
   played: z.boolean(),
 });
 export type StoryView = z.infer<typeof StoryView>;
+
+/** What a change that reached back rewrote: the change that keeps the passages (null when none needed it), and how many. */
+export const Rewrote = z.object({
+  change: z.number().int().nullable(),
+  count: z.number().int(),
+});
+export type Rewrote = z.infer<typeof Rewrote>;
+
+/**
+ * What POST /v1/books/:id/story/edits streams: while a change that reaches back is rewritten, how
+ * many parts of the story are done; then the story as it stands, with what was rewritten (null
+ * for a change that didn't reach back), or why it couldn't be made, with the story as it stands.
+ */
+export const EditEvent = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('rewriting'), done: z.number().int(), of: z.number().int() }),
+  z.object({ type: z.literal('done'), story: StoryView, rewrote: Rewrote.nullable() }),
+  z.object({ type: z.literal('error'), code: z.string(), message: z.string(), story: StoryView }),
+]);
+export type EditEvent = z.infer<typeof EditEvent>;
+
+/** A passage a change rewrote: where it is, and what it said before and after. */
+export const RewrittenPassage = z.object({
+  where: z.string(),
+  before: z.string(),
+  after: z.string(),
+});
+export type RewrittenPassage = z.infer<typeof RewrittenPassage>;
+
+/** GET /v1/books/:id/story/rewrites/:change: what a change rewrote, passage by passage. */
+export const RewriteView = z.object({
+  what: z.string(),
+  passages: z.array(RewrittenPassage),
+});
+export type RewriteView = z.infer<typeof RewriteView>;

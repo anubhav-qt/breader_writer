@@ -15,7 +15,7 @@ import type { InUse } from './settings.ts';
  * first scene's, offered to pick from; setup is the help with setup: suggestions and the
  * Suggestions chat.
  */
-export type Role = 'narrator' | 'actor' | 'author' | 'hints' | 'openings' | 'fold' | 'setup';
+export type Role = 'narrator' | 'actor' | 'author' | 'hints' | 'openings' | 'fold' | 'rewrite' | 'setup';
 
 /** A model call that came back with no answer: the proxy down, an account out of its limits. */
 export class ModelError extends Error {}

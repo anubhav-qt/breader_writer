@@ -1,0 +1,53 @@
+{#-
+  One part of the story for Procreator to rewrite to fit the owner's change (procreator/rewrite.ts):
+  a scene's passages, or the reference, memory and the owner's sheets. The book and the cast first,
+  then what changed, then the numbered passages, and the task last. Takes a RewriteView.
+-#}
+<book>
+Title: {{ book.title }}
+Length: {{ book.length }}
+Style: {{ book.style }}
+Point of view: {{ book.pov }}
+How dark it goes: {{ book.darkness }}
+</book>
+
+<cast>
+{{ cast | join(', ') }}
+</cast>
+
+<owner_change>
+{% for c in changed %}
+<changed subject="{{ c.subject }}">
+{% for f in c.fields %}
+<field name="{{ f.name }}">
+<was>{{ f.was if f.was else 'Nothing.' }}</was>
+<now>{{ f.now if f.now else 'Nothing.' }}</now>
+</field>
+{% endfor %}
+</changed>
+{% endfor %}
+</owner_change>
+
+<passages part="{{ part }}">
+{% for p in passages %}
+<passage n="{{ loop.index }}" where="{{ p.where }}">
+{{ p.text }}
+</passage>
+{% endfor %}
+</passages>
+
+<task>
+{% for r in renames %}
+- {{ r.was }} is called {{ r.now }} now, and always was. Change every form of the name {{ r.was }} that means them (with a possessive, a nickname or a short form made from it) to the matching form of {{ r.now }}. Leave alone words that only look like it.
+{% endfor %}
+{% for name in writtenOut %}
+- {{ name }} was never in the story. Write them out of these passages: what they did and said goes, or falls to no one, and each passage still reads whole.
+{% endfor %}
+{% if pov %}
+- The book's point of view is now "{{ pov.now }}", where it was "{{ pov.was }}". Rewrite each narration whole in the new one, keeping everything that happens and every word that's said. Nothing but the narration changes its point of view.
+{% endif %}
+{% if always %}
+- The rest of the change above holds always: rewrite whatever in these passages says otherwise.
+{% endif %}
+Rewrite the passages above to fit, with rewrite_passages.
+</task>

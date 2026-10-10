@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Mark, Opening, Person, Play, PlayTurn, SceneHead, Stage } from '@writer/shared/play';
-import type { Offer } from '../breading_ground.ts';
+import { REWROTE, type Offer } from '../breading_ground.ts';
 import type { Db } from '../db/client.ts';
 import { books, changes, scenes, versions } from '../db/schema.ts';
 import { castOf, namesOf } from '../story/cast.ts';
@@ -93,7 +93,36 @@ async function marksOf(db: Db, turns: Turn[], cast: CastIndex): Promise<Map<stri
     list.push(mark);
     marks.set(row.turnId, list);
   }
+  for (const rewrite of await rewritesAt(db, turns)) {
+    if (!rewrite.turnId) {
+      continue;
+    }
+    const list = marks.get(rewrite.turnId) ?? [];
+    list.push({ kind: 'rewrote', change: rewrite.change, what: rewrite.what, count: rewrite.count });
+    marks.set(rewrite.turnId, list);
+  }
   return marks;
+}
+
+/** The owner's changes that reached back at these turns and still stand, with how many passages each rewrote. */
+async function rewritesAt(db: Db, turns: Turn[]) {
+  return db
+    .select({ turnId: changes.turnId, change: changes.id, what: changes.what, count: count(versions.id) })
+    .from(changes)
+    .innerJoin(versions, eq(versions.changeId, changes.id))
+    .where(
+      and(
+        inArray(
+          changes.turnId,
+          turns.map((turn) => turn.id),
+        ),
+        eq(changes.by, 'owner'),
+        eq(changes.why, REWROTE),
+        isNull(changes.takenBackBy),
+      ),
+    )
+    .groupBy(changes.id)
+    .orderBy(asc(changes.id));
 }
 
 async function turnsShown(db: Db, scene: Scene | null, cast: CastIndex): Promise<PlayTurn[]> {

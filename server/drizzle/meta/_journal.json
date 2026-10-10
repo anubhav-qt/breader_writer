@@ -78,6 +78,13 @@
       "when": 1791357519725,
       "tag": "0010_actors",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791660497071,
+      "tag": "0011_actor_rewrites",
+      "breakpoints": true
     }
   ]
 }

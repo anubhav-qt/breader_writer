@@ -49,10 +49,10 @@ compaction), with their tests against a stand-in proxy. Neither has been tried a
 model yet. The play page is built (the prose, the pinned box, openings, cues, hints, undo,
 another reply, a scene's end and going on), checked in headless Chrome against a stand-in API
 (2026-10-11). The owner's edits mid story have their server (2026-10-11): what the Story panel
-shows, and every change setup can make, held from now on and told to Procreator; "Always so" and
-renames once something is played are turned away until their rewrite is built, which is next,
-then the Story and Notes panels. The owner
-has a real book set up locally that they mean to play through before production, so its data
+shows, and every change setup can make, held from now on and told to Procreator, or reaching back
+(a rename, "Always so"), rewritten into what was played by Procreator and kept at once, with the
+sessions and the actors' chats started again from it. Neither has met the real model yet. The
+Story and Notes panels are next. The owner has a real book set up locally that they mean to play through before production, so its data
 must survive every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
@@ -408,7 +408,8 @@ through them all in one local test once everything is built (see "Status").
   play's own.
 - "Always so" edits and renames (steps 6 and 7) start the session again from the rewritten
   turns: a new segment with a fresh head, the turns rebuilt as plain messages (their tool calls
-  and thinking don't survive a rewrite).
+  and thinking don't survive a rewrite). Built with step 6's edits, the actors' chats too (see
+  "Notes for step 6").
 - First run against the real model (2026-10-06): Gemini 3.8 Flash through the owner's
   Antigravity, two moves and the wrap-up, in a scratch database (never the owner's). It worked
   end to end. The first move set up Plan, Threads and Timeline before narrating; the wrap-up
@@ -694,8 +695,50 @@ through them all in one local test once everything is built (see "Status").
     first scene's session, if the openings opened it, starts again from a fresh brief instead of
     a note. An opening offered before someone was taken out brings in only who still stands (our
     call, 2026-10-11).
-  - Once anything is played, "Always so" and renames are turned away (409) until their rewrite is
-    built.
+  - Once anything is played, a rename and "Always so" reach back (`play/edits.ts`, then
+    `ownerEdit`). The book's title and length never do, and nor does someone joining. Before
+    anything changes, Procreator rewrites the story's passages (`story/passages.ts`): each
+    scene's turns, where and when it is and its summary, then the reference, memory, the
+    relationships' history and the owner's own sheets, lines and world, and the working copies
+    that will be sent again (the owner's notes in a session that goes on, and the actors' chats
+    and what they remember). It's given a part at a time, each passage numbered with where it is
+    (`procreator/rewrite.ts`), with people named as they'll be once the change is made, and edits
+    with exact words found once, or every place they stand as whole words, or the whole passage
+    (`rewrite_passages`). Edits that don't fit (words not there, a passage emptied that can't be,
+    a link to no one) go back to it with nothing kept, as often as it takes. What the change
+    makes or takes out itself (the sheet, the line, the world, someone written out) isn't given
+    to it.
+  - A rename alone gives Procreator only the passages with a word that starts like one of the old
+    name's words, in any case (`mayName`), and the rest of a renamed sheet holds from now on, told
+    as a note. Always so tells Procreator the whole change, and nothing after: the story always
+    said so. Someone taken out always so is written out of everything played ("was never in the
+    story") and removed whole, and a new point of view always so has every narration rewritten
+    whole in it.
+  - Nothing is kept until every part is rewritten. Then, in one transaction, the owner's change is
+    made, and the story's passages are kept as another change of the owner's (why "rewrote the
+    past", `REWROTE`), so each keeps the version it replaced. Every scene session that goes on
+    (the one being played, or one ended and waiting for its wrap-up) starts a new segment at no
+    turn, with a fresh head and its turns as plain messages, the owner's notes where they were;
+    every standing actor's chat a new segment with who they are now, what they remember and its
+    messages as they read now (`procreator/rebuild.ts`). The messages keep their turns, so an
+    undo still cuts them, and the new segments stay (migration 0011 lets an actor's segment be
+    made at no turn).
+  - The edit is streamed: how many parts are done, then the story and what was rewritten. Reaching
+    back while the AI is offline is a 503 before anything starts. The quiet line in the play's
+    page is a `rewrote` mark on the turn the change was made at, with how many passages it
+    rewrote, and `GET .../story/rewrites/:change` lists them, each before and after. The count is
+    the story's own passages; the working copies aren't the story.
+  - An undo after a rename leaves it and its rewrite, and gives the owner's words back as they now
+    read. Undoing a turn whose changes a rewrite built on is turned away, as the change log turns
+    such undos away, in words the owner can read.
+  - Not rewritten yet: the openings kept with the first scene, a cue kept with a turn
+    (`turns.cue`), and pages' titles. A turn played as someone written out always so still says
+    who played it ("someone no longer in the cast"). The written book joins in step 7.
+  - Rewrite calls are recorded as `rewrite`, keyed for the cache by the book
+    (`rewrite-<book id>`), so every part starts the same.
+  - The owner's local database was at migration 0007 on 2026-10-11 (backed up as
+    `.backups/2026-10-11-actor-segments-turn.sql`). 0008 to 0011 were tried on a copy of it and
+    everything came through; the owner runs `npm run migrate` themselves.
 
 ### Later versions
 
@@ -750,9 +793,12 @@ their code, changed where we need, not rewritten to ours.
 - `src/story.ts`: the story mid play (step 6), for the Story panel: what it shows (`StoryView`:
   the setup as it stands, Procreator's page about each person, and whether anything is played),
   a change the owner makes (`StoryEdit`, with the book's choices and world as `BookChoices`) and
-  how far it reaches (`Reach`), asked as `EditAsk`.
+  how far it reaches (`Reach`), asked as `EditAsk`, what one that reached back rewrote
+  (`Rewrote`), the edit's streamed events (`EditEvent`), and a rewrite passage by passage, before
+  and after (`RewriteView`).
 - `src/play.ts`: play (step 6). A turn as the page shows it (`PlayTurn`: its voice, who the
-  owner or an actor played, their words, the reply, and the quiet lines after it, `Mark`), where
+  owner or an actor played, their words, the reply, and the quiet lines after it, `Mark`, a
+  rewrite of the past among them), where
   the play stands (`Stage`, `cue` while the owner says who plays someone) and the play itself
   (`Play`, with who is about to act), the asks (`MoveAsk`, with `as` for a move as someone cued,
   `OpenAsk`, and `Going` for going on, another reply and letting an actor play, each with
@@ -885,7 +931,7 @@ A Hono API, port 8790, built like breader's server.
   characters who stay and removes only those who left, since later steps hang the story off
   them. Relationships are written whole on each save, and read back in pair order. Reading it
   leaves out whoever left the story, and their lines. `src/books/story.ts` is the story as the
-  Story panel shows it (`storyView`).
+  Story panel shows it (`storyView`), and a rewrite as its quiet line lists it (`rewriteView`).
 - `src/ai/`: the models.
   - `proxy.ts` speaks to CLIProxyAPI: the models its accounts serve (`/v1/models`, with the API
     key), and its management API (`manage`, under `/v8/management`, with the management key):
@@ -958,6 +1004,10 @@ A Hono API, port 8790, built like breader's server.
     are as it told them, and what they remember after a compaction), and messages of kind `play`
     or `fold`, each at a turn in a scene, with who they are when a message told them it changed.
     `cutActors` is undo's side.
+  - `passages.ts`: the story's passages, every text a change that reaches back may rewrite, in
+    parts (a scene at a time, then the rest), each with where it is (`passagesOf`), and keeping
+    one rewritten through the change log (`rewritePassage`, breading_ground's alone). `wheresOf`
+    says where each is, for looking a rewrite over.
   - `read.ts` reads everything a book's story knows in one go (`readStory`), and `view.ts`
     turns it into what the templates take (`briefView`): the people in the scene in full (sheet
     and page) and everyone else in a line, the relationships among those present in full with
@@ -967,8 +1017,8 @@ A Hono API, port 8790, built like breader's server.
     stands against its length. Pages and notes show people as links; the rest by plain name.
     `settingsView` is a book's settings as the prompts say them, for setup help too.
 - `src/procreator/`: Procreator at work in a scene's session.
-  - `brief.ts`: its instructions (`instructionsFor`) and a segment's head (`headFor`: the brief,
-    and after a compaction the scene so far).
+  - `brief.ts`: its instructions (`instructionsFor`), a segment's head (`headFor`: the brief,
+    and after a compaction the scene so far), and a turn as it's sent (`turnMessage`).
   - `tools.ts`: the memory tools (`read_page`, `write_page`, `edit_page`, `search`,
     `remember`, `forget`, `shift_relationship`), typebox schemas checked by pi before they run.
     Each write is one change, by the agent, at the run's turn, through breading_ground, and
@@ -1005,10 +1055,14 @@ A Hono API, port 8790, built like breader's server.
     if that fails), then sends the move, or an aside (hints). `askForOpenings` asks in the first
     scene's session before it begins. `addNote` adds a note to a session (breading_ground adds
     the owner's own).
+  - `rewrite.ts`: Procreator rewriting the past (`rewritePast`), a part at a time, with
+    `rewrite_passages`, whose edits `applyEdits` makes and checks. `rebuild.ts` starts the
+    sessions and the actors' chats again from the story as it now reads (`restartCopies`).
 - `src/breading_ground.ts`: the one door for changes to the story (see "Notes for step 6").
 - `src/play/`: play. `play.ts` is its flows (`askOpenings`, `openStory`, `makeMove`,
   `letActorPlay`, `goOn`, `undo`, `another`, `hintsFor`, and `alone`, one exchange at a time in
-  a book), and `view.ts` the play as the page shows it (`playView`).
+  a book), `view.ts` the play as the page shows it (`playView`), and `edits.ts` the owner's
+  changes mid story (`changeStory`, with Procreator's rewrite first when one reaches back).
 - `src/suggestions/`: setup help. `view.ts` lays out the page as it stands (`setupView`:
   everyone by name, the nameless numbered, two of one name told apart, `refsOf`) and the field
   asked about (`fieldView`: where it is, what's in it, how much it holds, and `lengthFor`, how
@@ -1025,7 +1079,7 @@ A Hono API, port 8790, built like breader's server.
   `chat.ts` runs it (`say`, `redo`, `approve`, and `alone`, one exchange at a time), with its
   tools `propose_changes` and `revise_change`.
 - `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with what it
-  was for (narrator, author, hints, fold, actor, or setup for setup help), the tokens the writer
+  was for (narrator, author, hints, fold, actor, rewrite, or setup for setup help), the tokens the writer
   counted before sending (`counted`) and what the model says it used, cache reads included. A
   call that comes back with no answer is a `ModelError`.
 - `src/prompts/`: the prompts, as Nunjucks templates in `templates/` (`render.ts`). A template
@@ -1037,7 +1091,8 @@ A Hono API, port 8790, built like breader's server.
   `procreator/turn.njk` a turn as it's sent; `procreator/openings.njk` and
   `procreator/hints.njk` the asks for openings and moves; `procreator/compact.njk` and
   `procreator/wrap.njk` the folds' requests; `procreator/change.njk` an owner's change from now
-  on, as its note. The asks come last, after the session. An actor's
+  on, as its note; `rewrite/system.njk` and `rewrite/ask.njk` a rewrite of the past (a part's
+  passages, numbered, with the change, and the task last). The asks come last, after the session. An actor's
   chat: `actor/system.njk` its instructions, `actor/head.njk` what a segment opens with,
   `actor/self.njk` who they are, `actor/cue.njk` a cue, `actor/director.njk` an answer sent
   back, and `actor/fold.njk` its compaction. `suggestions/field-system.njk` and `suggestions/field.njk` are a
@@ -1084,9 +1139,11 @@ A Hono API, port 8790, built like breader's server.
   up, Procreator's words, then the play, or why it couldn't go on (with the play as it stands).
   `.../play/undo` gives the play and the owner's words back, and `.../play/hints` three moves.
   What play can't do as the story stands is a 409. The Story panel, `open` only:
-  `GET /v1/books/:id/story` (the story as it stands) and `POST /v1/books/:id/story/edits` (an
-  owner's change, answered with the story; a 409 when it doesn't fit the story, or reaches back
-  before that's built). Once anything is played, `PUT .../setup` is a 409 too. `routes/ai.ts`
+  `GET /v1/books/:id/story` (the story as it stands), `POST /v1/books/:id/story/edits` (an
+  owner's change, streamed: how far a rewrite has got, then the story and what was rewritten, or
+  why not with the story as it stands; a 503 before it starts when it reaches back while the AI
+  is offline) and `GET /v1/books/:id/story/rewrites/:change` (what a rewrite changed, each
+  passage before and after). Once anything is played, `PUT .../setup` is a 409 too. `routes/ai.ts`
   is the model an account's calls run on, and the 503 and 502 every route that calls Procreator
   gives.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
@@ -1126,8 +1183,9 @@ A Hono API, port 8790, built like breader's server.
   undo, another reply, a turn that fails, hints) and the actors (what a chat holds and is told,
   sending back, undo, and the switch off), `test/session.test.ts` an actor's compaction too,
   `test/edits.test.ts` the owner's changes mid story (the Story panel's story, each change from
-  now on and its note, undo leaving them, someone leaving, and before anything is played), and
-  `test/door.test.ts` breading_ground as the one door.
+  now on and its note, undo leaving them, someone leaving, before anything is played, and renames
+  and always so reaching back), `test/rewrite.test.ts` Procreator's edits to the passages and
+  the passages a rename gives it, and `test/door.test.ts` breading_ground as the one door.
 
 ### Running it locally
 

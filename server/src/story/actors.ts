@@ -34,8 +34,8 @@ export interface ActorOpening {
   /** What they remember of the chat before fromSeq, after a compaction. */
   memory: string;
   fromSeq: number;
-  /** The turn it's made at, so an undo past it cuts it too. */
-  turnId: string;
+  /** The turn it's made at, so an undo past it cuts it too. Null when a rewrite of the past made it, which an undo leaves. */
+  turnId: string | null;
 }
 
 /** A message to keep in an actor's chat. */
@@ -91,14 +91,19 @@ export async function startActorSegment(db: Db | Tx, actor: Actor, opening: Acto
   return segment;
 }
 
-/** Adds a message at the end of the actor's chat. */
-export async function addActorMessage(db: Db | Tx, actor: Actor, entry: ActorEntry): Promise<ActorMessage> {
-  // Undone messages keep their numbers, so a number always means one message.
+/** The number the actor's chat's next message gets. */
+export async function nextActorSeq(db: Db | Tx, actor: Actor): Promise<number> {
   const [row] = await db
     .select({ last: max(actorMessages.seq) })
     .from(actorMessages)
     .where(messagesOfActor(actor));
-  const seq = (row?.last ?? 0) + 1;
+  return (row?.last ?? 0) + 1;
+}
+
+/** Adds a message at the end of the actor's chat. */
+export async function addActorMessage(db: Db | Tx, actor: Actor, entry: ActorEntry): Promise<ActorMessage> {
+  // Undone messages keep their numbers, so a number always means one message.
+  const seq = await nextActorSeq(db, actor);
   const [added] = await db
     .insert(actorMessages)
     .values({ ...actor, seq, ...entry })

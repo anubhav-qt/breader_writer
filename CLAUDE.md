@@ -48,7 +48,10 @@ answer back, the owner playing others with the switch off, each actor's chat and
 compaction), with their tests against a stand-in proxy. Neither has been tried against the real
 model yet. The play page is built (the prose, the pinned box, openings, cues, hints, undo,
 another reply, a scene's end and going on), checked in headless Chrome against a stand-in API
-(2026-10-11). The Story and Notes panels, and the owner's edits mid story, are next. The owner
+(2026-10-11). The owner's edits mid story have their server (2026-10-11): what the Story panel
+shows, and every change setup can make, held from now on and told to Procreator; "Always so" and
+renames once something is played are turned away until their rewrite is built, which is next,
+then the Story and Notes panels. The owner
 has a real book set up locally that they mean to play through before production, so its data
 must survive every change (see "Running it locally"). See "The code" below for what exists.
 
@@ -145,6 +148,15 @@ must survive every change (see "Running it locally"). See "The code" below for w
   book. When someone joins the cast or a relationship shifts, a quiet line in the interface font
   marks it in the page where it happened ("Corwin joins the cast", "Mara and Ines: trust broken"),
   and tapping it opens that sheet (the owner's pick, 2026-10-07). The book never has them.
+  The panel changes anything setup can (the owner's picks, 2026-10-11):
+  - Someone added, removed, tied and untied, all as on setup's page. Removing someone or untying
+    two asks "From now on" or "Always so", and Always so writes them out of everything already
+    played.
+  - The book's settings and the world sit at the panel's top as fields, and once one has changed,
+    a Save shows at the panel's end, split into "From now on" and "Always so" as a sheet's is. A
+    title change alone saves plainly, as a rename does.
+  - Length saves plainly too, and the pacing follows it. Point of view or how dark it goes asks,
+    and Always so rewrites what's been played (and later written) to match.
 - **Procreator's notes have a panel of their own** (the owner's pick, 2026-10-07). A Notes
   button beside Story opens a panel the same way, with the reference's pages by kind (places,
   groups, things, lore, and the story's Plan, Threads and Timeline), each opening as a sheet
@@ -203,6 +215,9 @@ must survive every change (see "Running it locally"). See "The code" below for w
     changed, its Save becomes two buttons, "From now on" and "Always so", each with a short
     line under it saying what it does; a rename alone shows plain Save (the owner's pick,
     2026-10-07).
+  - **A rewrite is kept at once, and listed after** (the owner's pick, 2026-10-11). An Always so
+    or a rename lands straight away, and a quiet line in the play's page says how many passages
+    it changed; a tap shows them, each before and after.
 
   How it works is in "Changing the past" below.
 - **breading_ground keeps track of the whole book** (the owner's, 2026-10-06; the name is
@@ -300,9 +315,7 @@ must survive every change (see "Running it locally"). See "The code" below for w
    have theirs (see "Decided"). The library and the book view start as copies of breader's
    pages; where the owner writes, the writer goes past breader (see "Writing gets a feel of its
    own").
-2. Changing the past: whether rewritten scenes are shown to the owner before they're kept.
-   Asked when we reach it (step 7).
-3. Bringing your own AI (step 9): how a writer's own key or sign-in is kept and used
+2. Bringing your own AI (step 9): how a writer's own key or sign-in is kept and used
    (CLIProxyAPI pools the accounts signed in to it, so one writer's sign-in could end up
    serving another's calls), and what counts as the free chapter (chapters come with the book,
    step 7). A risk to keep in view: subscription sign-ins like Antigravity are generally for
@@ -360,8 +373,8 @@ through them all in one local test once everything is built (see "Status").
 
 - A book's setup page (`books/<id>/setup`) is for looking over and changing what it was set up
   with. Nothing changes until Save, and leaving with changes asks first. Since the play page, no
-  card opens it: it's only at its address until the Story panel can change a book mid story,
-  which replaces it.
+  card opens it, and once anything is played its Save is turned away (`story_started`): mid story,
+  the Story panel changes a book, through breading_ground.
 - A new book's setup is kept in this browser as it's typed (`writer.draft.v1`), so closing the
   page loses nothing. Start makes the book and clears it; Clear empties it.
 - Picking Light novel switches the point of view to first person, and back, until the owner picks
@@ -388,8 +401,8 @@ through them all in one local test once everything is built (see "Status").
 - Folds run on the account's own model and thinking level, as play does.
 - Play (step 6) sends the owner's moves through `converse`, wraps an ended scene up as the next
   one's session opens, and undoes turns through breading_ground (`takeBackTurn`: `takeBack` of
-  the turn's changes and `cutSession`). It will tell Procreator of the owner's mid scene
-  changes with `addNote`. How each turn is written in the session is in "Notes for step 6".
+  the turn's changes and `cutSession`). breading_ground tells Procreator of the owner's mid
+  scene changes with a note at the end of the session (see "Notes for step 6"). How each turn is written in the session is in "Notes for step 6".
 - A session's instructions and tools must be the same for every call in it, folds included, or
   the provider's cache misses. Play's tools join the memory tools for every run, not only for
   play's own.
@@ -659,6 +672,30 @@ through them all in one local test once everything is built (see "Status").
     Suggestions chat's page does.
   - Story, Notes and Book join the top bar with what they open (the panels next, the book in
     step 7).
+- The owner's edits mid story (`ownerEdit` in breading_ground, `POST /v1/books/:id/story/edits`):
+  someone's sheet, someone new (`join`), someone leaving (`leave`), a line tied or changed, two
+  untied, or the book's choices and world together (`book`), each with how far it reaches
+  (`now` or `always`). Each is one change, the owner's, tagged at the newest turn with why
+  ("from now on" or "always so"), so undo leaves it. A change that changes nothing makes no
+  change and tells nothing.
+  - From now on, Procreator is told with a note at the end of the session of the scene ahead (the
+    one being played, or the one waiting): what changed, each field as it was and as it is now
+    (`story/edits.ts`, `procreator/change.njk`). It's added at no turn, so an undo never cuts it,
+    and its instructions say to play it as something that just happened and save it to the
+    reference.
+  - Someone who leaves from now on keeps their sheet with the role `left` (`LEFT` in
+    `story/cast.ts`), so everything written still names them and no one else can take their
+    name. They're out of the scene they were in and the cast as Procreator, the actors and the
+    panel see it (`standingOf`, `standingByName`); their lines and history stay, shown only
+    between people still standing, and the brief marks them as gone. Untied from now on, a
+    line's history stays as what happened between them.
+  - Before anything is played there's no past: someone leaving is taken out whole (their page,
+    lines and history too), an untied line takes its history, a rename is just a name, and the
+    first scene's session, if the openings opened it, starts again from a fresh brief instead of
+    a note. An opening offered before someone was taken out brings in only who still stands (our
+    call, 2026-10-11).
+  - Once anything is played, "Always so" and renames are turned away (409) until their rewrite is
+    built.
 
 ### Later versions
 
@@ -710,6 +747,10 @@ their code, changed where we need, not rewritten to ours.
   (`blankFields`), what's in a field (`fieldText`), changing it (`withFieldText`) and how much
   it holds (`fieldLimit`), the asks and the answers (`FieldAsk`, `FieldSuggestion`, `BlanksAsk`,
   `BlankSuggestions`), and when suggestions start (`filledIn`, against `SUGGEST_AFTER`).
+- `src/story.ts`: the story mid play (step 6), for the Story panel: what it shows (`StoryView`:
+  the setup as it stands, Procreator's page about each person, and whether anything is played),
+  a change the owner makes (`StoryEdit`, with the book's choices and world as `BookChoices`) and
+  how far it reaches (`Reach`), asked as `EditAsk`.
 - `src/play.ts`: play (step 6). A turn as the page shows it (`PlayTurn`: its voice, who the
   owner or an actor played, their words, the reply, and the quiet lines after it, `Mark`), where
   the play stands (`Stage`, `cue` while the owner says who plays someone) and the play itself
@@ -824,7 +865,8 @@ A Hono API, port 8790, built like breader's server.
   levels and no accounts to manage.
 - `src/db/schema.ts`: the writer's tables, all in the Postgres schema `writer`: `books` (owner's
   breader user id, title, colour, length, word goal, words written, point of view, darkness),
-  `worlds` (one per book), `characters` (role `protagonist` or `cast`, in order; the key is the
+  `worlds` (one per book), `characters` (role `protagonist`, `cast`, or `left` for someone who
+  left the story mid play, in order; the key is the
   book and the app made id together, so no book can reach another's characters) and
   `relationships` (one row per pair, smaller id first, which a check enforces: the bond and each
   side's "sees" and "hides"), and `settings` (one per account: its model and thinking level).
@@ -841,7 +883,9 @@ A Hono API, port 8790, built like breader's server.
   schema.
 - `src/books/setup.ts`: a book's setup in and out of those tables. Saving keeps the ids of
   characters who stay and removes only those who left, since later steps hang the story off
-  them. Relationships are written whole on each save, and read back in pair order.
+  them. Relationships are written whole on each save, and read back in pair order. Reading it
+  leaves out whoever left the story, and their lines. `src/books/story.ts` is the story as the
+  Story panel shows it (`storyView`).
 - `src/ai/`: the models.
   - `proxy.ts` speaks to CLIProxyAPI: the models its accounts serve (`/v1/models`, with the API
     key), and its management API (`manage`, under `/v8/management`, with the management key):
@@ -877,7 +921,11 @@ A Hono API, port 8790, built like breader's server.
     take-back isn't taken back itself. Undo takes back the newest first.
   - `scenes.ts`: scenes (made waiting as `next`, begun, set, ended, summed up) and turns. Turns
     are raw history: making one isn't a change (changes are tagged with turns), but rewriting
-    one is. `cast.ts` brings someone new into the cast (`joinCast`).
+    one is. `cast.ts` brings someone new into the cast (`joinCast`, `seatInCast` with the owner's
+    sheet and id) and says who still stands (`standingOf`). `sheets.ts` is the owner's own
+    pieces changed mid story: a sheet, someone added, leaving (`leaveCast`) or taken out whole
+    (`removePerson`), a line, two untied, the world and the book's choices. `edits.ts` says what
+    an owner's change did, field by field, for Procreator's note.
   - Only breading_ground calls the writes in `story/` (see "Notes for step 6").
   - `mentions.ts`: in the structured text (pages, notes, relationship history) a person is
     `<@id>`, and named when it's shown. Procreator writes a person as a link, `[[Name]]`
@@ -955,7 +1003,8 @@ A Hono API, port 8790, built like breader's server.
   - `converse.ts`: the way in for play (`converse`): opens the session if it hasn't been (with
     earlier scenes wrapped up first), compacts it if it's past its limit (and goes on as it was
     if that fails), then sends the move, or an aside (hints). `askForOpenings` asks in the first
-    scene's session before it begins. `addNote` adds the owner's mid scene change as a note.
+    scene's session before it begins. `addNote` adds a note to a session (breading_ground adds
+    the owner's own).
 - `src/breading_ground.ts`: the one door for changes to the story (see "Notes for step 6").
 - `src/play/`: play. `play.ts` is its flows (`askOpenings`, `openStory`, `makeMove`,
   `letActorPlay`, `goOn`, `undo`, `another`, `hintsFor`, and `alone`, one exchange at a time in
@@ -987,7 +1036,8 @@ A Hono API, port 8790, built like breader's server.
   `partials/scene.njk` turns word for word (an author note and an opening marked as such);
   `procreator/turn.njk` a turn as it's sent; `procreator/openings.njk` and
   `procreator/hints.njk` the asks for openings and moves; `procreator/compact.njk` and
-  `procreator/wrap.njk` the folds' requests. The asks come last, after the session. An actor's
+  `procreator/wrap.njk` the folds' requests; `procreator/change.njk` an owner's change from now
+  on, as its note. The asks come last, after the session. An actor's
   chat: `actor/system.njk` its instructions, `actor/head.njk` what a segment opens with,
   `actor/self.njk` who they are, `actor/cue.njk` a cue, `actor/director.njk` an answer sent
   back, and `actor/fold.njk` its compaction. `suggestions/field-system.njk` and `suggestions/field.njk` are a
@@ -1033,8 +1083,12 @@ A Hono API, port 8790, built like breader's server.
   `.../play/actor` (the one about to act is played by their actor), each streamed: the scene's heading when it's set, `finishing` while the scene before is wrapped
   up, Procreator's words, then the play, or why it couldn't go on (with the play as it stands).
   `.../play/undo` gives the play and the owner's words back, and `.../play/hints` three moves.
-  What play can't do as the story stands is a 409. `routes/ai.ts` is the model an account's
-  calls run on, and the 503 and 502 every route that calls Procreator gives.
+  What play can't do as the story stands is a 409. The Story panel, `open` only:
+  `GET /v1/books/:id/story` (the story as it stands) and `POST /v1/books/:id/story/edits` (an
+  owner's change, answered with the story; a 409 when it doesn't fit the story, or reaches back
+  before that's built). Once anything is played, `PUT .../setup` is a 409 too. `routes/ai.ts`
+  is the model an account's calls run on, and the 503 and 502 every route that calls Procreator
+  gives.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
@@ -1070,7 +1124,9 @@ A Hono API, port 8790, built like breader's server.
   `test/dashes.test.ts` the dashes taken out, `test/play.test.ts` play (openings, a pick or
   the owner's own, moves and notes and the quiet lines after them, scenes ending and going on,
   undo, another reply, a turn that fails, hints) and the actors (what a chat holds and is told,
-  sending back, undo, and the switch off), `test/session.test.ts` an actor's compaction too, and
+  sending back, undo, and the switch off), `test/session.test.ts` an actor's compaction too,
+  `test/edits.test.ts` the owner's changes mid story (the Story panel's story, each change from
+  now on and its note, undo leaving them, someone leaving, and before anything is played), and
   `test/door.test.ts` breading_ground as the one door.
 
 ### Running it locally
@@ -1299,7 +1355,8 @@ Decided 2026-10-06 (see "Every cast member has an actor"), built with play (step
 - **The play and the book are rewritten together**, so they still never disagree.
 - **Nothing is lost.** Every rewrite keeps the version it replaced, tagged with the change that
   caused it, so a change can be looked over and taken back.
-- Still open (see "Open"): whether rewritten scenes are shown before they're kept.
+- **A rewrite is kept at once**, and the play's page lists what it changed, each passage before
+  and after (see "Decided").
 
 ### Tools
 

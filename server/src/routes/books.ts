@@ -8,6 +8,7 @@ import type { AppEnv, Deps } from '../context.ts';
 import { books } from '../db/schema.ts';
 import { requireWriter } from '../lib/access.ts';
 import { ApiError, parse, readJson } from '../lib/errors.ts';
+import { newestInBook } from '../story/scenes.ts';
 
 const notFound = () => new ApiError(404, 'not_found', 'There’s no such book here.');
 
@@ -54,9 +55,15 @@ export function bookRoutes(deps: Deps) {
     return c.json(setup);
   });
 
-  /** Changes what a book is set up with. Answers with its card. */
+  /**
+   * Changes what a book is set up with. Answers with its card. Once anything is played, the story
+   * is changed through the Story panel instead, so every change goes through the change log.
+   */
   r.put('/books/:id/setup', async (c) => {
     const book = await ownBook(c.var.login.id, c.req.param('id'));
+    if (await newestInBook(deps.db, book.id)) {
+      throw new ApiError(409, 'story_started', 'The story has started, so change it in the Story panel.');
+    }
     const setup = parse(BookSetup, await readJson(c));
     const card = await updateSetup(deps.db, book.id, setup);
     return c.json(card);

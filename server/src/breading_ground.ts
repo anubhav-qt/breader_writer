@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
+import type { Reach, StoryEdit } from '@writer/shared/story';
 import { undashed } from './ai/dashes.ts';
 import type { Db, Tx } from './db/client.ts';
 import { books } from './db/schema.ts';
-import { castOf, joinCast as castJoin, type CharacterRow, type Newcomer } from './story/cast.ts';
-import { standingAt, startChange, takeBack, type Writer } from './story/changes.ts';
+import { castOf, joinCast as castJoin, standingOf, type CharacterRow, type Newcomer } from './story/cast.ts';
+import { standingAt, startChange, StoryError, takeBack, type Change, type Writer } from './story/changes.ts';
 import { forget as forgetNote, remember as rememberNote, type Note } from './story/memory.ts';
 import { editPage as pageEdit, writePage as pageWrite, type PageEdit, type PageWrite, type Written } from './story/pages.ts';
 import { shiftOnce, type HistoryEntry, type Shift, type SideShift } from './story/relationships.ts';
@@ -13,6 +14,9 @@ import {
   endScene as sceneEnd,
   lockedScene,
   markUndone,
+  newestInBook,
+  nextScene,
+  playingScene,
   prepareScene,
   reframeScene,
   sceneNow,
@@ -25,8 +29,22 @@ import {
   type Turn,
   type Voice,
 } from './story/scenes.ts';
+import { headFor } from './procreator/brief.ts';
+import { render } from './prompts/render.ts';
 import { cutActors } from './story/actors.ts';
-import { cutSession } from './story/session.ts';
+import { changeNoteView } from './story/edits.ts';
+import { readStory, type Story } from './story/read.ts';
+import { addMessage, currentSegment, cutSession, nextSeq, startSegment } from './story/session.ts';
+import {
+  addPerson,
+  changeBook,
+  changeLine,
+  changeSheet,
+  changeWorld,
+  leaveCast,
+  removePerson,
+  untie,
+} from './story/sheets.ts';
 
 /*
  * breading_ground: the one door for changes to the story (the owner's design, 2026-10-07). It
@@ -41,6 +59,9 @@ import { cutSession } from './story/session.ts';
  *   happened.
  * - someone's sheet, page or relationships changed: their actor is told who they are now with
  *   their next cue (procreator/actor.ts compares what it last told them with what stands).
+ * - the owner changed the story mid play, from now on: Procreator is told with a note at the end
+ *   of the scene's session, what changed and what it was. Before anything is played, the session
+ *   (if the first scene's has opened) starts again from a fresh brief instead.
  *
  * Everything Procreator writes comes through without dashes (ai/dashes.ts). The story's own
  * modules (story/) do the writing; only this file calls their writes, which a test holds it to.
@@ -107,7 +128,7 @@ export async function shiftRelationship(tx: Tx, writer: Writer, sceneId: string 
 
 /** The story's first scene, made to wait while the owner picks how it opens. Everyone is in it until then. */
 export async function prepareFirstScene(tx: Tx, writer: Writer): Promise<Scene> {
-  const cast = await castOf(tx, writer.bookId);
+  const cast = standingOf(await castOf(tx, writer.bookId));
   const present = cast.map((person) => person.id);
   const change = await startChange(tx, { ...writer, what: 'Made the first scene' });
   return prepareScene(tx, change, { place: '', time: '', present });
@@ -253,5 +274,131 @@ export async function takeBackTurn(db: Db, turn: Turn): Promise<void> {
     await markUndone(tx, turn);
     await cutSession(tx, turn.sceneId, turn.number);
     await cutActors(tx, turn.sceneId, turn.number);
+  });
+}
+
+// The owner's changes mid story, from the Story panel.
+
+/** Whether the change renames someone: a rename always reaches back. */
+export function renames(story: Story, edit: StoryEdit): boolean {
+  if (edit.kind !== 'sheet') {
+    return false;
+  }
+  const before = story.characters.find((each) => each.id === edit.character.id);
+  if (!before) {
+    return false;
+  }
+  const name = edit.character.name.trim().replace(/\s+/g, ' ');
+  return name !== before.name;
+}
+
+/** What a change is, in a few words, for the change log. */
+function whatOf(story: Story, edit: StoryEdit, played: boolean): string {
+  const names = new Map(story.characters.map((person) => [person.id, person.name]));
+  if (edit.kind === 'sheet') {
+    return `Changed ${names.get(edit.character.id) ?? 'someone'}'s sheet`;
+  }
+  if (edit.kind === 'join') {
+    return `${edit.character.name.trim()} joined the cast`;
+  }
+  if (edit.kind === 'leave' && played) {
+    return `${names.get(edit.id) ?? 'Someone'} left the story`;
+  }
+  if (edit.kind === 'leave') {
+    return `Took ${names.get(edit.id) ?? 'someone'} out of the story`;
+  }
+  if (edit.kind === 'line') {
+    return `Changed the line between ${names.get(edit.relationship.a.id) ?? 'someone'} and ${names.get(edit.relationship.b.id) ?? 'someone'}`;
+  }
+  if (edit.kind === 'untie') {
+    return `Untied ${names.get(edit.a) ?? 'someone'} and ${names.get(edit.b) ?? 'someone'}`;
+  }
+  return 'Changed the book';
+}
+
+/**
+ * Makes the change. Before anything is played there's no past to keep, so someone leaving is taken
+ * out altogether and an untied line takes its history with it.
+ */
+async function applyEdit(tx: Tx, change: Change, edit: StoryEdit, played: boolean) {
+  if (edit.kind === 'sheet') {
+    await changeSheet(tx, change, edit.character);
+  } else if (edit.kind === 'join') {
+    await addPerson(tx, change, edit.character);
+  } else if (edit.kind === 'leave' && played) {
+    await leaveCast(tx, change, edit.id);
+  } else if (edit.kind === 'leave') {
+    await removePerson(tx, change, edit.id);
+  } else if (edit.kind === 'line') {
+    await changeLine(tx, change, edit.relationship);
+  } else if (edit.kind === 'untie') {
+    await untie(tx, change, edit.a, edit.b, !played);
+  } else {
+    const { world, ...choices } = edit.book;
+    await changeBook(tx, change, choices);
+    await changeWorld(tx, change, world);
+  }
+}
+
+/** The scene Procreator plays next: the one being played, or the one waiting for the owner to go on. */
+async function sceneAhead(db: Db | Tx, bookId: string): Promise<Scene | null> {
+  const playing = await playingScene(db, bookId);
+  if (playing) {
+    return playing;
+  }
+  return nextScene(db, bookId);
+}
+
+/** The scene's session, if it has opened, starts again from a brief built from the story as it stands. */
+async function freshBrief(tx: Tx, scene: Scene) {
+  const segment = await currentSegment(tx, scene.id);
+  if (!segment) {
+    return;
+  }
+  const head = await headFor(tx, scene, '');
+  const fromSeq = await nextSeq(tx, scene.id);
+  await startSegment(tx, scene, { head, summary: '', fromSeq, turnId: null });
+}
+
+/**
+ * The owner changes the story mid play (step 6): a sheet, someone new, someone leaving, a line,
+ * two untied, or the book's choices and world. It's tagged as the owner's at the newest turn, so
+ * an undo of that turn leaves it standing. From now on, Procreator is told with a note at the end
+ * of the scene's session; before anything is played, the session starts afresh instead.
+ */
+export async function ownerEdit(db: Db, bookId: string, edit: StoryEdit, reach: Reach): Promise<void> {
+  const newest = await newestInBook(db, bookId);
+  const played = newest !== null;
+  await db.transaction(async (tx) => {
+    const before = await readStory(tx, bookId);
+    if (played && (reach === 'always' || renames(before, edit))) {
+      throw new StoryError('Changing what was already played comes with the next update. Save it from now on, without a new name.');
+    }
+    const note = changeNoteView(before, edit);
+    if (note.changed.length === 0) {
+      return;
+    }
+    let turnId: string | null = null;
+    if (newest) {
+      turnId = newest.id;
+    }
+    let why = 'from now on';
+    if (reach === 'always') {
+      why = 'always so';
+    }
+    const change = await startChange(tx, { bookId, turnId, by: 'owner', what: whatOf(before, edit, played), why });
+    await applyEdit(tx, change, edit, played);
+
+    const scene = await sceneAhead(tx, bookId);
+    if (!scene) {
+      return;
+    }
+    if (!played) {
+      await freshBrief(tx, scene);
+      return;
+    }
+    // Made at no turn, so an undo of the newest turn leaves it, as it leaves the change.
+    const text = render('procreator/change.njk', note);
+    await addMessage(tx, scene, 'note', null, { role: 'user', content: text, timestamp: Date.now() });
   });
 }

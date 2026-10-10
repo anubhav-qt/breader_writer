@@ -81,9 +81,9 @@ Nothing yet.
 {% endfor %}
 {% for c in others %}
 {% if c.line %}
-<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}>{{ c.line }}</character>
+<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}{% if c.left %} status="has left the story"{% endif %}>{{ c.line }}</character>
 {% else %}
-<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}/>
+<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}{% if c.left %} status="has left the story"{% endif %}/>
 {% endif %}
 {% endfor %}
 </cast>

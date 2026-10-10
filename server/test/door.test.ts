@@ -17,7 +17,8 @@ const WRITES: Record<string, string[]> = {
   'story/pages.ts': ['writePage', 'editPage'],
   'story/memory.ts': ['remember', 'forget'],
   'story/relationships.ts': ['shiftRelationship', 'shiftOnce'],
-  'story/cast.ts': ['joinCast'],
+  'story/cast.ts': ['joinCast', 'seatInCast'],
+  'story/sheets.ts': ['changeSheet', 'addPerson', 'leaveCast', 'removePerson', 'changeLine', 'untie', 'changeWorld', 'changeBook'],
   'story/scenes.ts': [
     'startScene',
     'prepareScene',

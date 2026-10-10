@@ -197,6 +197,20 @@ export async function markUndone(db: Db | Tx, turn: Turn): Promise<Turn> {
   return undone;
 }
 
+/** The book's newest turn that still stands, in any scene, or null before anything is played. */
+export async function newestInBook(db: Db | Tx, bookId: string): Promise<Turn | null> {
+  const [turn] = await db
+    .select()
+    .from(turns)
+    .where(and(eq(turns.bookId, bookId), eq(turns.undone, false)))
+    .orderBy(desc(turns.number))
+    .limit(1);
+  if (!turn) {
+    return null;
+  }
+  return turn;
+}
+
 /** A scene's newest turn that still stands, or null. */
 export async function newestTurn(db: Db | Tx, sceneId: string): Promise<Turn | null> {
   const [turn] = await db

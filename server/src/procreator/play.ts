@@ -2,7 +2,7 @@ import type { AgentTool } from '@writer/pi-agent';
 import { Type } from '@writer/pi-ai';
 import { undashed } from '../ai/dashes.ts';
 import { endScene, joinCast, setScene, type Offer } from '../breading_ground.ts';
-import { castByName, castOf } from '../story/cast.ts';
+import { castOf, standingByName } from '../story/cast.ts';
 import { StoryError } from '../story/changes.ts';
 import type { Cast } from '../story/mentions.ts';
 import type { Cue, Scene } from '../story/scenes.ts';
@@ -103,7 +103,7 @@ function setSceneTool(context: PlayContext): AgentTool<typeof SetScene> {
       guarded('set_scene', async () => {
         mustPlay(context, 'set_scene');
         const scene = await context.db.transaction(async (tx) => {
-          const cast = await castByName(tx, context.scene.bookId);
+          const cast = await standingByName(tx, context.scene.bookId);
           const joining = peopleNamed(cast, params.who ?? []);
           return setScene(tx, writerOf(context), context.scene, { place: params.where, time: params.when, joining });
         });
@@ -151,7 +151,7 @@ const CueParams = Type.Object({
 async function actorNamed(context: PlayContext, name: string): Promise<{ id: string; name: string }> {
   const bookId = context.scene.bookId;
   return context.db.transaction(async (tx) => {
-    const cast = await castByName(tx, bookId);
+    const cast = await standingByName(tx, bookId);
     const bare = bareName(name);
     const ids = cast.idsOf(bare);
     if (ids.length === 0) {
@@ -247,7 +247,7 @@ function endSceneTool(context: PlayContext): AgentTool<typeof EndScene> {
       const result = await guarded('end_scene', async () => {
         mustPlay(context, 'end_scene');
         const next = await context.db.transaction(async (tx) => {
-          const cast = await castByName(tx, context.scene.bookId);
+          const cast = await standingByName(tx, context.scene.bookId);
           const present = peopleNamed(cast, params.who);
           return endScene(tx, writerOf(context), context.scene, { place: params.where, time: params.when, present });
         });
@@ -280,7 +280,7 @@ function offerOpeningsTool(context: PlayContext): AgentTool<typeof OfferOpenings
       if (context.mode !== 'openings') {
         throw new StoryError('offer_openings is only for when the owner asks how the story could open.');
       }
-      const cast = await castByName(context.db, context.scene.bookId);
+      const cast = await standingByName(context.db, context.scene.bookId);
       const offers: Offer[] = [];
       for (const each of params.openings) {
         const present = peopleNamed(cast, each.who);

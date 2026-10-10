@@ -36,7 +36,7 @@ describe('the brief', () => {
       },
       { name: 'Ren', protagonist: false, sheet: { who: 'The ferryman’s son', personality: '', past: '', notes: '' }, about: '', page: '' },
     ]);
-    expect(brief.others).toEqual([{ name: 'Sora', protagonist: false, line: '' }]);
+    expect(brief.others).toEqual([{ name: 'Sora', protagonist: false, left: false, line: '' }]);
     expect(brief.scene).toEqual({ number: 2, place: 'The ferry', time: 'Dusk', present: ['Aiko', 'Ren'] });
   });
 

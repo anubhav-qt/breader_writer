@@ -10,7 +10,8 @@
     "./setup": "./src/setup.ts",
     "./suggestions": "./src/suggestions.ts",
     "./chat": "./src/chat.ts",
-    "./play": "./src/play.ts"
+    "./play": "./src/play.ts",
+    "./story": "./src/story.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

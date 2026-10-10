@@ -71,6 +71,15 @@ export async function startSegment(db: Db | Tx, scene: Scene, opening: Opening):
   return segment;
 }
 
+/** The number the scene's session's next message gets. */
+export async function nextSeq(db: Db | Tx, sceneId: string): Promise<number> {
+  const [row] = await db
+    .select({ last: max(sessionMessages.seq) })
+    .from(sessionMessages)
+    .where(eq(sessionMessages.sceneId, sceneId));
+  return (row?.last ?? 0) + 1;
+}
+
 /** Adds a message at the end of the scene's session. */
 export async function addMessage(
   db: Db | Tx,
@@ -80,11 +89,7 @@ export async function addMessage(
   message: Message,
 ): Promise<SessionMessage> {
   // Undone messages keep their numbers, so a number always means one message.
-  const [row] = await db
-    .select({ last: max(sessionMessages.seq) })
-    .from(sessionMessages)
-    .where(eq(sessionMessages.sceneId, scene.id));
-  const seq = (row?.last ?? 0) + 1;
+  const seq = await nextSeq(db, scene.id);
   const [added] = await db
     .insert(sessionMessages)
     .values({ bookId: scene.bookId, sceneId: scene.id, seq, turnId, kind, message })

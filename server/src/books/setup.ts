@@ -13,13 +13,14 @@ import {
 import type { BookCard } from '@writer/shared/protocol';
 import type { Db, Tx } from '../db/client.ts';
 import { books, characters, relationships, worlds } from '../db/schema.ts';
+import { LEFT } from '../story/cast.ts';
 
 /*
  * A book's setup in the database: the book's own row (title, colour, length, point of view,
  * darkness), its world, its characters and the relationships between them.
  */
 
-type BookRow = typeof books.$inferSelect;
+export type BookRow = typeof books.$inferSelect;
 type CharacterRow = typeof characters.$inferSelect;
 type RelationshipRow = typeof relationships.$inferSelect;
 type Role = 'protagonist' | 'cast';
@@ -191,9 +192,15 @@ export async function readSetup(db: Db, book: BookRow): Promise<BookSetup> {
     .where(eq(relationships.bookId, book.id))
     .orderBy(asc(relationships.aId), asc(relationships.bId));
 
+  // Someone who left the story mid play is no longer in its cast, nor on its lines.
   let protagonist: Character | null = null;
   const cast: Character[] = [];
+  const standing = new Set<string>();
   for (const row of rows) {
+    if (row.role === LEFT) {
+      continue;
+    }
+    standing.add(row.id);
     const character = toCharacter(row);
     if (row.role === 'protagonist') {
       protagonist = character;
@@ -201,6 +208,7 @@ export async function readSetup(db: Db, book: BookRow): Promise<BookSetup> {
       cast.push(character);
     }
   }
+  const standingLines = lines.filter((line) => standing.has(line.aId) && standing.has(line.bId));
   if (!protagonist) {
     throw new Error(`Book ${book.id} has no protagonist.`);
   }
@@ -220,6 +228,6 @@ export async function readSetup(db: Db, book: BookRow): Promise<BookSetup> {
     },
     protagonist,
     cast,
-    relationships: lines.map(toRelationship),
+    relationships: standingLines.map(toRelationship),
   };
 }

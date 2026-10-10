@@ -1,5 +1,5 @@
 import { SCENE_WORDS, type Darkness, type Length, type Pov } from '@writer/shared/book';
-import { namesOf } from './cast.ts';
+import { isStanding, namesOf } from './cast.ts';
 import { linked, named } from './mentions.ts';
 import { PAGE_KINDS, PLAN, THREADS, type Page } from './pages.ts';
 import type { BookRow, CharacterRow, RelationshipRow, Story } from './read.ts';
@@ -73,6 +73,8 @@ export interface CharacterView {
 export interface OtherView {
   name: string;
   protagonist: boolean;
+  /** They left the story mid way: what was written still names them. */
+  left: boolean;
   line: string;
 }
 
@@ -349,7 +351,8 @@ export function briefView(story: Story, scene: Scene, lastScene: Turn[]): BriefV
   const others: OtherView[] = [];
   for (const character of story.characters) {
     const page = story.pages.find((each) => each.characterId === character.id) ?? null;
-    if (present.has(character.id)) {
+    const left = !isStanding(character);
+    if (present.has(character.id) && !left) {
       inScene.push(characterView(character, page, names));
       continue;
     }
@@ -357,7 +360,7 @@ export function briefView(story: Story, scene: Scene, lastScene: Turn[]): BriefV
     if (!line && page) {
       line = page.about;
     }
-    others.push({ name: character.name, protagonist: character.role === 'protagonist', line });
+    others.push({ name: character.name, protagonist: character.role === 'protagonist', left, line });
   }
 
   const close: RelationshipView[] = [];

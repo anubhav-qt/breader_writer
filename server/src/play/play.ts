@@ -20,7 +20,7 @@ import { cueActor, tellActor, type Moment } from '../procreator/actor.ts';
 import { askForOpenings, converse } from '../procreator/converse.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { render } from '../prompts/render.ts';
-import { castOf, namesOf, type CharacterRow } from '../story/cast.ts';
+import { castOf, namesOf, standingOf, type CharacterRow } from '../story/cast.ts';
 import type { Writer } from '../story/changes.ts';
 import {
   cueOf,
@@ -106,7 +106,7 @@ async function protagonistOf(db: Db, bookId: string): Promise<CharacterRow> {
 
 /** Someone in the cast, by id, with their name as it is now. */
 async function personOf(db: Db, bookId: string, id: string): Promise<{ id: string; name: string }> {
-  const cast = await castOf(db, bookId);
+  const cast = standingOf(await castOf(db, bookId));
   const person = cast.find((each) => each.id === id);
   if (!person) {
     throw new PlayError('The one Procreator asked about isn’t in the cast any more.');
@@ -238,8 +238,11 @@ export async function askOpenings(ai: Procreator, bookId: string): Promise<void>
   await ai.db.transaction((tx) => offerOpenings(tx, agent(bookId), first, offers));
 }
 
-/** Where and when the story opens, and its words, from the owner's pick or their own opening. */
-function openingFrom(first: Scene, ask: OpenAsk): { text: string; frame: Frame } {
+/**
+ * Where and when the story opens, and its words, from the owner's pick or their own opening. An
+ * opening offered before the owner took someone out of the story brings in only who still stands.
+ */
+async function openingFrom(db: Db, first: Scene, ask: OpenAsk): Promise<{ text: string; frame: Frame }> {
   if (ask.kind === 'own') {
     // Procreator sets where, when and who as it opens the scene.
     return { text: ask.text, frame: { place: '', time: '', present: [] } };
@@ -249,7 +252,9 @@ function openingFrom(first: Scene, ask: OpenAsk): { text: string; frame: Frame }
   if (!offer) {
     throw new PlayError('There’s no such opening.');
   }
-  return { text: offer.text, frame: { place: offer.place, time: offer.time, present: offer.present } };
+  const standing = standingOf(await castOf(db, first.bookId)).map((person) => person.id);
+  const present = offer.present.filter((id) => standing.includes(id));
+  return { text: offer.text, frame: { place: offer.place, time: offer.time, present } };
 }
 
 /** The owner opens the story, with an opening offered or their own, and Procreator writes it. */
@@ -261,7 +266,7 @@ export async function openStory(ai: Procreator, bookId: string, ask: OpenAsk, wa
   if (await newestTurn(ai.db, first.id)) {
     throw new PlayError('The story has opened already.');
   }
-  const opening = openingFrom(first, ask);
+  const opening = await openingFrom(ai.db, first, ask);
   const scene = await ai.db.transaction(async (tx) => {
     if (first.status === 'next') {
       return beginScene(tx, owner(bookId), first, opening.frame);

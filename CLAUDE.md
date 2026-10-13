@@ -756,9 +756,9 @@ through them all in one local test once everything is built (see "Status").
     who played it ("someone no longer in the cast"). The written book joins in step 7.
   - Rewrite calls are recorded as `rewrite`, keyed for the cache by the book
     (`rewrite-<book id>`), so every part starts the same.
-  - The owner's local database was at migration 0007 on 2026-10-11 (backed up as
-    `.backups/2026-10-11-actor-segments-turn.sql`). 0008 to 0011 were tried on a copy of it and
-    everything came through; the owner runs `npm run migrate` themselves.
+  - The owner's local database is at migration 0011 since 2026-10-13 (backed up just before as
+    `.backups/2026-10-13-before-0008.sql`). Their book came through whole: 10 characters, 16
+    relationships, nothing played yet.
 
 ### Later versions
 

@@ -11,6 +11,7 @@ laptop, the app as static files behind a Cloudflare Worker, and a nightly backup
 | (none) | breader's Supabase | the `writer` schema, beside breader's tables |
 | (none) | breader's R2 backup bucket | the backups, under `writer/` |
 | (none) | breader's worker, `worker:8327` | CLIProxyAPI, the AI accounts |
+| (none) | inside `writer-api`, `127.0.0.1:8328` | the writers' proxy: a CLIProxyAPI of its own for writers' sign-ins, kept in the `writers-proxy` volume |
 
 The app calls `writer-api.` with breader's login cookie, which is on `breader.site` and its
 subdomains. While the laptop is off, the app says the writer is offline and comes back by itself.
@@ -51,8 +52,12 @@ reaches it because the writer's API joins breader's compose network.
      node:24-alpine node scripts/live-env.mjs
    ```
    `BREADER_ENV=<path>` points it at breader's `infra/.env` if that isn't at `../breader/infra/.env`.
+   The first time, it also makes `KEYS_SECRET`, which seals writers' own API keys, and keeps it
+   every time after. Copy it somewhere safe (your password manager): the backups hold the keys
+   only sealed, so a restore without it loses every writer's key, and they have to add them again.
 3. In `infra/.env`, fill in `WRITER_EMAILS` (who can write) and `OWNER_EMAILS` (who signs the AI
-   accounts in and out; each in `WRITER_EMAILS` too).
+   accounts in and out; each in `WRITER_EMAILS` too). Leave `OPEN_TO_ALL=false` for now (see
+   "Opening it to everyone").
 4. Start it:
    ```sh
    docker compose -f infra/compose.yml up -d
@@ -90,7 +95,36 @@ a Pages Function in breader (`functions/writer/[[path]].js`) that hands `/writer
 
 Log in on breader.site, then open `breader.site/writer`. The model chip lists the models; as the
 owner, its menu lists the AI accounts, which breader's admin page signs in and out too. Make a
-book and play a move.
+book and play a move. `docker compose -f infra/compose.yml logs writer-api | grep -i writers`
+shows "the writers’ proxy started", beside the API.
+
+## Opening it to everyone
+
+Once it works for the invited, `OPEN_TO_ALL=true` in `infra/.env` (then
+`docker compose -f infra/compose.yml up -d`) lets every breader account with a confirmed email
+write. Their first chapter is on your AI accounts: setup help, scene 1 and its chapter. Going on
+from scene 1 needs their own AI, which they bring in the model chip's menu under "Your AI": an API
+key (Google, Anthropic or OpenAI), or a sign-in to a subscription they have (Antigravity, ChatGPT,
+Claude). The invited keep your accounts for everything. Turning it back off shuts everyone else
+out again; their books stay.
+
+Writers' sign-ins go to the writers' proxy, never to breader's: `writer-api` runs it beside itself,
+on its own machine only, and keeps them in the `writers-proxy` volume (not backed up: if it's lost,
+writers sign in again). One writer signs in at a time; another trying meanwhile is told to wait a
+minute or two.
+
+The first time a writer signs in a subscription, check what couldn't be checked without a real
+CLIProxyAPI:
+
+1. Their picker lists the sign-in's models as "Your Antigravity sign-in" (or ChatGPT, Claude), and
+   a move plays on one of them.
+2. Another writer's picker doesn't list them.
+3. `docker compose -f infra/compose.yml logs writer-api | grep -i "writers"` shows no complaint
+   about its settings.
+
+If 1 fails with a Gemini model only, the proxy's Gemini route doesn't take a model id with a slash
+in it; if no sign-in models show at all, it doesn't list prefixed models. Either way, keys still
+work, and the fix is in `server/src/ai/own/` (see "Notes for step 9" in `CLAUDE.md`).
 
 ## Backups
 

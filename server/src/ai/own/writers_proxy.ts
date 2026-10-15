@@ -79,6 +79,7 @@ export function startWritersProxy(o: WritersProxyOptions): Proxy | null {
   const run = () => {
     writeFileSync(file, config(o.dir, o.port, apiKey, managementKey), { mode: 0o600 });
     child = spawn(o.bin, ['-config', file], { cwd: o.dir, stdio: 'inherit' });
+    log.info({ port: o.port }, 'the writers’ proxy started');
     child.on('error', (err) => log.warn({ err }, 'the writers’ proxy could not start'));
     child.on('exit', (code, signal) => {
       child = null;

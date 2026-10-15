@@ -68,8 +68,13 @@ Gemini 3.8 Flash, which resets on 2026-10-19 at 04:58 UTC; until then the owner 
 model or waits. Step 8 (ship) is written and checked here, not deployed (2026-10-15, see "Notes
 for step 8"): the server's image, the laptop's compose stack beside breader's, the nightly backup,
 the Worker that serves the app at `breader.site/writer`, and CI. Setting it up is the owner's, in
-`infra/README.md`. The owner has a real book set up locally that they mean to play through
-before production, so its data must survive every change (see "Running it locally"). See "The code" below for what exists.
+`infra/README.md`. Step 9 (open to everyone) is built and checked here (2026-10-15, see "Notes
+for step 9"): `OPEN_TO_ALL`, everyone's first chapter on the house, writers' own keys and sign-ins,
+and "Your AI" in the model picker, checked in headless Chrome against a stand-in API. The writers'
+proxy hasn't met a real CLIProxyAPI yet. So every step in the build order is built; what's left is
+the owner's test and setting it up. The owner has a real book set up locally that they mean to
+play through before production, so its data must survive every change (see "Running it locally").
+See "The code" below for what exists.
 
 ### Decided
 
@@ -127,8 +132,8 @@ before production, so its data must survive every change (see "Running it locall
   Everyone's first chapter is free, on the owner's own Antigravity account (the one signed in to
   CLIProxyAPI): normal writing, nothing held back or marked as a trial. Once that chapter is
   done, the owner's account writes no more of the book, and going on needs the writer's own AI.
-  Not built yet (see "Open").
-- **Until then, only invited accounts can play.** Like breader's `SPEECH_EMAILS`: a list of
+  Built (2026-10-15, see "Notes for step 9"), and off until `OPEN_TO_ALL` turns it on.
+- **Until it's opened, only invited accounts can play.** Like breader's `SPEECH_EMAILS`: a list of
   emails (`WRITER_EMAILS`), each with a confirmed address. Everyone else can see the writer, with
   a quiet note that it's invite only. A key on its own isn't enough to play, since a key has no
   email. `OPEN_TO_ALL` (off by default) lets every confirmed account in (see "Notes for step 9").
@@ -343,12 +348,6 @@ before production, so its data must survive every change (see "Running it locall
    have theirs (see "Decided"). The library and the book view start as copies of breader's
    pages; where the owner writes, the writer goes past breader (see "Writing gets a feel of its
    own").
-2. Bringing your own AI (step 9): how a writer's own key or sign-in is kept and used
-   (CLIProxyAPI pools the accounts signed in to it, so one writer's sign-in could end up
-   serving another's calls), and what counts as the free chapter (chapters come with the book,
-   step 7). A risk to keep in view: subscription sign-ins like Antigravity are generally for
-   their holder's own use, so serving every writer's first chapter through the owner's could
-   get it limited.
 
 ### Build order
 
@@ -1014,7 +1013,9 @@ All of step 9's design calls are ours (2026-10-15, the owner can change them).
   whether `force-model-prefix` sits under `routing`, whether `/v1/models` lists a prefixed
   credential's models as `<prefix>/<model>` (if it lists them bare, the writer's prefix is put on
   the models of the kinds they signed in), and whether Gemini's route takes a model id with a
-  slash. The checklist has the check.
+  slash. `infra/README.md` has the check ("Opening it to everyone").
+- A risk to keep in view: subscription sign-ins like Antigravity are generally for their holder's
+  own use, so serving every writer's first chapter through the owner's could get it limited.
 - **"Your AI" in the model picker** is every writer's but the owner's, where the owner's "AI
   accounts" are: a line on what the house writes for them (`settings.house`), their keys (the
   provider and "Key ending in 1234", with Remove and a confirm in place) and their sign-ins (with

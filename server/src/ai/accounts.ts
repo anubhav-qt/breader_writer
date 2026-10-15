@@ -90,6 +90,14 @@ export async function signOut(proxy: Proxy, id: string): Promise<void> {
 }
 
 /**
+ * Gives a signed in account a prefix: from then on only calls for `<prefix>/<model>` reach it,
+ * where the proxy forces prefixes (the writers' proxy, ai/own/signins.ts).
+ */
+export async function setPrefix(proxy: Proxy, id: string, prefix: string): Promise<void> {
+  await manage(proxy, '/credentials/fields', Done, { method: 'PATCH', body: { name: id, prefix } });
+}
+
+/**
  * Starts signing an account in: the page to sign in on, and the sign-in's state. `is_webui` has
  * the proxy listen for the callback on its own machine while it waits, the way its own settings
  * page does.

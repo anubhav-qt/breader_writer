@@ -69,6 +69,14 @@ const Env = z.object({
    * takes no keys. Changing it loses every key kept, and writers bring theirs again.
    */
   KEYS_SECRET: z.string().min(32).optional(),
+  /**
+   * The writers' proxy (step 9), a CLIProxyAPI the server runs for writers' own sign-ins: its
+   * binary (the image's; none means no sign-ins here), where it keeps them, and its port on this
+   * machine.
+   */
+  WRITERS_PROXY_BIN: z.string().default('/usr/local/bin/cli-proxy-api'),
+  WRITERS_PROXY_DIR: z.string().default('/data/writers-proxy'),
+  WRITERS_PROXY_PORT: z.coerce.number().int().default(8328),
 });
 
 export type Env = z.infer<typeof Env>;

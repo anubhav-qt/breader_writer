@@ -4,13 +4,17 @@ import type { KeyProvider, ModelSource, OwnKey } from '@writer/shared/protocol';
 import type { Db } from '../../db/client.ts';
 import { ownKeys } from '../../db/schema.ts';
 import { log } from '../../log.ts';
+import { Catalog } from '../catalog.ts';
+import { ProxyError, type Proxy } from '../proxy.ts';
 import { KeyError, modelsWithKey, type ProviderUrls } from './providers.ts';
 import { seal, unseal } from './seal.ts';
+import { prefixFor, WritersSignIns } from './signins.ts';
 
 /*
- * An account's own AI (step 9): its API keys, kept sealed, and the models they reach, read again
- * once a minute at most. Its calls go straight to the provider with the account's key, so they
- * draw on the account's own limits and nobody else's.
+ * An account's own AI (step 9): its API keys, kept sealed, its sign-ins on the writers' proxy
+ * (signins.ts), and the models they reach, read again once a minute at most. Calls with a key go
+ * straight to the provider, and through a sign-in to the writers' proxy under the account's
+ * prefix, so either way they draw on the account's own limits and nobody else's.
  */
 
 const FRESH_FOR_MS = 60_000;
@@ -39,11 +43,21 @@ export class OwnAi {
   /** What keys are sealed with, or null where KEYS_SECRET isn't set and no keys are taken. */
   readonly sealing: Buffer | null;
   readonly urls: ProviderUrls;
+  /** The sign-ins on the writers' proxy, or null where it doesn't run and none are taken. */
+  readonly signIns: WritersSignIns | null;
+  /** The writers' proxy's models, every writer's under their prefix. */
+  private readonly signedIn: Catalog | null;
   private read = new Map<string, Read>();
 
-  constructor(sealing: Buffer | null, urls: ProviderUrls) {
+  constructor(sealing: Buffer | null, urls: ProviderUrls, writersProxy: Proxy | null = null) {
     this.sealing = sealing;
     this.urls = urls;
+    this.signIns = null;
+    this.signedIn = null;
+    if (writersProxy) {
+      this.signIns = new WritersSignIns(writersProxy);
+      this.signedIn = new Catalog(writersProxy);
+    }
   }
 
   /** The account's keys as settings show them: the provider and the key's last four characters. */
@@ -75,6 +89,52 @@ export class OwnAi {
   /** Lets go of what it read for the account, so the next ask reads its AI again. */
   forget(userId: string) {
     this.read.delete(userId);
+  }
+
+  /** Lets go of what it read, the writers' proxy's models included: a sign-in came or went. */
+  forgetSignIns(userId: string) {
+    this.forget(userId);
+    this.signedIn?.forget();
+  }
+
+  /**
+   * The models the account's sign-ins serve, called as `<prefix>/<model>`. The writers' proxy lists
+   * each writer's under their prefix; one that lists them without gets the account's prefix put on
+   * the models of the kinds it signed in.
+   */
+  private async modelsOfSignIns(db: Db, userId: string): Promise<OwnModel[]> {
+    const signIns = this.signIns;
+    const catalog = this.signedIn;
+    if (!signIns || !catalog) {
+      return [];
+    }
+    const providers = await signIns.providersOf(db, userId);
+    if (providers.size === 0) {
+      return [];
+    }
+    let all: Model<Api>[];
+    try {
+      all = await catalog.models();
+    } catch (err) {
+      if (!(err instanceof ProxyError)) {
+        throw err;
+      }
+      log.warn({ err: err.message }, 'the writers’ proxy can’t be reached, so its sign-ins serve no models');
+      return [];
+    }
+    const prefix = `${prefixFor(userId)}/`;
+    const apiKey = signIns.proxy.apiKey;
+    const prefixed = all.some((model) => model.id.includes('/'));
+    const models: OwnModel[] = [];
+    for (const model of all) {
+      if (prefixed && model.id.startsWith(prefix)) {
+        models.push({ source: 'signin', model, apiKey });
+      }
+      if (!prefixed && providers.has(model.provider)) {
+        models.push({ source: 'signin', model: { ...model, id: prefix + model.id }, apiKey });
+      }
+    }
+    return models;
   }
 
   /** The models each of the account's keys reaches. A key that can't be opened or used adds none. */
@@ -113,7 +173,9 @@ export class OwnAi {
     if (kept && Date.now() - kept.at < FRESH_FOR_MS) {
       return kept.models;
     }
-    const models = await this.modelsOfKeys(db, userId);
+    const ofKeys = await this.modelsOfKeys(db, userId);
+    const ofSignIns = await this.modelsOfSignIns(db, userId);
+    const models = [...ofKeys, ...ofSignIns];
     this.read.set(userId, { at: Date.now(), models });
     return models;
   }

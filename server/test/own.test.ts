@@ -2,13 +2,14 @@ import { and, eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PlayEvent } from '@writer/shared/play';
 import { OwnAi } from '../src/ai/own/own.ts';
+import { prefixFor } from '../src/ai/own/signins.ts';
 import { sealingKey, seal, unseal } from '../src/ai/own/seal.ts';
 import { writeMissing, type Scribe } from '../src/book/scribe.ts';
 import { users } from '../src/db/breader.ts';
 import { chapters, ownKeys, scenes } from '../src/db/schema.ts';
 import type { Procreator } from '../src/procreator/run.ts';
 import { ORIGIN, SEALING, account, address, call, deps, send, writer, type Writer } from './helpers.ts';
-import { API_KEY, antigravity, catalogOf, fakeProxy, type FakeProxy, type Reply } from './proxy.ts';
+import { API_KEY, MANAGEMENT_KEY, antigravity, catalogOf, fakeProxy, type FakeProxy, type Reply } from './proxy.ts';
 import { aBook } from './stories.ts';
 
 /*
@@ -35,6 +36,24 @@ async function standIn(replies: Reply[] = []) {
 function ownAt(provider: FakeProxy, sealing: Buffer | null = SEALING) {
   const urls = { google: `${provider.url}/v1beta`, anthropic: provider.url, openai: `${provider.url}/v1` };
   return new OwnAi(sealing, urls);
+}
+
+/** The accounts' own AI, with sign-ins on this stand-in for the writers' proxy, and no provider keys. */
+function signInsAt(writers: FakeProxy) {
+  const proxy = { url: writers.url, apiKey: API_KEY, managementKey: MANAGEMENT_KEY };
+  return new OwnAi(SEALING, { google: '', anthropic: '', openai: '' }, proxy);
+}
+
+/** Finishes a sign-in at the stand-in, the way the provider's page would: a credential appears. */
+function signedIn(writers: FakeProxy, state: string, name: string, email: string) {
+  const pending = writers.signIns.get(state);
+  if (!pending) {
+    throw new Error(`no sign-in ${state}`);
+  }
+  pending.status = 'ok';
+  const credentials = writers.served.credentials ?? [];
+  credentials.push({ name, provider: 'antigravity', email, status: 'active' });
+  writers.served.credentials = credentials;
 }
 
 /** A scribe that writes when nudged, as far as it's told, and lets a test wait for it. */
@@ -186,5 +205,82 @@ describe('own keys', () => {
     const written = await db.select().from(chapters).where(eq(chapters.bookId, bookId));
     expect(written.map((row) => row.title)).toEqual(['The Ferry']);
     expect(house.asked).toHaveLength(4);
+  });
+});
+
+describe('own sign-ins', () => {
+  it('signs a writer’s subscription in under their prefix, so only their calls reach it', async () => {
+    const writers = await fakeProxy({ ...antigravity(), credentials: [], replies: [offering()] });
+    proxies.push(writers);
+    const own = signInsAt(writers);
+    const mine = address('mine');
+    const theirs = address('theirs');
+    const app = writer({ WRITER_EMAILS: [mine, theirs] }, null, null, own);
+    const myCookie = await account(mine, true);
+    const theirCookie = await account(theirs, true);
+    const me = await userIdOf(mine);
+
+    const started = await send(app, 'POST', '/v1/own/sign-in', myCookie, { provider: 'antigravity' });
+    expect(started.status).toBe(200);
+    const state = started.body.state;
+    const busy = await send(app, 'POST', '/v1/own/sign-in', theirCookie, { provider: 'antigravity' });
+    expect(busy.status).toBe(409);
+    expect(busy.body.code).toBe('sign_in_busy');
+    const notTheirs = await call(app, 'GET', `/v1/own/sign-in/${state}`, theirCookie);
+    expect(notTheirs.status).toBe(404);
+
+    const waiting = await call(app, 'GET', `/v1/own/sign-in/${state}`, myCookie);
+    expect(waiting.body.status).toBe('wait');
+    signedIn(writers, state, 'antigravity-mine.json', 'mine@gmail.example');
+    const done = await call(app, 'GET', `/v1/own/sign-in/${state}`, myCookie);
+    expect(done.body.status).toBe('ok');
+    expect(writers.served.credentials?.[0].prefix).toBe(prefixFor(me));
+
+    const view = await call(app, 'GET', '/v1/own', myCookie);
+    expect(view.body.signIns).toEqual([{ id: 'antigravity-mine.json', provider: 'antigravity', name: 'mine@gmail.example', problem: null }]);
+    expect(view.body.signInsHere).toBe(true);
+    const others = await call(app, 'GET', '/v1/own', theirCookie);
+    expect(others.body.signIns).toEqual([]);
+
+    const settings = await call(app, 'GET', '/v1/settings', myCookie);
+    const model = `${prefixFor(me)}/gemini-3.8-flash-high`;
+    const ours = settings.body.models.filter((info: { source: string }) => info.source === 'signin');
+    expect(ours.map((info: { id: string; name: string }) => [info.id, info.name])).toContainEqual([model, 'Gemini 3.8 Flash']);
+    const theirSettings = await call(app, 'GET', '/v1/settings', theirCookie);
+    // With no AI of their own and no house here, they have nothing to pick.
+    expect(theirSettings.body.models).toBeNull();
+
+    await send(app, 'PUT', '/v1/settings', myCookie, { source: 'signin', model, thinking: 'high' });
+    const { bookId } = await aBook(me);
+    const openings = await play(app, myCookie, bookId, 'openings');
+    expect(openings.status).toBe(200);
+    expect(writers.asked.map((asked) => asked.model)).toEqual([model]);
+
+    const refused = await call(app, 'DELETE', '/v1/own/sign-ins/antigravity-mine.json', theirCookie);
+    expect(refused.status).toBe(404);
+    const out = await call(app, 'DELETE', '/v1/own/sign-ins/antigravity-mine.json', myCookie);
+    expect(out.body.signIns).toEqual([]);
+    expect(writers.served.credentials).toEqual([]);
+  });
+
+  it('signs out what nobody owns before a sign-in starts, so it’s never taken for someone else’s', async () => {
+    const left = { name: 'left-over.json', provider: 'antigravity', email: 'nobody@example.com' };
+    const writers = await fakeProxy({ ...antigravity(), credentials: [left] });
+    proxies.push(writers);
+    const email = address('own');
+    const app = writer({ WRITER_EMAILS: [email] }, null, null, signInsAt(writers));
+    const cookie = await account(email, true);
+    const started = await send(app, 'POST', '/v1/own/sign-in', cookie, { provider: 'antigravity' });
+    expect(started.status).toBe(200);
+    expect(writers.served.credentials).toEqual([]);
+  });
+
+  it('takes no sign-ins where there’s no writers’ proxy', async () => {
+    const email = address('own');
+    const app = writer({ WRITER_EMAILS: [email] });
+    const cookie = await account(email, true);
+    const r = await send(app, 'POST', '/v1/own/sign-in', cookie, { provider: 'antigravity' });
+    expect(r.status).toBe(503);
+    expect(r.body.code).toBe('sign_ins_off');
   });
 });

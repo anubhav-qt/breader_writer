@@ -51,6 +51,8 @@ export interface Credential {
   status_message?: string;
   disabled?: boolean;
   unavailable?: boolean;
+  /** Its prefix: only calls for `<prefix>/<model>` reach it. */
+  prefix?: string;
 }
 
 /** A sign-in the proxy has started, and how it stands. A test moves it along. */
@@ -228,6 +230,24 @@ function signOut(served: Served, url: URL): Answer {
   return { status: 200, body: { status: 'ok' } };
 }
 
+/**
+ * Gives an account a prefix, as the writers' proxy does a writer's: its kind's models are listed
+ * again under it, `<prefix>/<model>`.
+ */
+function setFields(served: Served, sent: Record<string, unknown>): Answer {
+  const credential = (served.credentials ?? []).find((each) => each.name === sent.name);
+  if (!credential) {
+    return { status: 404, body: { error: 'auth not found' } };
+  }
+  const prefix = String(sent.prefix ?? '');
+  credential.prefix = prefix;
+  const ofKind = served.models.filter((model) => model.owned_by === credential.provider && !model.id.includes('/'));
+  for (const model of ofKind) {
+    served.models.push({ id: `${prefix}/${model.id}`, owned_by: model.owned_by });
+  }
+  return { status: 200, body: { status: 'ok' } };
+}
+
 /** The management routes the writer uses. The callback takes no key, as the proxy's doesn't. */
 async function manage(proxy: FakeProxy, req: IncomingMessage, url: URL, key: string): Promise<Answer> {
   const path = url.pathname.slice(MANAGEMENT.length);
@@ -249,6 +269,10 @@ async function manage(proxy: FakeProxy, req: IncomingMessage, url: URL, key: str
   }
   if (path === '/credentials' && method === 'DELETE') {
     return signOut(proxy.served, url);
+  }
+  if (path === '/credentials/fields' && method === 'PATCH') {
+    const sent = JSON.parse(await bodyOf(req)) as Record<string, unknown>;
+    return setFields(proxy.served, sent);
   }
   if (path === '/oauth/auth-url' && method === 'GET') {
     return startSignIn(proxy.signIns, url);
@@ -456,7 +480,8 @@ export async function fakeProxy(served: Served): Promise<FakeProxy> {
   };
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://proxy');
-    const call = url.pathname.match(/^\/v1beta\/models\/([^/:]+):streamGenerateContent$/);
+    // A writer's model on the writers' proxy has their prefix: <prefix>/<model>.
+    const call = url.pathname.match(/^\/v1beta\/models\/([^:]+):streamGenerateContent$/);
     if (call) {
       if (req.headers['x-goog-api-key'] !== API_KEY) {
         refuse(res);

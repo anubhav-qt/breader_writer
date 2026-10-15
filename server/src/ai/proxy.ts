@@ -77,7 +77,7 @@ const ModelDefinitions = z.object({
 
 /** A request to the proxy: its method, and a JSON body or none. */
 export interface Sent {
-  method: 'GET' | 'POST' | 'DELETE';
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
 }
 

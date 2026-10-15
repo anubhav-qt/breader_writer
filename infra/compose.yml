@@ -29,6 +29,8 @@ services:
       migrate: { condition: service_completed_successfully }
     networks: [breader]
     healthcheck: { test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8790/health"], interval: 10s }
+    # The writers' proxy runs inside it, and keeps writers' own sign-ins here.
+    volumes: ["writers-proxy:/data/writers-proxy"]
 
   # Checks every 10 minutes and backs up once a night after 03:00 here (infra/backup.sh).
   backup:
@@ -48,3 +50,4 @@ networks:
 
 volumes:
   backups: {}
+  writers-proxy: {}

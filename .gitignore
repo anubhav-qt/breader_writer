@@ -13,3 +13,5 @@ dist/
 .backups/
 # Wrangler's local state from wrangler dev.
 .wrangler/
+# The writers' proxy's sign-ins, when it's tried here (WRITERS_PROXY_DIR).
+.writers-proxy/

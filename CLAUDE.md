@@ -925,7 +925,8 @@ does that.
   quotes and all, since compose reads both files the same way. It prints none of them. It and
   `dev-env.mjs` share `scripts/env-file.mjs`.
 - **The image** (`server/Dockerfile`, `ghcr.io/anubhav-qt/breader-writer`) runs the server from its
-  TypeScript through tsx, as it runs here, so tsx is a dependency of the server, not a dev one.
+  TypeScript through tsx, as it runs here, so tsx is a dependency of the server, not a dev one. It
+  carries CLIProxyAPI too (breader's release and checksums), for the writers' proxy (step 9).
   The same image runs the migrations (`src/migrate.ts`) and the backup (`infra/backup.sh`). CI
   builds it on every push to dev, amd64 and arm64, after the tests; `infra/update.sh` (breader's,
   renamed) pulls it on the laptop every 5 minutes, and the compose `migrate` service migrates
@@ -993,6 +994,27 @@ All of step 9's design calls are ours (2026-10-15, the owner can change them).
   so they draw on the writer's own limits. A server without `KEYS_SECRET` takes no keys;
   `dev:env` and `live:env` make one the first time and keep it after, since a new one loses every
   key kept. Which models a key reaches is read again once a minute at most (`OwnAi`).
+- **Own sign-ins** (Antigravity, ChatGPT, Claude) go to **the writers' proxy**, a CLIProxyAPI the
+  API runs beside itself (`ai/own/writers_proxy.ts`, as breader's worker runs the house's), never
+  the house's: its settings are written fresh at each start, it listens on the API's machine only,
+  its keys are made from `KEYS_SECRET`, and it keeps the sign-ins in `WRITERS_PROXY_DIR` (a volume
+  on the laptop). The image has its binary; here it's off unless `WRITERS_PROXY_BIN` points at
+  Homebrew's. It forces prefixes (`force-model-prefix`), and each writer's sign-ins get a prefix of
+  their own (`prefixFor`, from their account), set through `PATCH /credentials/fields`, so a call
+  for `<prefix>/<model>` reaches only that writer's: one writer's sign-in never serves another's
+  calls, and the house is never touched.
+- The proxy doesn't say which credential a sign-in made, so one sign-in runs at a time on the
+  server (another writer's start is a 409, `sign_in_busy`, for up to 6 minutes), and once it's
+  done, whatever is there that nobody owns is that writer's (`own_sign_ins`). Before a sign-in
+  starts, whatever nobody owns is signed out, so a left over sign-in is never taken for someone
+  else's. The sign-in itself is the owner's flow: a new tab, and the address it ended on pasted
+  in, since the writers' proxy is never on the writer's machine.
+- A writer's sign-in models are the writers' proxy's models under their prefix (`bareId` finds
+  what the proxy knows about each). Not tried against a real CLIProxyAPI, only the stand-in:
+  whether `force-model-prefix` sits under `routing`, whether `/v1/models` lists a prefixed
+  credential's models as `<prefix>/<model>` (if it lists them bare, the writer's prefix is put on
+  the models of the kinds they signed in), and whether Gemini's route takes a model id with a
+  slash. The checklist has the check.
 
 ### Later versions
 
@@ -1191,7 +1213,8 @@ A Hono API, port 8790, built like breader's server.
   Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
   the invite list, and `OWNER_EMAILS` who signs the AI accounts in and out (each a writer too).
   `OPEN_TO_ALL` lets every confirmed account write (step 9), and `KEYS_SECRET` is what writers'
-  own keys are sealed with (none are taken without it).
+  own keys are sealed with (none are taken without it). `WRITERS_PROXY_BIN`, `WRITERS_PROXY_DIR`
+  and `WRITERS_PROXY_PORT` are the writers' proxy for their own sign-ins.
   `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are the CLIProxyAPI the
   models come through; no URL means the AI is offline, and no management key means no thinking
   levels and no accounts to manage.
@@ -1414,7 +1437,12 @@ A Hono API, port 8790, built like breader's server.
   lists the models a key reaches and makes them pi's, and `own.ts` keeps the keys and reads their
   models (`OwnAi`, `Deps.own`). `routes/own.ts` is `GET /v1/own` (the account's keys and sign-ins,
   and whether this server takes either) and `PUT` and `DELETE /v1/own/keys/:provider` (a 400
-  `key_refused` when the provider turns the key away, a 503 `keys_off` without `KEYS_SECRET`). An unconfirmed address is told so
+  `key_refused` when the provider turns the key away, a 503 `keys_off` without `KEYS_SECRET`).
+  `ai/own/signins.ts` is a writer's sign-ins on the writers' proxy (`WritersSignIns`, one at a time,
+  claimed with the writer's prefix) and `ai/own/writers_proxy.ts` runs that proxy. Their routes:
+  `POST /v1/own/sign-in`, `GET`, `POST` and `DELETE /v1/own/sign-in/:state` (the account's own
+  sign-in only, a 404 for anyone else's), and `DELETE /v1/own/sign-ins/:name`; a 503 `sign_ins_off`
+  where the server runs no writers' proxy. An unconfirmed address is told so
   before the list is checked, so nobody learns whether an email they don't own is invited.
   `isOwner` is a writer whose email is in `OWNER_EMAILS`; `requireOwner` guards the accounts.
 - `src/routes/`: `GET /health`; `GET /v1/me` (the account, its access and whether it's the
@@ -1503,8 +1531,8 @@ A Hono API, port 8790, built like breader's server.
   overtook, renames reaching chapters, a story ending and being finished, the EPUB, and search),
   `test/door.test.ts` breading_ground as the one door, `test/sse.test.ts` the streams' comments
   while they're quiet, `test/house.test.ts` the house's free chapter, and `test/own.test.ts` a
-  writer's own keys. The stand-in proxy lists models as Google's and Anthropic's APIs do too, so
-  it stands in for them.
+  writer's own keys and sign-ins. The stand-in proxy lists models as Google's and Anthropic's APIs
+  do too, so it stands in for them, and takes prefixes as the writers' proxy does.
 
 ### `frontend/worker.js`, `infra/`, `scripts/` and CI
 

@@ -3,7 +3,8 @@ import { Catalog } from './ai/catalog.ts';
 import { OwnAi } from './ai/own/own.ts';
 import { PROVIDER_URLS } from './ai/own/providers.ts';
 import { sealingKey } from './ai/own/seal.ts';
-import { proxyFrom } from './ai/proxy.ts';
+import { startWritersProxy } from './ai/own/writers_proxy.ts';
+import { proxyFrom, type Proxy } from './ai/proxy.ts';
 import { backgroundScribe } from './book/scribe.ts';
 import { makeApp } from './app.ts';
 import { breaderDb, makePool, writerDb } from './db/client.ts';
@@ -31,14 +32,24 @@ if (proxy) {
   log.warn('CLIPROXY_URL is unset, so the AI is offline');
 }
 
-// Writers' own keys are kept sealed with KEYS_SECRET. Without it, this server takes none.
+// Writers' own keys are kept sealed with KEYS_SECRET, and the writers' proxy's keys are made from
+// it. Without it, this server takes neither keys nor sign-ins.
+const stopping = new AbortController();
 let sealing: Buffer | null = null;
+let writersProxy: Proxy | null = null;
 if (env.KEYS_SECRET) {
   sealing = sealingKey(env.KEYS_SECRET);
+  writersProxy = startWritersProxy({
+    bin: env.WRITERS_PROXY_BIN,
+    dir: env.WRITERS_PROXY_DIR,
+    port: env.WRITERS_PROXY_PORT,
+    secret: env.KEYS_SECRET,
+    signal: stopping.signal,
+  });
 } else {
-  log.warn('KEYS_SECRET is unset, so writers can’t bring their own keys');
+  log.warn('KEYS_SECRET is unset, so writers can’t bring their own AI');
 }
-const own = new OwnAi(sealing, PROVIDER_URLS);
+const own = new OwnAi(sealing, PROVIDER_URLS, writersProxy);
 
 const deps = { env, db: writerDb(pool), pool, breader: breaderDb(breaderPool), catalog, own, scribe: backgroundScribe() };
 const server = serve({ fetch: makeApp(deps).fetch, port: env.PORT, hostname: '0.0.0.0' }, (info) => {
@@ -47,6 +58,7 @@ const server = serve({ fetch: makeApp(deps).fetch, port: env.PORT, hostname: '0.
 
 const stop = () => {
   log.info('shutting down');
+  stopping.abort();
   server.close(() => {
     const pools = [pool.end()];
     if (breaderPool !== pool) {

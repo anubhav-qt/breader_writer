@@ -88,12 +88,21 @@ function drawsPictures(definition: ModelDefinition | undefined): boolean {
   return outputs.includes('image');
 }
 
+/**
+ * A model's id without a prefix: the writers' proxy lists each writer's models under theirs
+ * (`<prefix>/<model>`, ai/own/signins.ts), and knows about them by the model's own id.
+ */
+export function bareId(id: string): string {
+  return id.slice(id.lastIndexOf('/') + 1);
+}
+
 function modelFor(proxy: Proxy, listed: Listed, definition: ModelDefinition | undefined): Model<Api> {
-  const { api, path } = apiFor(listed.id, listed.owned_by);
+  const bare = bareId(listed.id);
+  const { api, path } = apiFor(bare, listed.owned_by);
   const map = thinkingMap(definition);
   const model: Model<Api> = {
     id: listed.id,
-    name: definition?.display_name ?? titleFromId(listed.id),
+    name: definition?.display_name ?? titleFromId(bare),
     api,
     provider: listed.owned_by,
     baseUrl: proxy.url + path,
@@ -176,7 +185,7 @@ async function load(proxy: Proxy): Promise<Loaded> {
   const definitions = await definitionsFor(proxy, listed);
   const models = new Map<string, Model<Api>>();
   for (const entry of listed) {
-    const definition = definitions.get(entry.id);
+    const definition = definitions.get(bareId(entry.id));
     if (models.has(entry.id) || drawsPictures(definition)) {
       continue;
     }
@@ -223,6 +232,12 @@ export class Catalog {
   async infos(): Promise<ModelInfo[]> {
     const loaded = await this.current();
     return loaded.infos;
+  }
+
+  /** Every model, as pi's. Throws a ProxyError while the proxy is down. */
+  async models(): Promise<Model<Api>[]> {
+    const loaded = await this.current();
+    return [...loaded.models.values()];
   }
 
   /** pi's model for an id, or null when no account serves it. */

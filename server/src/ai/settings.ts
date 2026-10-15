@@ -36,9 +36,10 @@ export async function saveChoice(db: Db, userId: string, choice: ModelChoice) {
     .onConflictDoUpdate({ target: settings.userId, set: { model: row.model, thinking: row.thinking, updatedAt: row.updatedAt } });
 }
 
-/** A model the account's story can run on, and the choice it stands for. */
+/** A model the account's story can run on, the key its calls take, and the choice it stands for. */
 export interface InUse {
   model: Model<Api>;
+  apiKey: string;
   choice: ModelChoice;
 }
 
@@ -65,7 +66,7 @@ export async function modelInUse(catalog: Catalog, saved: ModelChoice | null): P
   }
   const wanted = saved?.thinking ?? DEFAULT_THINKING;
   const thinking = clampThinkingLevel(model, wanted);
-  return { model, choice: { model: model.id, thinking } };
+  return { model, apiKey: catalog.proxy.apiKey, choice: { model: model.id, thinking } };
 }
 
 /** What settings show: the choice in use, and every model there is, or none while the AI is offline. */

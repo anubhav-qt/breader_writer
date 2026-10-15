@@ -154,7 +154,7 @@ export async function writeUp(ai: Procreator, scene: Scene): Promise<Written> {
   const sent: Sent = { startedAt: new Date(), estimate: counted(context.messages) };
   const stream = streamSimple(ai.inUse.model, context, {
     reasoning: thinkingOf(ai.inUse),
-    apiKey: ai.catalog.proxy.apiKey,
+    apiKey: ai.inUse.apiKey,
     signal: ai.signal,
     // Every chapter of a book starts with the same instructions, so they can stay cached.
     sessionId: `author-${scene.bookId}`,

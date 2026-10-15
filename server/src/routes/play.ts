@@ -77,8 +77,8 @@ export function playRoutes(deps: Deps) {
 
   /** Procreator on the account's model, or a 503 while the AI is offline. */
   async function procreatorFor(userId: string, signal: AbortSignal): Promise<Procreator> {
-    const { catalog, inUse } = await modelFor(deps, userId);
-    return { db: deps.db, catalog, inUse, userId, signal };
+    const inUse = await modelFor(deps, userId);
+    return { db: deps.db, inUse, userId, signal };
   }
 
   /**

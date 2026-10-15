@@ -36,14 +36,14 @@ async function procreatorWith(replies: Reply[], userId: string, served: Served =
   if (!inUse) {
     throw new Error('The fake proxy serves no models.');
   }
-  const ai: Procreator = { db, catalog, inUse, userId };
-  return { proxy, ai };
+  const ai: Procreator = { db, inUse, userId };
+  return { proxy, ai, catalog };
 }
 
 /** Procreator as procreatorWith makes it, on another model the proxy serves. */
 async function procreatorOn(model: string, replies: Reply[], userId: string, served: Served = antigravity()) {
-  const { proxy, ai } = await procreatorWith(replies, userId, served);
-  const inUse = await modelInUse(ai.catalog, { model, thinking: 'high' });
+  const { proxy, ai, catalog } = await procreatorWith(replies, userId, served);
+  const inUse = await modelInUse(catalog, { model, thinking: 'high' });
   if (inUse?.model.id !== model) {
     throw new Error(`The fake proxy doesn’t serve ${model}.`);
   }

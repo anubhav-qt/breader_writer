@@ -213,7 +213,7 @@ async function rewriteGroup(ai: Procreator, bookId: string, brief: RewriteBrief,
   const config: AgentLoopConfig = {
     model: ai.inUse.model,
     reasoning: thinkingOf(ai.inUse),
-    apiKey: ai.catalog.proxy.apiKey,
+    apiKey: ai.inUse.apiKey,
     // Every part of a rewrite starts the same, so the cache can hold the instructions.
     sessionId: `rewrite-${bookId}`,
     cacheRetention: 'long',

@@ -1,4 +1,3 @@
-import type { Catalog } from '../ai/catalog.ts';
 import { ProxyError } from '../ai/proxy.ts';
 import { modelInUse, savedChoice, type InUse } from '../ai/settings.ts';
 import type { Deps } from '../context.ts';
@@ -55,7 +54,7 @@ export function failedFrom(err: Error): ApiError {
 }
 
 /** The model the account's calls run on, or a 503 while the AI is offline. */
-export async function modelFor(deps: Deps, userId: string): Promise<{ catalog: Catalog; inUse: InUse }> {
+export async function modelFor(deps: Deps, userId: string): Promise<InUse> {
   const catalog = deps.catalog;
   if (!catalog) {
     throw offline();
@@ -72,7 +71,7 @@ export async function modelFor(deps: Deps, userId: string): Promise<{ catalog: C
   if (!inUse) {
     throw offline();
   }
-  return { catalog, inUse };
+  return inUse;
 }
 
 /**
@@ -86,8 +85,8 @@ export async function writeTheBook(deps: Deps, userId: string, bookId: string) {
     return;
   }
   try {
-    const { catalog, inUse } = await modelFor(deps, userId);
-    scribe.nudge({ db: deps.db, catalog, inUse, userId }, bookId);
+    const inUse = await modelFor(deps, userId);
+    scribe.nudge({ db: deps.db, inUse, userId }, bookId);
   } catch (err) {
     if (!(err instanceof ApiError)) {
       throw err;

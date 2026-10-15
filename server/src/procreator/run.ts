@@ -9,7 +9,6 @@ import {
   type SystemMessage,
   type UserMessage,
 } from '@writer/pi-ai';
-import type { Catalog } from '../ai/catalog.ts';
 import { counted, ModelError, recordCall, textOf, thinkingOf, type CallTag, type Role, type Sent } from '../ai/call.ts';
 import { undashed, Undasher } from '../ai/dashes.ts';
 import type { InUse } from '../ai/settings.ts';
@@ -31,7 +30,6 @@ import type { Mode } from './tools.ts';
 /** What running Procreator needs: the database, and the model and account it runs on. */
 export interface Procreator {
   db: Db;
-  catalog: Catalog;
   inUse: InUse;
   userId: string;
   signal?: AbortSignal;
@@ -192,7 +190,7 @@ export async function exchange(ai: Procreator, scene: Scene, segment: Segment, a
   const config: AgentLoopConfig = {
     model: ai.inUse.model,
     reasoning: thinkingOf(ai.inUse),
-    apiKey: ai.catalog.proxy.apiKey,
+    apiKey: ai.inUse.apiKey,
     // Keeps a session's calls on one cache where the provider keys its cache by session.
     sessionId: scene.id,
     // The owner often takes longer than five minutes over a move, so the cache is asked to last:

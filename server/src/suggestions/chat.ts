@@ -246,7 +246,7 @@ async function exchange(helper: Helper, chat: ChatRow, setup: DraftSetup, mode: 
   const config: AgentLoopConfig = {
     model: helper.inUse.model,
     reasoning: thinkingOf(helper.inUse),
-    apiKey: helper.catalog.proxy.apiKey,
+    apiKey: helper.inUse.apiKey,
     // Keeps the chat's calls on one cache, where the provider keys its cache by session.
     sessionId: chat.id,
     cacheRetention: 'long',

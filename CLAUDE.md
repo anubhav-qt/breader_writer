@@ -1202,7 +1202,8 @@ A Hono API, port 8790, built like breader's server.
     (`gemini-3.8-flash-high` as Antigravity names it), thinking high.
   - `settings.ts` decides the model an account's story runs on (`modelInUse`): its choice while
     an account serves it, else the default, else the first; its thinking moves to the nearest
-    level the model takes.
+    level the model takes. What it answers (`InUse`) carries the key its calls take, so a call
+    never asks where the model came from.
   - `dashes.ts`: no dashes in anything Procreator writes (see "Writing"). Its instructions say
     so, and what it writes passes through `undashed` anyway (`Undasher` for streamed words,
     holding a dash back until the next words show what it becomes): a comma between words, an

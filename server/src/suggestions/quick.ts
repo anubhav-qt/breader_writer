@@ -8,7 +8,6 @@ import {
   type Model,
   type UserMessage,
 } from '@writer/pi-ai';
-import type { Catalog } from '../ai/catalog.ts';
 import { counted, ModelError, recordCall, textOf, thinkingOf, type CallTag, type Sent } from '../ai/call.ts';
 import type { InUse } from '../ai/settings.ts';
 import type { Db } from '../db/client.ts';
@@ -22,7 +21,6 @@ import type { Db } from '../db/client.ts';
 /** What setup help runs on: the database, the model, and the account and book it's for. */
 export interface Helper {
   db: Db;
-  catalog: Catalog;
   inUse: InUse;
   userId: string;
   /** The book, once it's made and only if it's the account's. */
@@ -45,10 +43,10 @@ function quick(inUse: InUse): InUse {
     // would send no level at all.
     const thinks: Model<Api> = { ...model, reasoning: true };
     const level = clampThinkingLevel(thinks, 'low');
-    return { model: thinks, choice: { model: inUse.choice.model, thinking: level } };
+    return { ...inUse, model: thinks, choice: { ...inUse.choice, thinking: level } };
   }
   const levels = getSupportedThinkingLevels(model);
-  return { model, choice: { model: inUse.choice.model, thinking: levels[0] } };
+  return { ...inUse, choice: { ...inUse.choice, thinking: levels[0] } };
 }
 
 /**
@@ -64,7 +62,7 @@ export async function askQuickly(helper: Helper, system: string, ask: string): P
   const sent: Sent = { startedAt: new Date(), estimate: counted(context.messages) };
   const stream = streamSimple(inUse.model, context, {
     reasoning: thinkingOf(inUse),
-    apiKey: helper.catalog.proxy.apiKey,
+    apiKey: helper.inUse.apiKey,
     signal: helper.signal,
     // The instructions are the same for every call and the page changes only as the owner
     // types, so calls close together share their start. The cache is asked to last as long as

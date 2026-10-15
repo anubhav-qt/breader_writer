@@ -70,8 +70,8 @@ export function storyRoutes(deps: Deps) {
     if (!(await reachesBack(deps.db, book.id, edit, reach))) {
       return null;
     }
-    const { catalog, inUse } = await modelFor(deps, userId);
-    return { db: deps.db, catalog, inUse, userId, signal };
+    const inUse = await modelFor(deps, userId);
+    return { db: deps.db, inUse, userId, signal };
   }
 
   /** The story as the Story panel shows it. */

@@ -44,9 +44,9 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/blanks', async (c) => {
     const ask = parse(BlanksAsk, await readJson(c));
     const userId = c.var.login.id;
-    const { catalog, inUse } = await modelFor(deps, userId);
+    const inUse = await modelFor(deps, userId);
     const bookId = await ownBookId(userId, ask.bookId);
-    const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId, signal: c.req.raw.signal };
+    const helper: Helper = { db: deps.db, inUse, userId, bookId, signal: c.req.raw.signal };
     let fields: BlankSuggestion[];
     try {
       fields = await suggestBlanks(helper, ask.setup);
@@ -130,9 +130,9 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/chats', async (c) => {
     const ask = parse(ChatSay, await readJson(c));
     const userId = c.var.login.id;
-    const { catalog, inUse } = await modelFor(deps, userId);
+    const inUse = await modelFor(deps, userId);
     const chat = await chatToSay(userId, ask);
-    const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
+    const helper: Helper = { db: deps.db, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
     return eventStream(c, async (stream) => {
       await send(stream, { type: 'started', chatId: chat.id });
       try {
@@ -164,8 +164,8 @@ export function suggestionRoutes(deps: Deps) {
     const ask = parse(ChatRedo, await readJson(c));
     const userId = c.var.login.id;
     const chat = await ownChat(userId, c.req.param('id'));
-    const { catalog, inUse } = await modelFor(deps, userId);
-    const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
+    const inUse = await modelFor(deps, userId);
+    const helper: Helper = { db: deps.db, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
     try {
       const answered = await alone(chat.id, () => redo(helper, chat, ask.setup, ask.entry, ask.item, ask.notes));
       return c.json(answered);
@@ -198,9 +198,9 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/field', async (c) => {
     const ask = parse(FieldAsk, await readJson(c));
     const userId = c.var.login.id;
-    const { catalog, inUse } = await modelFor(deps, userId);
+    const inUse = await modelFor(deps, userId);
     const bookId = await ownBookId(userId, ask.bookId);
-    const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId, signal: c.req.raw.signal };
+    const helper: Helper = { db: deps.db, inUse, userId, bookId, signal: c.req.raw.signal };
     let text: string | null;
     try {
       text = await suggestField(helper, ask.setup, ask.field);

@@ -103,7 +103,7 @@ async function call(ai: Procreator, moment: Moment, segment: ActorSegment, messa
     context,
     {
       reasoning: thinkingOf(ai.inUse),
-      apiKey: ai.catalog.proxy.apiKey,
+      apiKey: ai.inUse.apiKey,
       signal: ai.signal,
       // Keeps the actor's calls on one cache where the provider keys its cache by session, and
       // asks for it to last, since an actor is often cued only once or twice a scene.

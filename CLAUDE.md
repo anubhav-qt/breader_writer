@@ -897,7 +897,9 @@ owner said to finish everything without asking.
   its file name the book's title.
 - The owner's local database is at migration 0012 (the chapters) since 2026-10-15, backed up just
   before as `.backups/2026-10-15-before-0012.sql` and tried on a copy first. Their book came
-  through whole.
+  through whole. Then 0013 (a writer's own AI, step 9), the same day, backed up as
+  `.backups/2026-10-15-before-0013.sql` and tried on a copy: 1 book, 10 characters and 16
+  relationships came through.
 
 ### Notes for step 8
 
@@ -974,6 +976,23 @@ All of step 9's design calls are ours (2026-10-15, the owner can change them).
   house: the scribe goes only as far as it's told (`through`), so the house never writes a later
   chapter. Settings say where the account stands (`house`: `always`, `first_chapter`, or `used`
   once the first book has a scene 2, waiting or begun).
+- **A writer's own AI** comes from keys (below) or sign-ins, and its models join the picker beside
+  the house's, each with where it comes from (`ModelSource`: `house`, `google`, `anthropic`,
+  `openai`, `signin`), since one id can come from two places. The house's are shown while it
+  writes anything for the account. The choice keeps its source (`settings.source`). A call runs
+  on the account's own model when it picked one and it's still there; else on the house while the
+  house writes the work; else on the first of its own models; else it's the 403 (`modelFor`). So
+  a writer who brings a key goes on past the free chapter without picking anything, and the
+  scribe writes each chapter on whatever its scene would run on, the house's free one included.
+- **Own keys** for Google (the Gemini API), Anthropic and OpenAI, one per provider per account
+  (`own_keys`). A key is checked by listing the models it reaches before it's kept, and kept
+  sealed with AES-256-GCM under a key made from `KEYS_SECRET` (`ai/own/seal.ts`), so the
+  database alone never gives one away. It's never sent back: settings show its provider and last
+  four characters. Calls go straight to the provider with it (`ai/own/providers.ts` makes pi's
+  models: Gemini 3 thinks low or high, Claude any level, OpenAI's reasoning models can't be off),
+  so they draw on the writer's own limits. A server without `KEYS_SECRET` takes no keys;
+  `dev:env` and `live:env` make one the first time and keep it after, since a new one loses every
+  key kept. Which models a key reaches is read again once a minute at most (`OwnAi`).
 
 ### Later versions
 
@@ -1004,7 +1023,8 @@ their code, changed where we need, not rewritten to ours.
 
 - `src/protocol.ts`: the zod shapes the server and the app exchange (`Me`, `Access`,
   `BookCard`, `BookList`, `Settings` with what the house writes for the account (`HouseStanding`),
-  and the AI accounts and their sign-ins: `AiAccount`,
+  where each model comes from (`ModelSource`, on `ModelInfo` and `ModelChoice`), a writer's own AI
+  (`KeyProvider`, `OwnKey`, `OwnAi`, `KeyAsk`), and the AI accounts and their sign-ins: `AiAccount`,
   `SignIn`, `SignInStatus`, `SignInAddress`). Change a shape here and both sides get the type
   error.
 - `src/book.ts`: what a book is set up with (`BookSetup`): its length (and each length's word
@@ -1170,7 +1190,8 @@ A Hono API, port 8790, built like breader's server.
   `BREADER_DATABASE_URL` is where breader's logins are (unset in production, where it's the same
   Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
   the invite list, and `OWNER_EMAILS` who signs the AI accounts in and out (each a writer too).
-  `OPEN_TO_ALL` lets every confirmed account write (step 9).
+  `OPEN_TO_ALL` lets every confirmed account write (step 9), and `KEYS_SECRET` is what writers'
+  own keys are sealed with (none are taken without it).
   `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are the CLIProxyAPI the
   models come through; no URL means the AI is offline, and no management key means no thinking
   levels and no accounts to manage.
@@ -1180,7 +1201,9 @@ A Hono API, port 8790, built like breader's server.
   left the story mid play, in order; the key is the
   book and the app made id together, so no book can reach another's characters) and
   `relationships` (one row per pair, smaller id first, which a check enforces: the bond and each
-  side's "sees" and "hides"), and `settings` (one per account: its model and thinking level).
+  side's "sees" and "hides"), and `settings` (one per account: its model, where it comes from and
+  its thinking level), `own_keys` (an account's own API keys, sealed) and `own_sign_ins` (whose each
+  sign-in on the writers' proxy is).
   The story's own tables follow (see `src/story/`): `scenes` (numbered, one playing at a time,
   with where, when, who is in it and, once wrapped up, its summary), `turns` (the owner's move
   and the reply, word for word, numbered through the book), `changes` and `versions` (the change
@@ -1387,7 +1410,11 @@ A Hono API, port 8790, built like breader's server.
   `open` (every confirmed account is `open` with `OPEN_TO_ALL`), and `isInvited` whether an
   account is on the invite list; `requireWriter` guards routes that need `open`.
   `src/ai/house.ts` is what the owner's AI writes for an account (`houseReach`, `houseStanding`,
-  see "Notes for step 9"). An unconfirmed address is told so
+  see "Notes for step 9"). `src/ai/own/` is a writer's own AI: `seal.ts` seals keys, `providers.ts`
+  lists the models a key reaches and makes them pi's, and `own.ts` keeps the keys and reads their
+  models (`OwnAi`, `Deps.own`). `routes/own.ts` is `GET /v1/own` (the account's keys and sign-ins,
+  and whether this server takes either) and `PUT` and `DELETE /v1/own/keys/:provider` (a 400
+  `key_refused` when the provider turns the key away, a 503 `keys_off` without `KEYS_SECRET`). An unconfirmed address is told so
   before the list is checked, so nobody learns whether an email they don't own is invited.
   `isOwner` is a writer whose email is in `OWNER_EMAILS`; `requireOwner` guards the accounts.
 - `src/routes/`: `GET /health`; `GET /v1/me` (the account, its access and whether it's the
@@ -1475,7 +1502,9 @@ A Hono API, port 8790, built like breader's server.
   chapters written in order with the one before in view, a chapter that fails and one a rewrite
   overtook, renames reaching chapters, a story ending and being finished, the EPUB, and search),
   `test/door.test.ts` breading_ground as the one door, `test/sse.test.ts` the streams' comments
-  while they're quiet, and `test/house.test.ts` the house's free chapter.
+  while they're quiet, `test/house.test.ts` the house's free chapter, and `test/own.test.ts` a
+  writer's own keys. The stand-in proxy lists models as Google's and Anthropic's APIs do too, so
+  it stands in for them.
 
 ### `frontend/worker.js`, `infra/`, `scripts/` and CI
 
@@ -1506,7 +1535,7 @@ writer reads that login. Only the writer's own tables are local.
    `WRITER_EMAILS` there, the owner's in `OWNER_EMAILS` too, and the proxy's management key in
    `CLIPROXY_MANAGEMENT_KEY` (its config only keeps a hash of it, so it comes from the owner,
    and a wrong one gets this machine shut out of the management API for 30 minutes; see "Notes
-   for step 4").
+   for step 4"). It makes a `KEYS_SECRET` the first time, for writers' own keys, and keeps it.
 3. `npm run db`, `npm run migrate`, then `npm run api` (port 8790) and `npm run web` (5174).
 4. Open `https://local.breader.site:5174/writer/`. HTTPS is needed because breader's cookie is
    Secure. With mkcert, once (`brew install mkcert`, `mkcert -install`, then `npm run certs`,

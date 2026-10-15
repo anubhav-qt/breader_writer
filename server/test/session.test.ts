@@ -43,7 +43,7 @@ async function procreatorWith(replies: Reply[], userId: string, served: Served =
 /** Procreator as procreatorWith makes it, on another model the proxy serves. */
 async function procreatorOn(model: string, replies: Reply[], userId: string, served: Served = antigravity()) {
   const { proxy, ai, catalog } = await procreatorWith(replies, userId, served);
-  const inUse = await modelInUse(catalog, { model, thinking: 'high' });
+  const inUse = await modelInUse(catalog, { source: 'house', model, thinking: 'high' });
   if (inUse?.model.id !== model) {
     throw new Error(`The fake proxy doesn’t serve ${model}.`);
   }

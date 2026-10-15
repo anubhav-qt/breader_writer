@@ -1,5 +1,8 @@
 import { eq } from 'drizzle-orm';
 import type { Catalog } from '../src/ai/catalog.ts';
+import { OwnAi } from '../src/ai/own/own.ts';
+import { PROVIDER_URLS } from '../src/ai/own/providers.ts';
+import { sealingKey } from '../src/ai/own/seal.ts';
 import type { Scribe } from '../src/book/scribe.ts';
 import { makeApp } from '../src/app.ts';
 import type { Deps } from '../src/context.ts';
@@ -11,12 +14,17 @@ import { makeBreader, signUp } from './breader.ts';
 export const ORIGIN = 'http://localhost:5174';
 export const env = loadEnv();
 export const pool = makePool(env.DATABASE_URL, { ssl: false, name: 'test' });
-export const deps: Deps = { env, db: writerDb(pool), pool, breader: breaderDb(pool), catalog: null, scribe: null };
+/** What tests seal keys with. */
+export const SEALING = sealingKey('a test secret for sealing keys, long enough');
+export const deps: Deps = { env, db: writerDb(pool), pool, breader: breaderDb(pool), catalog: null, own: new OwnAi(SEALING, PROVIDER_URLS), scribe: null };
 export const breader = makeBreader(pool, { secure: false });
 
-/** The writer, with some settings changed for one test, its models from this catalog, and a scribe when a test wants the book written. */
-export function writer(over: Partial<Env> = {}, catalog: Catalog | null = null, scribe: Scribe | null = null) {
-  return makeApp({ ...deps, env: { ...env, ...over }, catalog, scribe });
+/**
+ * The writer, with some settings changed for one test, its models from this catalog, a scribe when
+ * a test wants the book written, and the accounts' own AI when a test brings it.
+ */
+export function writer(over: Partial<Env> = {}, catalog: Catalog | null = null, scribe: Scribe | null = null, own: OwnAi = deps.own) {
+  return makeApp({ ...deps, env: { ...env, ...over }, catalog, scribe, own });
 }
 
 export type Writer = ReturnType<typeof writer>;

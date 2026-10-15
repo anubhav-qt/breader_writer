@@ -117,12 +117,51 @@ export const relationships = writer.table(
 export const settings = writer.table('settings', {
   /** The breader account (its Better Auth user id). */
   userId: text('user_id').primaryKey(),
-  /** A model id as the proxy lists it. */
+  /**
+   * Where the model comes from (step 9): `house`, the owner's proxy; `google`, `anthropic` or
+   * `openai`, the account's own key; or `signin`, its own sign-ins on the writers' proxy.
+   */
+  source: text('source').notNull().default('house'),
+  /** A model id as its source lists it. */
   model: text('model').notNull(),
   /** off, minimal, low, medium, high, xhigh or max. */
   thinking: text('thinking').notNull(),
   updatedAt: at('updated_at').notNull().defaultNow(),
 });
+
+/**
+ * An account's own API key for a provider (step 9), one each: sealed with KEYS_SECRET (ai/own/seal.ts),
+ * never shown again, and known in settings by its last four characters.
+ */
+export const ownKeys = writer.table(
+  'own_keys',
+  {
+    userId: text('user_id').notNull(),
+    /** google, anthropic or openai. */
+    provider: text('provider').notNull(),
+    sealed: text('sealed').notNull(),
+    hint: text('hint').notNull(),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.provider] })],
+);
+
+/**
+ * An account's own subscription signed in to the writers' proxy (step 9), by its credential's name
+ * there. The proxy keeps the sign-in itself; this says whose it is.
+ */
+export const ownSignIns = writer.table(
+  'own_sign_ins',
+  {
+    name: text('name').primaryKey(),
+    userId: text('user_id').notNull(),
+    /** antigravity, codex or claude. */
+    provider: text('provider').notNull(),
+    email: text('email').notNull().default(''),
+    createdAt: at('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('own_sign_ins_user').on(t.userId)],
+);
 
 /*
  * The story: everything it knows lives in these tables, and each scene's session opens with a

@@ -12,7 +12,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse, readLines, setLine, unquote, writeSecret } from './env-file.mjs';
+import { keepOrMakeSecret, parse, readLines, setLine, unquote, writeSecret } from './env-file.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const breaderEnv = process.env.BREADER_ENV || resolve(root, '../breader/infra/.env');
@@ -87,6 +87,8 @@ if (proxy) {
   setLine(lines, 'CLIPROXY_URL', proxy.url);
   setLine(lines, 'CLIPROXY_API_KEY', proxy.key);
 }
+// Writers' own keys are sealed with it, so one made once is kept.
+const madeKeysSecret = keepOrMakeSecret(lines, 'KEYS_SECRET');
 writeSecret(target, lines);
 
 console.log(`Wrote server/.env with breader's ${Object.values(FROM_BREADER).join(', ')} (values not shown).`);
@@ -94,6 +96,9 @@ if (proxy) {
   console.log(`And the address and API key of the CLIProxyAPI in ${proxyConfig} (key not shown).`);
 } else {
   console.log(`No CLIProxyAPI config at ${proxyConfig}, so the AI is offline. Set CLIPROXY_CONFIG to where it is.`);
+}
+if (madeKeysSecret) {
+  console.log('Made a KEYS_SECRET, which writers\' own keys are sealed with (not shown). Keep it: a new one loses them.');
 }
 const written = parse(lines.join('\n'));
 if (proxy && !written.CLIPROXY_MANAGEMENT_KEY) {

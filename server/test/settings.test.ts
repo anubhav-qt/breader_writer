@@ -31,7 +31,7 @@ describe('GET /v1/settings', () => {
     const { app, cookie } = await setUp(catalogOf(proxy));
     const r = await call(app, 'GET', '/v1/settings', cookie);
     expect(r.status).toBe(200);
-    expect(r.body.using).toEqual({ model: 'gemini-3.8-flash-high', thinking: 'high' });
+    expect(r.body.using).toEqual({ source: 'house', model: 'gemini-3.8-flash-high', thinking: 'high' });
     const ids = r.body.models.map((model: { id: string }) => model.id);
     expect(ids).toEqual(['gemini-3.8-flash-high', 'claude-sonnet-4-6', 'gpt-oss-120b-medium']);
   });
@@ -41,6 +41,7 @@ describe('GET /v1/settings', () => {
     const r = await call(app, 'GET', '/v1/settings', cookie);
     const byId = new Map(r.body.models.map((model: { id: string }) => [model.id, model]));
     expect(byId.get('gemini-3.8-flash-high')).toEqual({
+      source: 'house',
       id: 'gemini-3.8-flash-high',
       name: 'Gemini 3.8 Flash',
       provider: 'antigravity',
@@ -56,13 +57,13 @@ describe('GET /v1/settings', () => {
     const { app, cookie } = await setUp(catalogOf(proxy, ''));
     const r = await call(app, 'GET', '/v1/settings', cookie);
     expect(r.body.models).toHaveLength(4);
-    expect(r.body.using).toEqual({ model: 'gemini-3.8-flash-high', thinking: 'off' });
+    expect(r.body.using).toEqual({ source: 'house', model: 'gemini-3.8-flash-high', thinking: 'off' });
   });
 
   it('says the AI is offline without a proxy, or while it is down', async () => {
     const none = await setUp(null);
     const unset = await call(none.app, 'GET', '/v1/settings', none.cookie);
-    expect(unset.body).toEqual({ using: { model: 'gemini-3.8-flash-high', thinking: 'high' }, models: null, house: 'always' });
+    expect(unset.body).toEqual({ using: { source: 'house', model: 'gemini-3.8-flash-high', thinking: 'high' }, models: null, house: 'always' });
 
     const gone = await fakeProxy(antigravity());
     await gone.close();
@@ -78,10 +79,10 @@ describe('PUT /v1/settings', () => {
     const { app, cookie } = await setUp(catalogOf(proxy));
     const r = await send(app, 'PUT', '/v1/settings', cookie, { model: 'claude-sonnet-4-6', thinking: 'low' });
     expect(r.status).toBe(200);
-    expect(r.body.using).toEqual({ model: 'claude-sonnet-4-6', thinking: 'low' });
+    expect(r.body.using).toEqual({ source: 'house', model: 'claude-sonnet-4-6', thinking: 'low' });
 
     const again = await call(app, 'GET', '/v1/settings', cookie);
-    expect(again.body.using).toEqual({ model: 'claude-sonnet-4-6', thinking: 'low' });
+    expect(again.body.using).toEqual({ source: 'house', model: 'claude-sonnet-4-6', thinking: 'low' });
   });
 
   it('turns away a model nobody serves, and a level the model doesn’t take', async () => {
@@ -114,7 +115,7 @@ describe('PUT /v1/settings', () => {
     changing.served.models = changing.served.models.filter((model) => model.id !== 'claude-sonnet-4-6');
     const after = writer({ WRITER_EMAILS: [email] }, catalogOf(changing));
     const r = await call(after, 'GET', '/v1/settings', cookie);
-    expect(r.body.using).toEqual({ model: 'gemini-3.8-flash-high', thinking: 'minimal' });
+    expect(r.body.using).toEqual({ source: 'house', model: 'gemini-3.8-flash-high', thinking: 'minimal' });
     await changing.close();
   });
 });

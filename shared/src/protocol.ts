@@ -58,11 +58,20 @@ export type BookList = z.infer<typeof BookList>;
 export const ThinkingLevel = z.enum(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 export type ThinkingLevel = z.infer<typeof ThinkingLevel>;
 
-/** A model the accounts signed in to the proxy can serve, as settings show it. */
+/**
+ * Where a model comes from (step 9): the house, the owner's own proxy; an account's own key for
+ * Google, Anthropic or OpenAI; or its own sign-ins (`signin`), on the writers' proxy.
+ */
+export const ModelSource = z.enum(['house', 'google', 'anthropic', 'openai', 'signin']);
+export type ModelSource = z.infer<typeof ModelSource>;
+
+/** A model an account can pick, as settings show it. */
 export const ModelInfo = z.object({
+  /** Where it comes from. The same id can come from two places. */
+  source: ModelSource.default('house'),
   id: z.string(),
   name: z.string(),
-  /** The account kind serving it: antigravity, codex, claude. */
+  /** Who serves it: antigravity, codex or claude for an account signed in, else google, anthropic or openai. */
   provider: z.string(),
   /** In tokens. */
   contextWindow: z.number().int(),
@@ -71,8 +80,9 @@ export const ModelInfo = z.object({
 });
 export type ModelInfo = z.infer<typeof ModelInfo>;
 
-/** The model the story runs on, and how hard it thinks. PUT /v1/settings. */
+/** The model the story runs on, where it comes from, and how hard it thinks. PUT /v1/settings. */
 export const ModelChoice = z.object({
+  source: ModelSource.default('house'),
   model: z.string().min(1).max(200),
   thinking: ThinkingLevel,
 });
@@ -149,3 +159,32 @@ export const SignInAddress = z.object({
   address: z.string().trim().min(1).max(4000),
 });
 export type SignInAddress = z.infer<typeof SignInAddress>;
+
+/** The providers an account brings its own API key for (step 9). */
+export const KeyProvider = z.enum(['google', 'anthropic', 'openai']);
+export type KeyProvider = z.infer<typeof KeyProvider>;
+
+/** An account's own key, as settings show it: never the key, only its provider and last four characters. */
+export const OwnKey = z.object({
+  provider: KeyProvider,
+  hint: z.string(),
+});
+export type OwnKey = z.infer<typeof OwnKey>;
+
+/**
+ * GET /v1/own: the account's own AI. `keysHere` and `signInsHere` say whether this server takes
+ * keys (it has KEYS_SECRET) and sign-ins (it runs the writers' proxy).
+ */
+export const OwnAi = z.object({
+  keys: z.array(OwnKey),
+  signIns: z.array(AiAccount),
+  keysHere: z.boolean(),
+  signInsHere: z.boolean(),
+});
+export type OwnAi = z.infer<typeof OwnAi>;
+
+/** PUT /v1/own/keys/:provider: the key, checked with its provider before it's kept. */
+export const KeyAsk = z.object({
+  key: z.string().trim().min(8).max(1000),
+});
+export type KeyAsk = z.infer<typeof KeyAsk>;

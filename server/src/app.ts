@@ -9,6 +9,7 @@ import { accountRoutes } from './routes/accounts.ts';
 import { bookRoutes } from './routes/books.ts';
 import { healthRoutes } from './routes/health.ts';
 import { meRoutes } from './routes/me.ts';
+import { ownRoutes } from './routes/own.ts';
 import { playRoutes } from './routes/play.ts';
 import { readingRoutes } from './routes/reading.ts';
 import { storyRoutes } from './routes/story.ts';
@@ -65,6 +66,7 @@ export function makeApp(deps: Deps) {
   app.route('/v1', readingRoutes(deps));
   app.route('/v1', settingsRoutes(deps));
   app.route('/v1', accountRoutes(deps));
+  app.route('/v1', ownRoutes(deps));
   app.route('/v1', suggestionRoutes(deps));
 
   app.notFound((c) => c.json({ code: 'not_found', message: 'No such endpoint.' }, 404));

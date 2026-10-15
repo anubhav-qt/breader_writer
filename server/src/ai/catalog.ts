@@ -1,5 +1,5 @@
 import { getSupportedThinkingLevels, type Api, type Model, type ThinkingLevelMap } from '@writer/pi-ai';
-import { ThinkingLevel, type ModelInfo } from '@writer/shared/protocol';
+import { ThinkingLevel, type ModelInfo, type ModelSource } from '@writer/shared/protocol';
 import { listModels, modelDefinitions, type Listed, type ModelDefinition, type Proxy } from './proxy.ts';
 
 /*
@@ -110,8 +110,10 @@ function modelFor(proxy: Proxy, listed: Listed, definition: ModelDefinition | un
   return model;
 }
 
-function infoFor(model: Model<Api>): ModelInfo {
+/** A model as settings show it, from the house unless said. */
+export function infoFor(model: Model<Api>, source: ModelSource = 'house'): ModelInfo {
   return {
+    source,
     id: model.id,
     name: model.name,
     provider: model.provider,
@@ -180,7 +182,7 @@ async function load(proxy: Proxy): Promise<Loaded> {
     }
     models.set(entry.id, modelFor(proxy, entry, definition));
   }
-  const infos = [...models.values()].map(infoFor);
+  const infos = [...models.values()].map((model) => infoFor(model));
   return { at: Date.now(), models, infos: inShowingOrder(infos) };
 }
 

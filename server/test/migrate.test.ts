@@ -22,6 +22,8 @@ describe('the writer schema', () => {
       'characters',
       'migrations',
       'notes',
+      'own_keys',
+      'own_sign_ins',
       'pages',
       'relationship_history',
       'relationships',

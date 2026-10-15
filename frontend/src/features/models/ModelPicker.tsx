@@ -41,8 +41,13 @@ function nearestLevel(levels: ThinkingLevel[], wanted: ThinkingLevel): ThinkingL
   return levels[0] ?? 'off';
 }
 
-function modelIn(settings: Settings, id: string): ModelInfo | undefined {
-  return settings.models?.find((model) => model.id === id);
+/** The model a choice stands for, among those settings list: the same id can come from two places. */
+function modelIn(settings: Settings, choice: ModelChoice): ModelInfo | undefined {
+  return settings.models?.find((model) => isChoice(model, choice));
+}
+
+function isChoice(model: ModelInfo, choice: ModelChoice): boolean {
+  return model.source === choice.source && model.id === choice.model;
 }
 
 /** What the chip says: the model and how hard it thinks, or that the AI is offline. */
@@ -54,7 +59,7 @@ function chipText(loaded: Loaded): string {
     return 'AI offline';
   }
   const { using } = loaded.settings;
-  const model = modelIn(loaded.settings, using.model);
+  const model = modelIn(loaded.settings, using);
   const name = model?.name ?? using.model;
   if (!picksThinking(model)) {
     return name;
@@ -130,15 +135,15 @@ export function ModelPicker({ owner }: { owner: boolean }) {
   const pickModel = (settings: Settings, model: ModelInfo) => {
     // Coming from a model that thinks at its own pace, there's no level to keep: start from high.
     let wanted: ThinkingLevel = 'high';
-    if (picksThinking(modelIn(settings, settings.using.model))) {
+    if (picksThinking(modelIn(settings, settings.using))) {
       wanted = settings.using.thinking;
     }
     const thinking = nearestLevel(model.thinkingLevels, wanted);
-    void choose(settings, { model: model.id, thinking });
+    void choose(settings, { source: model.source, model: model.id, thinking });
   };
 
   const pickThinking = (settings: Settings, thinking: ThinkingLevel) => {
-    void choose(settings, { model: settings.using.model, thinking });
+    void choose(settings, { ...settings.using, thinking });
   };
 
   return (
@@ -230,7 +235,7 @@ function Menu({ loaded, message, owner, accounts, onRetry, onModel, onThinking }
     );
   }
 
-  const current = modelIn(settings, settings.using.model);
+  const current = modelIn(settings, settings.using);
   const levels = current?.thinkingLevels ?? [];
   const options = levels.map((level) => ({ v: level, label: thinkingName(level) }));
   return (
@@ -239,9 +244,9 @@ function Menu({ loaded, message, owner, accounts, onRetry, onModel, onThinking }
       <div className="pick-list" role="radiogroup" aria-labelledby="pick-models">
         {settings.models.map((model) => (
           <ModelRow
-            key={model.id}
+            key={`${model.source} ${model.id}`}
             model={model}
-            picked={model.id === settings.using.model}
+            picked={isChoice(model, settings.using)}
             onPick={() => onModel(settings, model)}
           />
         ))}

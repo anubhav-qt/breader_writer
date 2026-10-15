@@ -29,7 +29,7 @@ export interface Scribe {
 }
 
 /** The book's first scene that's wrapped up and not written yet, or null. */
-async function nextToWrite(db: Db, bookId: string): Promise<Scene | null> {
+export async function nextToWrite(db: Db, bookId: string): Promise<Scene | null> {
   const waiting = await db
     .select({ scene: scenes, chapter: chapters.id })
     .from(scenes)

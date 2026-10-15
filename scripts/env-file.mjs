@@ -2,6 +2,7 @@
  * Reading and writing KEY=value files, for the scripts that write the writer's settings from
  * breader's (dev-env.mjs and live-env.mjs). Neither prints a value it reads.
  */
+import { randomBytes } from 'node:crypto';
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 
 export function unquote(value) {
@@ -58,4 +59,15 @@ export function writeSecret(path, lines) {
   writeFileSync(path, `${lines.join('\n')}\n`, { mode: 0o600 });
   // The mode above only applies to a new file.
   chmodSync(path, 0o600);
+}
+
+/**
+ * Makes a random secret for the key unless the lines hold one already, since changing it would
+ * lose what it guards. Answers whether it made one.
+ */
+export function keepOrMakeSecret(lines, key) {
+  const current = parse(lines.join('\n'))[key];
+  if (current) return false;
+  setLine(lines, key, randomBytes(32).toString('base64url'));
+  return true;
 }

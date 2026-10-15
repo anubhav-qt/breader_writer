@@ -13,7 +13,7 @@ import { hkdfSync } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse, parseRaw, readLines, setLine, writeSecret } from './env-file.mjs';
+import { keepOrMakeSecret, parse, parseRaw, readLines, setLine, writeSecret } from './env-file.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const breaderEnv = process.env.BREADER_ENV || resolve(root, '../breader/infra/.env');
@@ -77,12 +77,17 @@ for (const [key, from] of Object.entries({ ...NEEDED, ...WANTED })) {
 }
 setLine(lines, 'CLIPROXY_API_KEY', proxyKey(breader.ADMIN_TOKEN, 'api key'));
 setLine(lines, 'CLIPROXY_MANAGEMENT_KEY', proxyKey(breader.ADMIN_TOKEN, 'management key'));
+// Writers' own keys are sealed with it, so one made once is kept.
+const madeKeysSecret = keepOrMakeSecret(lines, 'KEYS_SECRET');
 writeSecret(target, lines);
 
 console.log(`Wrote infra/.env with breader's ${copied.join(', ')} (values not shown).`);
 console.log("And the proxy's two keys, made from breader's ADMIN_TOKEN (not shown).");
 if (notThere.length > 0) {
   console.log(`Breader has no ${notThere.join(', ')}, so infra/.env keeps what it had for them.`);
+}
+if (madeKeysSecret) {
+  console.log('Made a KEYS_SECRET, which writers\' own keys are sealed with (not shown). Keep it: a new one loses them.');
 }
 const written = parse(lines.join('\n'));
 if (!written.WRITER_EMAILS) {

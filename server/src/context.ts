@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import type { Catalog } from './ai/catalog.ts';
+import type { OwnAi } from './ai/own/own.ts';
 import type { Scribe } from './book/scribe.ts';
 import type { BreaderDb, Db } from './db/client.ts';
 import type { Env } from './env.ts';
@@ -12,8 +13,10 @@ export interface Deps {
   pool: pg.Pool;
   /** Breader's logins, read only (lib/login.ts). The same database as db in production. */
   breader: BreaderDb;
-  /** The models the shared proxy serves, or null where there's no proxy and the AI is offline. */
+  /** The models the shared proxy serves (the house), or null where there's no proxy and the AI is offline. */
   catalog: Catalog | null;
+  /** Each account's own AI (step 9). */
+  own: OwnAi;
   /** Who writes the book in the background as scenes are wrapped up, or null for none (tests). */
   scribe: Scribe | null;
 }

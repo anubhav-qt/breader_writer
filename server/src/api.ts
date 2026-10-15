@@ -1,5 +1,8 @@
 import { serve } from '@hono/node-server';
 import { Catalog } from './ai/catalog.ts';
+import { OwnAi } from './ai/own/own.ts';
+import { PROVIDER_URLS } from './ai/own/providers.ts';
+import { sealingKey } from './ai/own/seal.ts';
 import { proxyFrom } from './ai/proxy.ts';
 import { backgroundScribe } from './book/scribe.ts';
 import { makeApp } from './app.ts';
@@ -28,7 +31,16 @@ if (proxy) {
   log.warn('CLIPROXY_URL is unset, so the AI is offline');
 }
 
-const deps = { env, db: writerDb(pool), pool, breader: breaderDb(breaderPool), catalog, scribe: backgroundScribe() };
+// Writers' own keys are kept sealed with KEYS_SECRET. Without it, this server takes none.
+let sealing: Buffer | null = null;
+if (env.KEYS_SECRET) {
+  sealing = sealingKey(env.KEYS_SECRET);
+} else {
+  log.warn('KEYS_SECRET is unset, so writers can’t bring their own keys');
+}
+const own = new OwnAi(sealing, PROVIDER_URLS);
+
+const deps = { env, db: writerDb(pool), pool, breader: breaderDb(breaderPool), catalog, own, scribe: backgroundScribe() };
 const server = serve({ fetch: makeApp(deps).fetch, port: env.PORT, hostname: '0.0.0.0' }, (info) => {
   log.info({ port: info.port, release: env.RELEASE }, 'writer api listening');
 });

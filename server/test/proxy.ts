@@ -263,8 +263,32 @@ async function manage(proxy: FakeProxy, req: IncomingMessage, url: URL, key: str
   return { status: 404, body: { error: 'not found' } };
 }
 
+/** Gemini's models as Google's API lists them. */
+function googleModels(served: Served): Answer {
+  const gemini = served.models.filter((model) => model.id.startsWith('gemini'));
+  const models = gemini.map((model) => ({
+    name: `models/${model.id}`,
+    displayName: model.id,
+    inputTokenLimit: 1_048_576,
+    outputTokenLimit: 65_536,
+    supportedGenerationMethods: ['generateContent', 'countTokens'],
+  }));
+  return { status: 200, body: { models } };
+}
+
 async function answer(proxy: FakeProxy, req: IncomingMessage, url: URL): Promise<Answer> {
-  const key = keyOf(req.headers.authorization);
+  let key = keyOf(req.headers.authorization);
+  // Anthropic's API takes its key on a header of its own.
+  const anthropicKey = req.headers['x-api-key'];
+  if (typeof anthropicKey === 'string') {
+    key = anthropicKey;
+  }
+  if (url.pathname === '/v1beta/models') {
+    if (req.headers['x-goog-api-key'] !== API_KEY) {
+      return { status: 400, body: { error: { message: 'API key not valid.' } } };
+    }
+    return googleModels(proxy.served);
+  }
   if (url.pathname === '/v1/models') {
     if (key !== API_KEY) {
       return { status: 401, body: { error: 'Invalid API key' } };

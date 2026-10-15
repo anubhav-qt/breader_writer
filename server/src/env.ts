@@ -63,6 +63,12 @@ const Env = z.object({
    * still work, without thinking levels, and settings can't manage the accounts.
    */
   CLIPROXY_MANAGEMENT_KEY: z.string().default(''),
+
+  /**
+   * What writers' own API keys are sealed with in the database (step 9). Unset means this server
+   * takes no keys. Changing it loses every key kept, and writers bring theirs again.
+   */
+  KEYS_SECRET: z.string().min(32).optional(),
 });
 
 export type Env = z.infer<typeof Env>;

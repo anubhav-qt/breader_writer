@@ -37,21 +37,22 @@ proxy's management key in `server/.env` (only the owner has it). Every call now 
 provider for its longest cache (see "Notes for step 3"). Step 5 (setup help) is under way:
 Procreator's faint text in setup's fields is built, and since 2026-10-07 every blank field
 shows it at once (see "Notes for step 5"). It was checked in the desktop app's browser against a
-stand-in API; the field by field version was tried against the real model, the blank fields
-all at once not yet. The Suggestions chat is built: its server, tried against the real model
+stand-in API, and both the field by field version and the blank fields all at once were tried
+against the real model (the blank fields on 2026-10-15). The Suggestions chat is built: its server, tried against the real model
 (2026-10-07), and its panel on the setup page, checked in headless Chrome against a stand-in API
 (2026-10-15), so step 5 is done. Step 6 (play) is under way
 (see "Notes for step 6"): breading_ground is the one door for story changes, and play's server
 is built (the openings, moves narrated as they're written, scenes ending and going on, undo,
 another reply, hints, someone joining the cast), and so are the cast's actors (cues, sending an
 answer back, the owner playing others with the switch off, each actor's chat and its
-compaction), with their tests against a stand-in proxy. Neither has been tried against the real
-model yet. The play page is built (the prose, the pinned box, openings, cues, hints, undo,
+compaction), with their tests against a stand-in proxy, and both were tried against the real
+model on 2026-10-15 (see "Notes for step 6"). The play page is built (the prose, the pinned box, openings, cues, hints, undo,
 another reply, a scene's end and going on), checked in headless Chrome against a stand-in API
 (2026-10-11). The owner's edits mid story have their server (2026-10-11): what the Story panel
 shows, and every change setup can make, held from now on and told to Procreator, or reaching back
 (a rename, "Always so"), rewritten into what was played by Procreator and kept at once, with the
-sessions and the actors' chats started again from it. Neither has met the real model yet. The
+sessions and the actors' chats started again from it. A rename met the real model on 2026-10-15;
+the other changes haven't yet. The
 Story panel is built on it (2026-10-11), checked in headless Chrome against a stand-in API, and
 so is the Notes panel (2026-10-15), with the owner's edits to pages and memory through the same
 door. On 2026-10-15 the owner said to finish everything left without stopping for design
@@ -61,8 +62,10 @@ the design calls from then on are ours, each marked so below. Step 7 (the book) 
 a chapter in the background, a story ends and the book is finished, the book view (breader's
 reader, cut down) is a tap away from the play with a mark for a new chapter, the EPUB download,
 and changes that reach back reach the chapters too. Its server has tests against a stand-in
-proxy; the book view was checked in headless Chrome against a stand-in API. The author hasn't
-met the real model yet. The owner has a real book set up locally that they mean to play through
+proxy; the book view was checked in headless Chrome against a stand-in API, and the author was
+tried against the real model on 2026-10-15. That run used up the owner's Antigravity limit for
+Gemini 3.8 Flash, which resets on 2026-10-19 at 04:58 UTC; until then the owner plays on another
+model or waits. The owner has a real book set up locally that they mean to play through
 before production, so its data must survive every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
@@ -455,9 +458,10 @@ through them all in one local test once everything is built (see "Status").
     long as it keeps it.
   - Gemini (Antigravity): nothing to ask; a prefix it has seen is cached by itself. The proxy
     passes its usage on whole, cached tokens included, and keys the session by the first
-    message (the head), which stays the same through a segment. Antigravity has reported no
-    cached tokens so far: either its backend doesn't cache these calls or it doesn't say. Keep
-    the start steady anyway, in case it does.
+    message (the head), which stays the same through a segment. Antigravity caches, but
+    seldom: of 48 calls in the 2026-10-15 run, past 4,096 tokens and often seconds apart, only
+    two read from the cache (14,102 and 14,645 tokens, two of the wrap-up's). Its input count
+    leaves the cached tokens out. Keep the start steady, so it can.
 
 ### Notes for step 4
 
@@ -547,6 +551,13 @@ through them all in one local test once everything is built (see "Status").
     most open ones (a blank title, a blank personality, a name) still thought for 500 to 800
     tokens and took 7 to 12. No thinking at all was about as quick, but one call in four thought
     for 9 seconds anyway.
+- The blank fields all at once, tried against the real model (2026-10-15), thinking low: a half
+  filled page (a gothic mystery in a Cornish hotel in 1952, a night clerk and the hotel's owner,
+  a third person with nothing filled in, and a line between the first two with nothing on it),
+  asked twice. Each time all 20 blanks came back from one call in 13 to 14 seconds (2,024 tokens
+  in, about 1,000 out). They fit each other and the page: the nameless one got a name and a past
+  that ties into the others', what each side hides fit what the other sees, and the title fit
+  the setting. The two rounds differed throughout. No dashes.
 - The Suggestions chat (`server/src/suggestions/chat.ts`) is one session, kept as the scene
   sessions are: every message as the model was sent it, in order, only ever added to
   (`setup_chat_messages`), so each call starts as the one before and the cache can hold it.
@@ -792,6 +803,29 @@ through them all in one local test once everything is built (see "Status").
     `.backups/2026-10-13-before-0008.sql`). Their book came through whole: 10 characters, 16
     relationships, nothing played yet.
 
+- Tried against the real model (2026-10-15): Gemini 3.8 Flash through the owner's Antigravity, at
+  the model's own thinking (no management key), in a scratch database (never the owner's). A
+  short story with three people: the openings, the first one opened, two moves, an author note
+  ending the scene, going on, the chapter, a rename and one more move. It worked end to end.
+  - The openings took 13 seconds, and opening with the first 69. A move took about a minute:
+    Procreator cues each actor in the scene before writing their part, narrates, then saves one
+    thing per call, six or seven calls in a row, each sending the whole session again, while the
+    box waits. Asking it to make its saves together in one reply cut a move to three calls, but
+    that move saved nothing, and the account's limit came before a second try, so the
+    instructions are as they were. Worth trying again, carefully: the saving matters more.
+  - The prose was good: close third, past tense, within the words asked, no dashes, straight
+    quotes. The actors kept to their sides (the evasive one evaded, the anxious one panicked),
+    and when the protagonist said what she had seen, the relationship shifted and its quiet line
+    showed.
+  - The author note ended the scene where asked (`end_scene`, the next one waiting where and when
+    the note said) and closed it in a paragraph. Going on wrapped the scene up in four calls and
+    opened the next, 54 seconds in all.
+  - The rename took 113 seconds, four calls for three parts, and rewrote 10 passages: the turns,
+    the summary and the chapter, possessives included, with the old name left nowhere.
+  - The next call met the account's limit for the model (a 429, "Individual quota reached",
+    resetting in 90 hours). The move was taken back whole, as a turn that fails is, and the
+    routes now say so in words instead of "Try again in a moment" (`failedFrom`).
+
 ### Notes for step 7
 
 All of step 7's design calls are ours (2026-10-15, the owner can change them), made after the
@@ -817,6 +851,12 @@ owner said to finish everything without asking.
   chapters get short titles, a light novel's long descriptive ones. Written to Google's Gemini
   3.8 Flash guides (fetched 2026-10-15): no sampling settings, context first and the task last,
   the length asked for, tags used the same way throughout.
+- Tried against the real model (2026-10-15, see the run in "Notes for step 6"): a scene of five
+  turns became "The First Wick", 1,704 words in 39 seconds (3,076 tokens in, 3,971 out with its
+  thinking). It kept the play's dialogue word for word or close to it and filled the scene in
+  around it (the place, the weather, the gestures, the world's history from the brief), in close
+  third and the past tense, with no dashes. A short scene gives a chapter short of the 2,000
+  words asked, as the ask allows.
 - **A chapter is the story's** (`chapters` table, `story/chapters.ts`, through breading_ground's
   `writeChapter`), so its title and prose are passages: a rename or an always so rewrites them with
   the turns, and a new point of view rewrites them whole. A chapter read before such a rewrite
@@ -1670,6 +1710,9 @@ Decided 2026-10-06 (see "Every cast member has an actor"), built with play (step
 
 - Node 24: `source ~/.nvm/nvm.sh && nvm use 24` (the default here is 18, which fails).
 - This Mac is a test machine. Breader's live server is the ThinkPad.
+- A run against the real model spends the owner's own Antigravity limit, the one their book plays
+  on: the 2026-10-15 run used up Gemini 3.8 Flash's for 90 hours. Keep runs short, and say what
+  one will cost before a long one.
 - Docker is fine here for the writer. Its Postgres runs from `infra/compose.dev.yml` (project
   `breader-writer`). Breader's handoff rule against starting the Mac's Docker stack is about
   breader's own stack; don't stretch another project's rules over this one without asking.

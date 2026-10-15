@@ -120,8 +120,8 @@ before production, so its data must survive every change (see "Running it locall
 - **Settings live in the model picker.** Below the models and "For every book.", only the owner
   sees "AI accounts": every account signed in to the proxy (its kind, its email, and why it
   can't serve if it can't), each with Sign out and a confirm in place, then "Sign in:
-  Antigravity, ChatGPT, Claude". The owner is whoever's email is in `OWNER_EMAILS`. Other
-  writers see only the models. Later it's where every writer brings their own AI.
+  Antigravity, ChatGPT, Claude". The owner is whoever's email is in `OWNER_EMAILS`. Every other
+  writer sees "Your AI" there instead, where they bring their own (see "Notes for step 9").
 - **Anyone can write, with their own AI.** A writer brings their own: an API key (BYOK), or a
   sign-in with a subscription they already have (Claude Code, Codex, Antigravity and the like).
   Everyone's first chapter is free, on the owner's own Antigravity account (the one signed in to
@@ -1015,6 +1015,16 @@ All of step 9's design calls are ours (2026-10-15, the owner can change them).
   credential's models as `<prefix>/<model>` (if it lists them bare, the writer's prefix is put on
   the models of the kinds they signed in), and whether Gemini's route takes a model id with a
   slash. The checklist has the check.
+- **"Your AI" in the model picker** is every writer's but the owner's, where the owner's "AI
+  accounts" are: a line on what the house writes for them (`settings.house`), their keys (the
+  provider and "Key ending in 1234", with Remove and a confirm in place) and their sign-ins (with
+  Sign out), then "Add a key: Google, Anthropic, OpenAI" (a paste field, Save checks it with the
+  provider, and a key turned away says so) and "Sign in: Antigravity, ChatGPT, Claude", the
+  owner's flow against `/v1/own/sign-in`. Each model's row says where it comes from: the house's
+  account for the owner and the invited, "On the house" during the free chapter, or "Your Google
+  key", "Your ChatGPT sign-in". While the house is offline, or past the free chapter with nothing
+  of their own, the picker still shows "Your AI". Checked in headless Chrome against a stand-in
+  API (2026-10-15).
 
 ### Later versions
 
@@ -1189,10 +1199,12 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   (`add.css`); `models.css` only adds what those lack. A pick shows at once and is saved
   (`PUT /v1/settings`), and goes back if the server says no. Moving to another model keeps the
   thinking level, or the nearest it takes. For the owner the menu goes on to the AI accounts
-  (`Accounts.tsx`, with the server calls in `src/data/accounts.ts`). `useAccounts.ts` keeps them
+  (`Accounts.tsx`, with the server calls in `src/data/accounts.ts`), and for anyone else to their
+  own AI (`YourAi.tsx`, with the server calls in `src/data/own.ts`; see "Notes for step 9"), and
+  each model says where it comes from (`sourceName`). `useAccounts.ts` and `useOwn.ts` keep them
   in the picker rather than its menu, so a sign-in goes on being asked after while the menu is
-  closed. What opens at the menu's end (a sign-out's confirm, a sign-in's wait) scrolls itself
-  into view.
+  closed; both sign in through `useSignIn.ts`. What opens at the menu's end (a confirm, a key's
+  field, a sign-in's wait) scrolls itself into view (`useInView.ts`).
 - `src/features/gallery/`: breader's cards, bento and shelves, without series, genres, real
   covers, editing or sharing. A card fills with the book's colour as it's written; the two most
   recent get a drawn cover. Below Recent, once there are more than 9, every book again by date.

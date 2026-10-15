@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ThinkingLevel, type ModelChoice, type ModelInfo, type Settings } from '@writer/shared/protocol';
+import { ThinkingLevel, type HouseStanding, type ModelChoice, type ModelInfo, type Settings } from '@writer/shared/protocol';
 import { IconCheck, IconChevron } from '../../components/icons';
 import { Segmented } from '../../components/Segmented';
-import { contextName, fetchSettings, picksThinking, providerName, saveChoice, thinkingName } from '../../data/models';
+import { contextName, fetchSettings, picksThinking, saveChoice, sourceName, thinkingName } from '../../data/models';
 import { failureText } from '../../lib/api';
 import { springs } from '../../lib/springs';
 import '../account/account.css';
 import '../add/add.css';
 import { AccountsSection } from './Accounts';
 import { useAccounts, type Accounts } from './useAccounts';
+import { useOwn, type Own } from './useOwn';
+import { YourAiSection } from './YourAi';
 import './models.css';
 
 /** The settings as last heard, or why there are none. */
@@ -58,6 +60,9 @@ function chipText(loaded: Loaded): string {
   if (loaded.state === 'failed' || !loaded.settings.models) {
     return 'AI offline';
   }
+  if (loaded.settings.models.length === 0) {
+    return 'No model';
+  }
   const { using } = loaded.settings;
   const model = modelIn(loaded.settings, using);
   const name = model?.name ?? using.model;
@@ -70,7 +75,8 @@ function chipText(loaded: Loaded): string {
 /**
  * The header's model picker: the model the account's stories run on, and how hard it thinks, for
  * every book. It drops down the models the accounts signed in to Procreator's proxy serve, and
- * for the owner, those accounts, to sign in and out. Built from what the library has: its ghost
+ * for the owner, those accounts, to sign in and out; for anyone else, the models of their own AI
+ * too, and their keys and sign-ins. Built from what the library has: its ghost
  * button, the account menu's dropdown, and breader's segmented control.
  */
 export function ModelPicker({ owner }: { owner: boolean }) {
@@ -89,6 +95,7 @@ export function ModelPicker({ owner }: { owner: boolean }) {
   }, []);
 
   const accounts = useAccounts(owner, open, load);
+  const own = useOwn(!owner, open, load);
 
   useEffect(() => {
     void load();
@@ -173,6 +180,7 @@ export function ModelPicker({ owner }: { owner: boolean }) {
               message={message}
               owner={owner}
               accounts={accounts}
+              own={own}
               onRetry={() => void load()}
               onModel={pickModel}
               onThinking={pickThinking}
@@ -189,12 +197,34 @@ interface MenuProps {
   message: string | null;
   owner: boolean;
   accounts: Accounts;
+  own: Own;
   onRetry: () => void;
   onModel: (settings: Settings, model: ModelInfo) => void;
   onThinking: (settings: Settings, thinking: ThinkingLevel) => void;
 }
 
-function Menu({ loaded, message, owner, accounts, onRetry, onModel, onThinking }: MenuProps) {
+/**
+ * What follows the models: for the owner, the AI accounts every story runs on, and for anyone
+ * else, their own AI.
+ */
+function AiPart({ owner, accounts, own, house }: { owner: boolean; accounts: Accounts; own: Own; house: HouseStanding }) {
+  if (owner) {
+    return (
+      <>
+        <div className="acct-sep" />
+        <AccountsSection accounts={accounts} />
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="acct-sep" />
+      <YourAiSection house={house} own={own} />
+    </>
+  );
+}
+
+function Menu({ loaded, message, owner, accounts, own, onRetry, onModel, onThinking }: MenuProps) {
   if (loaded.state === 'waiting') {
     return <div className="acct-verify">Asking for the models…</div>;
   }
@@ -207,30 +237,33 @@ function Menu({ loaded, message, owner, accounts, onRetry, onModel, onThinking }
     );
   }
   const { settings } = loaded;
+  const aiPart = <AiPart owner={owner} accounts={accounts} own={own} house={settings.house} />;
   if (!settings.models) {
+    // While the house's proxy is offline the owner has nothing to sign in to, so the accounts wait
+    // with the models; anyone else can still bring their own AI.
+    let ownPart: ReactNode = null;
+    if (!owner) {
+      ownPart = aiPart;
+    }
     return (
-      <div className="acct-verify">
-        <span>The AI is offline: Procreator’s proxy can’t be reached. It comes back by itself.</span>
-        <button type="button" className="login-link" onClick={onRetry}>Try again</button>
-      </div>
-    );
-  }
-  // The owner signs the accounts in and out below the models. While the proxy is offline there's
-  // nothing to sign in to, so they wait with the models.
-  let accountsPart: ReactNode = null;
-  if (owner) {
-    accountsPart = (
       <>
-        <div className="acct-sep" />
-        <AccountsSection accounts={accounts} />
+        <div className="acct-verify">
+          <span>The AI is offline: Procreator’s proxy can’t be reached. It comes back by itself.</span>
+          <button type="button" className="login-link" onClick={onRetry}>Try again</button>
+        </div>
+        {ownPart}
       </>
     );
   }
   if (settings.models.length === 0) {
+    let none = 'No models yet: no AI account is signed in.';
+    if (!owner) {
+      none = 'No models yet: bring your own AI below.';
+    }
     return (
       <>
-        <div className="acct-verify">No models yet: no AI account is signed in.</div>
-        {accountsPart}
+        <div className="acct-verify">{none}</div>
+        {aiPart}
       </>
     );
   }
@@ -246,6 +279,7 @@ function Menu({ loaded, message, owner, accounts, onRetry, onModel, onThinking }
           <ModelRow
             key={`${model.source} ${model.id}`}
             model={model}
+            house={settings.house}
             picked={isChoice(model, settings.using)}
             onPick={() => onModel(settings, model)}
           />
@@ -263,18 +297,25 @@ function Menu({ loaded, message, owner, accounts, onRetry, onModel, onThinking }
       {message && <p className="acct-message" role="status">{message}</p>}
       <div className="acct-sep" />
       <div className="acct-verify">For every book.</div>
-      {accountsPart}
+      {aiPart}
     </>
   );
 }
 
-/** A model, as one of the account menu's items, with what serves it and its context below. */
-function ModelRow({ model, picked, onPick }: { model: ModelInfo; picked: boolean; onPick: () => void }) {
+interface ModelRowProps {
+  model: ModelInfo;
+  house: HouseStanding;
+  picked: boolean;
+  onPick: () => void;
+}
+
+/** A model, as one of the account menu's items, with where it comes from and its context below. */
+function ModelRow({ model, house, picked, onPick }: ModelRowProps) {
   return (
     <button type="button" role="radio" aria-checked={picked} className="acct-item pick-row" onClick={onPick}>
       <span>
         {model.name}
-        <small>{providerName(model.provider)} · {contextName(model.contextWindow)} context</small>
+        <small>{sourceName(model, house)} · {contextName(model.contextWindow)} context</small>
       </span>
       {picked && <IconCheck />}
     </button>

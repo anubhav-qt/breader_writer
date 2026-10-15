@@ -1,9 +1,10 @@
-import { Settings, type ModelChoice, type ModelInfo, type ThinkingLevel } from '@writer/shared/protocol';
+import { Settings, type HouseStanding, type KeyProvider, type ModelChoice, type ModelInfo, type ThinkingLevel } from '@writer/shared/protocol';
 import { writer } from '../lib/api';
 
 /*
  * The model the owner's stories run on, and how hard it thinks: picked in the header, once for
- * every book. The models are whatever the accounts signed in to Procreator's proxy serve.
+ * every book. The models are whatever the accounts signed in to Procreator's proxy serve, and
+ * for every writer but the owner, whatever their own AI reaches.
  */
 
 /** The server asks the proxy, which can take a while the first time. */
@@ -43,6 +44,34 @@ const PROVIDER_NAMES: Record<string, string> = {
 
 export function providerName(provider: string): string {
   return PROVIDER_NAMES[provider] ?? provider;
+}
+
+const KEY_PROVIDER_NAMES: Record<KeyProvider, string> = {
+  google: 'Google',
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+};
+
+/** Who a writer's own key is for. */
+export function keyProviderName(provider: KeyProvider): string {
+  return KEY_PROVIDER_NAMES[provider];
+}
+
+/**
+ * Where a model comes from, as its row says: the house's account that serves it, or "On the
+ * house" while the house writes only the free chapter, or the writer's own key or sign-in.
+ */
+export function sourceName(model: ModelInfo, house: HouseStanding): string {
+  if (model.source === 'house' && house === 'always') {
+    return providerName(model.provider);
+  }
+  if (model.source === 'house') {
+    return 'On the house';
+  }
+  if (model.source === 'signin') {
+    return `Your ${providerName(model.provider)} sign-in`;
+  }
+  return `Your ${keyProviderName(model.source)} key`;
 }
 
 /** 1,048,576 tokens reads as "1M", 200,000 as "200k". */

@@ -1,17 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import type { AiAccount, Provider } from '@writer/shared/protocol';
 import { PROVIDERS } from '../../data/accounts';
 import { providerName } from '../../data/models';
 import type { Accounts, Pending } from './useAccounts';
-
-/** Brings a part that just opened into view: the menu scrolls once it's long, and these open at its end. */
-function useInView<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  useEffect(() => {
-    ref.current?.scrollIntoView({ block: 'nearest' });
-  }, []);
-  return ref;
-}
+import { useInView } from './useInView';
 
 /** The owner's part of the model picker: the AI accounts, and signing them in and out. */
 export function AccountsSection({ accounts }: { accounts: Accounts }) {
@@ -83,7 +75,7 @@ function Body({ accounts }: { accounts: Accounts }) {
   );
 }
 
-function AccountRow({ account, busy, onSignOut }: { account: AiAccount; busy: boolean; onSignOut: () => void }) {
+export function AccountRow({ account, busy, onSignOut }: { account: AiAccount; busy: boolean; onSignOut: () => void }) {
   return (
     <div className="pick-account">
       <span>
@@ -103,7 +95,7 @@ interface SignOutProps {
   onConfirm: () => void;
 }
 
-function SignOut({ account, busy, onCancel, onConfirm }: SignOutProps) {
+export function SignOut({ account, busy, onCancel, onConfirm }: SignOutProps) {
   const ref = useInView<HTMLDivElement>();
   let label = 'Sign out';
   if (busy) {
@@ -131,7 +123,7 @@ interface WaitingProps {
  * A sign-in under way. On the proxy's own machine it finishes by itself; anywhere else its last
  * page can't load, so its address is pasted here.
  */
-function Waiting({ pending, busy, onSend, onCancel }: WaitingProps) {
+export function Waiting({ pending, busy, onSend, onCancel }: WaitingProps) {
   const ref = useInView<HTMLFormElement>();
   const [address, setAddress] = useState('');
   const given = address.trim();
@@ -167,7 +159,7 @@ function Waiting({ pending, busy, onSend, onCancel }: WaitingProps) {
   );
 }
 
-function SignInLinks({ busy, onStart }: { busy: boolean; onStart: (provider: Provider) => void }) {
+export function SignInLinks({ busy, onStart }: { busy: boolean; onStart: (provider: Provider) => void }) {
   return (
     <div className="pick-signin">
       <span>Sign in</span>

@@ -960,6 +960,20 @@ All of step 9's design calls are ours (2026-10-15, the owner can change them).
 - **`OPEN_TO_ALL`** (off by default) lets every breader account with a confirmed address write.
   The invited (`WRITER_EMAILS`) and the owner are as before; `isInvited` tells them apart from
   everyone else, and the owner must still be invited.
+- **The house** is the owner's own AI, the proxy's accounts (`server/src/ai/house.ts`). It writes
+  everything for the invited. For anyone else it writes the free chapter: the first scene of their
+  first book (the first they made), and setup help while that book is being made and on it. That
+  is the openings, every move, undo and another reply and hints in scene 1, its wrap-up and its
+  chapter, and a rewrite while the play is in scene 1. Every call says which book and scene its
+  work is in (`Work`: setup help is scene 1, going on is the scene it goes to), and past the
+  house's reach `modelFor` is a 403, `own_ai_needed`, which says to bring their own AI from the
+  model picker. Nothing is held back or marked as a trial before that.
+- **The free chapter ends at going on.** Going on from scene 1 needs the writer's own AI, so the
+  route wraps scene 1 up on the house first (`wrapUpOnly`, streamed as `finishing`), nudges the
+  scribe, and then streams the 403. Scene 2 stays waiting, and the scribe writes chapter 1 on the
+  house: the scribe goes only as far as it's told (`through`), so the house never writes a later
+  chapter. Settings say where the account stands (`house`: `always`, `first_chapter`, or `used`
+  once the first book has a scene 2, waiting or begun).
 
 ### Later versions
 
@@ -989,7 +1003,8 @@ their code, changed where we need, not rewritten to ours.
 ### `shared/` (`@writer/shared`)
 
 - `src/protocol.ts`: the zod shapes the server and the app exchange (`Me`, `Access`,
-  `BookCard`, `BookList`, `Settings`, and the AI accounts and their sign-ins: `AiAccount`,
+  `BookCard`, `BookList`, `Settings` with what the house writes for the account (`HouseStanding`),
+  and the AI accounts and their sign-ins: `AiAccount`,
   `SignIn`, `SignInStatus`, `SignInAddress`). Change a shape here and both sides get the type
   error.
 - `src/book.ts`: what a book is set up with (`BookSetup`): its length (and each length's word
@@ -1370,7 +1385,9 @@ A Hono API, port 8790, built like breader's server.
   signature, then looks the token up in breader's tables. Logging in and out stay breader's job.
 - `src/lib/access.ts`: `accessFor` decides `logged_out`, `unconfirmed`, `invite_only` or
   `open` (every confirmed account is `open` with `OPEN_TO_ALL`), and `isInvited` whether an
-  account is on the invite list; `requireWriter` guards routes that need `open`. An unconfirmed address is told so
+  account is on the invite list; `requireWriter` guards routes that need `open`.
+  `src/ai/house.ts` is what the owner's AI writes for an account (`houseReach`, `houseStanding`,
+  see "Notes for step 9"). An unconfirmed address is told so
   before the list is checked, so nobody learns whether an email they don't own is invited.
   `isOwner` is a writer whose email is in `OWNER_EMAILS`; `requireOwner` guards the accounts.
 - `src/routes/`: `GET /health`; `GET /v1/me` (the account, its access and whether it's the
@@ -1408,7 +1425,8 @@ A Hono API, port 8790, built like breader's server.
   passage before and after). Once anything is played, `PUT .../setup` is a 409 too. The book,
   `open` only (`routes/reading.ts`): `GET /v1/books/:id/book` (the book as it's written so far)
   and `GET /v1/books/:id/epub` (the EPUB, as a download). `routes/ai.ts` is the model an
-  account's calls run on, the 503 and 502 every route that calls Procreator gives (a 429 instead
+  account's calls run on for a book and scene (`modelFor`, with the house's 403 past its reach),
+  the 503 and 502 every route that calls Procreator gives (a 429 instead
   when the AI account has reached its limit, saying when it resets where the provider says), and the nudge
   to the scribe (`writeTheBook`) that play and the book make.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
@@ -1456,8 +1474,8 @@ A Hono API, port 8790, built like breader's server.
   the passages a rename gives it, `test/book.test.ts` the book (reading the author's answer,
   chapters written in order with the one before in view, a chapter that fails and one a rewrite
   overtook, renames reaching chapters, a story ending and being finished, the EPUB, and search),
-  `test/door.test.ts` breading_ground as the one door, and `test/sse.test.ts` the streams' comments
-  while they're quiet.
+  `test/door.test.ts` breading_ground as the one door, `test/sse.test.ts` the streams' comments
+  while they're quiet, and `test/house.test.ts` the house's free chapter.
 
 ### `frontend/worker.js`, `infra/`, `scripts/` and CI
 

@@ -19,7 +19,7 @@ import { log } from '../log.ts';
 import { cueActor, tellActor, type Moment } from '../procreator/actor.ts';
 import { turnMessage } from '../procreator/brief.ts';
 import { askForOpenings, converse } from '../procreator/converse.ts';
-import { wrapUp } from '../procreator/folds.ts';
+import { wrapUp, wrapUpEnded } from '../procreator/folds.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { render } from '../prompts/render.ts';
 import { castOf, standingOf, type CharacterRow } from '../story/cast.ts';
@@ -148,6 +148,37 @@ async function sceneOnPage(db: Db, bookId: string): Promise<Scene | null> {
     return sceneNumbered(db, bookId, waiting.number - 1);
   }
   return lastScene(db, bookId);
+}
+
+/** The number of the scene play's work is in: the one on the page, or the first before it opens. */
+export async function sceneAtWork(db: Db, bookId: string): Promise<number> {
+  const scene = await sceneOnPage(db, bookId);
+  if (!scene) {
+    return 1;
+  }
+  return scene.number;
+}
+
+/** The number of the scene going on goes to: the newest, waiting or begun but not opened. */
+export async function sceneGoingTo(db: Db, bookId: string): Promise<number> {
+  const last = await lastScene(db, bookId);
+  if (!last) {
+    return 1;
+  }
+  return last.number;
+}
+
+/**
+ * Wraps up the scene that just ended, without going on, so it can go into the book: where the
+ * house's free chapter ends, and going on needs the owner's own AI (step 9).
+ */
+export async function wrapUpOnly(ai: Procreator, bookId: string, watch: Watch): Promise<void> {
+  const scene = await sceneOnPage(ai.db, bookId);
+  if (!scene || scene.status !== 'ended' || scene.summary !== '') {
+    return;
+  }
+  watch.onFinishing(scene.number);
+  await wrapUpEnded(ai, bookId);
 }
 
 /** A turn to make: its voice, the owner's words, who it's played as, and the cue it answers, if any. */

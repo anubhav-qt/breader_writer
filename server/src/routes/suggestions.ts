@@ -17,6 +17,9 @@ import { suggestField } from '../suggestions/field.ts';
 import type { Helper } from '../suggestions/quick.ts';
 import { failedFrom, modelFor } from './ai.ts';
 
+/** Setup help is work on a book before its first scene, which the house writes as the free chapter's. */
+const SETUP = 1;
+
 const noChat = () => new ApiError(404, 'not_found', 'There’s no such chat here.');
 
 /** Sends one of the chat's events down the stream. */
@@ -44,8 +47,8 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/blanks', async (c) => {
     const ask = parse(BlanksAsk, await readJson(c));
     const userId = c.var.login.id;
-    const inUse = await modelFor(deps, userId);
     const bookId = await ownBookId(userId, ask.bookId);
+    const inUse = await modelFor(deps, c.var.login, { bookId, scene: SETUP });
     const helper: Helper = { db: deps.db, inUse, userId, bookId, signal: c.req.raw.signal };
     let fields: BlankSuggestion[];
     try {
@@ -130,8 +133,8 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/chats', async (c) => {
     const ask = parse(ChatSay, await readJson(c));
     const userId = c.var.login.id;
-    const inUse = await modelFor(deps, userId);
     const chat = await chatToSay(userId, ask);
+    const inUse = await modelFor(deps, c.var.login, { bookId: chat.bookId, scene: SETUP });
     const helper: Helper = { db: deps.db, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
     return eventStream(c, async (stream) => {
       await send(stream, { type: 'started', chatId: chat.id });
@@ -164,7 +167,7 @@ export function suggestionRoutes(deps: Deps) {
     const ask = parse(ChatRedo, await readJson(c));
     const userId = c.var.login.id;
     const chat = await ownChat(userId, c.req.param('id'));
-    const inUse = await modelFor(deps, userId);
+    const inUse = await modelFor(deps, c.var.login, { bookId: chat.bookId, scene: SETUP });
     const helper: Helper = { db: deps.db, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
     try {
       const answered = await alone(chat.id, () => redo(helper, chat, ask.setup, ask.entry, ask.item, ask.notes));
@@ -198,8 +201,8 @@ export function suggestionRoutes(deps: Deps) {
   r.post('/suggestions/field', async (c) => {
     const ask = parse(FieldAsk, await readJson(c));
     const userId = c.var.login.id;
-    const inUse = await modelFor(deps, userId);
     const bookId = await ownBookId(userId, ask.bookId);
+    const inUse = await modelFor(deps, c.var.login, { bookId, scene: SETUP });
     const helper: Helper = { db: deps.db, inUse, userId, bookId, signal: c.req.raw.signal };
     let text: string | null;
     try {

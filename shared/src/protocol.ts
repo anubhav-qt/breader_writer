@@ -79,13 +79,22 @@ export const ModelChoice = z.object({
 export type ModelChoice = z.infer<typeof ModelChoice>;
 
 /**
+ * What the owner's own AI (the house) writes for an account (step 9): everything, for the invited;
+ * a first chapter still to come; or that chapter used, so going on needs the account's own AI.
+ */
+export const HouseStanding = z.enum(['always', 'first_chapter', 'used']);
+export type HouseStanding = z.infer<typeof HouseStanding>;
+
+/**
  * GET and PUT /v1/settings. `using` is what the story runs on now: the account's choice, or the
  * default until it makes one, moved to the nearest the model takes. `models` is null while the
- * proxy can't be reached, and then the AI is offline.
+ * proxy can't be reached, and then the AI is offline. `house` is what the owner's AI writes for
+ * the account.
  */
 export const Settings = z.object({
   using: ModelChoice,
   models: z.array(ModelInfo).nullable(),
+  house: HouseStanding.default('always'),
 });
 export type Settings = z.infer<typeof Settings>;
 

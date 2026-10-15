@@ -37,7 +37,7 @@ export function readingRoutes(deps: Deps) {
   r.get('/books/:id/book', async (c) => {
     const login = c.var.login;
     const book = await ownBook(login.id, c.req.param('id'));
-    await writeTheBook(deps, login.id, book.id);
+    await writeTheBook(deps, login, book.id);
     return c.json(await bookView(deps.db, book, login.name, deps.scribe));
   });
 

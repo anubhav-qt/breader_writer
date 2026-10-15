@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { clampThinkingLevel, type Api, type Model } from '@writer/pi-ai';
-import { ThinkingLevel, type ModelChoice, type Settings } from '@writer/shared/protocol';
+import { ThinkingLevel, type HouseStanding, type ModelChoice, type Settings } from '@writer/shared/protocol';
 import type { Db } from '../db/client.ts';
 import { settings } from '../db/schema.ts';
 import { log } from '../log.ts';
@@ -69,10 +69,13 @@ export async function modelInUse(catalog: Catalog, saved: ModelChoice | null): P
   return { model, apiKey: catalog.proxy.apiKey, choice: { model: model.id, thinking } };
 }
 
-/** What settings show: the choice in use, and every model there is, or none while the AI is offline. */
-export async function settingsFor(db: Db, catalog: Catalog | null, userId: string): Promise<Settings> {
+/**
+ * What settings show: the choice in use, and every model there is, or none while the AI is
+ * offline, with what the house writes for the account.
+ */
+export async function settingsFor(db: Db, catalog: Catalog | null, userId: string, house: HouseStanding): Promise<Settings> {
   const saved = await savedChoice(db, userId);
-  const offline: Settings = { using: saved ?? OFFLINE_DEFAULT, models: null };
+  const offline: Settings = { using: saved ?? OFFLINE_DEFAULT, models: null, house };
   if (!catalog) {
     return offline;
   }
@@ -80,9 +83,9 @@ export async function settingsFor(db: Db, catalog: Catalog | null, userId: strin
     const models = await catalog.infos();
     const inUse = await modelInUse(catalog, saved);
     if (!inUse) {
-      return { using: offline.using, models };
+      return { using: offline.using, models, house };
     }
-    return { using: inUse.choice, models };
+    return { using: inUse.choice, models, house };
   } catch (err) {
     if (err instanceof ProxyError) {
       log.warn({ err: err.message }, 'the proxy is down, so the AI is offline');

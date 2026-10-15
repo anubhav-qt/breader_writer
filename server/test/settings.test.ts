@@ -62,7 +62,7 @@ describe('GET /v1/settings', () => {
   it('says the AI is offline without a proxy, or while it is down', async () => {
     const none = await setUp(null);
     const unset = await call(none.app, 'GET', '/v1/settings', none.cookie);
-    expect(unset.body).toEqual({ using: { model: 'gemini-3.8-flash-high', thinking: 'high' }, models: null });
+    expect(unset.body).toEqual({ using: { model: 'gemini-3.8-flash-high', thinking: 'high' }, models: null, house: 'always' });
 
     const gone = await fakeProxy(antigravity());
     await gone.close();

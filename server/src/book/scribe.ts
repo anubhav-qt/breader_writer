@@ -19,8 +19,11 @@ import type { Scene } from '../story/scenes.ts';
 
 /** Who writes the book in the background, so tests can do without. */
 export interface Scribe {
-  /** Writes what's missing from the book, on this Procreator, unless it's writing in the book already. */
-  nudge: (ai: Procreator, bookId: string) => void;
+  /**
+   * Writes what's missing from the book, on this Procreator, unless it's writing in the book
+   * already: every chapter, or only those up to the scene `through` (the house's free chapter).
+   */
+  nudge: (ai: Procreator, bookId: string, through?: number) => void;
   /** Whether it's writing in the book now. */
   busy: (bookId: string) => boolean;
 }
@@ -41,14 +44,15 @@ async function nextToWrite(db: Db, bookId: string): Promise<Scene | null> {
 }
 
 /**
- * Writes every scene that's wrapped up and not in the book yet, oldest first. Answers with how
- * many chapters it kept. Throws what the author's call throws; what was kept before stays kept.
+ * Writes every scene that's wrapped up and not in the book yet, oldest first, up to the scene
+ * `through`. Answers with how many chapters it kept. Throws what the author's call throws; what
+ * was kept before stays kept.
  */
-export async function writeMissing(ai: Procreator, bookId: string): Promise<number> {
+export async function writeMissing(ai: Procreator, bookId: string, through = Number.POSITIVE_INFINITY): Promise<number> {
   let kept = 0;
   for (;;) {
     const scene = await nextToWrite(ai.db, bookId);
-    if (!scene) {
+    if (!scene || scene.number > through) {
       return kept;
     }
     const since = await newestChange(ai.db, bookId);
@@ -69,11 +73,11 @@ export function backgroundScribe(): Scribe {
   // Books nudged while they were being written: there may be more to write once it's done.
   const again = new Set<string>();
 
-  const run = async (ai: Procreator, bookId: string) => {
+  const run = async (ai: Procreator, bookId: string, through: number | undefined) => {
     try {
       do {
         again.delete(bookId);
-        await writeMissing(ai, bookId);
+        await writeMissing(ai, bookId, through);
       } while (again.has(bookId));
     } catch (err) {
       log.warn({ err, bookId }, 'a chapter couldn’t be written; it’s tried again next time');
@@ -83,7 +87,7 @@ export function backgroundScribe(): Scribe {
   };
 
   return {
-    nudge: (ai, bookId) => {
+    nudge: (ai, bookId, through) => {
       if (writing.has(bookId)) {
         again.add(bookId);
         return;
@@ -91,7 +95,7 @@ export function backgroundScribe(): Scribe {
       writing.add(bookId);
       // Not the request's: the book is written whether or not anyone is still waiting.
       const own: Procreator = { ...ai, signal: undefined };
-      void run(own, bookId);
+      void run(own, bookId, through);
     },
     busy: (bookId) => writing.has(bookId),
   };

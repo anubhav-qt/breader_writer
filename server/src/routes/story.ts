@@ -8,10 +8,11 @@ import { rewriteView, storyView } from '../books/story.ts';
 import type { AppEnv, Deps } from '../context.ts';
 import { requireWriter } from '../lib/access.ts';
 import { ApiError, parse, readJson } from '../lib/errors.ts';
+import type { Login } from '../lib/login.ts';
 import { eventStream } from '../lib/sse.ts';
 import { log } from '../log.ts';
 import { changeStory, reachesBack } from '../play/edits.ts';
-import { alone, PlayError } from '../play/play.ts';
+import { alone, PlayError, sceneAtWork } from '../play/play.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { StoryError } from '../story/changes.ts';
 import { failedFrom, modelFor } from './ai.ts';
@@ -66,12 +67,13 @@ export function storyRoutes(deps: Deps) {
   }
 
   /** Procreator on the account's model when the change reaches back (a 503 while the AI is offline), else null. */
-  async function rewriterFor(userId: string, book: BookRow, edit: StoryEdit, reach: Reach, signal: AbortSignal): Promise<Procreator | null> {
+  async function rewriterFor(login: Login, book: BookRow, edit: StoryEdit, reach: Reach, signal: AbortSignal): Promise<Procreator | null> {
     if (!(await reachesBack(deps.db, book.id, edit, reach))) {
       return null;
     }
-    const inUse = await modelFor(deps, userId);
-    return { db: deps.db, inUse, userId, signal };
+    const scene = await sceneAtWork(deps.db, book.id);
+    const inUse = await modelFor(deps, login, { bookId: book.id, scene });
+    return { db: deps.db, inUse, userId: login.id, signal };
   }
 
   /** The story as the Story panel shows it. */
@@ -88,7 +90,7 @@ export function storyRoutes(deps: Deps) {
     const ask = parse(EditAsk, await readJson(c));
     const userId = c.var.login.id;
     const book = await ownBook(userId, c.req.param('id'));
-    const ai = await rewriterFor(userId, book, ask.edit, ask.reach, c.req.raw.signal);
+    const ai = await rewriterFor(c.var.login, book, ask.edit, ask.reach, c.req.raw.signal);
     return eventStream(c, async (stream) => {
       const onProgress = (done: number, of: number) => {
         void send(stream, { type: 'rewriting', done, of });

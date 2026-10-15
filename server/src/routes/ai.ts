@@ -1,7 +1,9 @@
+import { FIRST_SCENE, houseReach, ownAiNeeded } from '../ai/house.ts';
 import { ProxyError } from '../ai/proxy.ts';
 import { modelInUse, savedChoice, type InUse } from '../ai/settings.ts';
 import type { Deps } from '../context.ts';
 import { ApiError } from '../lib/errors.ts';
+import type { Login } from '../lib/login.ts';
 
 /*
  * What the routes that call Procreator share: the model an account's calls run on, and how they
@@ -53,8 +55,26 @@ export function failedFrom(err: Error): ApiError {
   return new ApiError(429, 'ai_limit', message);
 }
 
-/** The model the account's calls run on, or a 503 while the AI is offline. */
-export async function modelFor(deps: Deps, userId: string): Promise<InUse> {
+/** What a call is for: the book (null for a new book's setup) and the scene the work is in (1 for setup). */
+export interface Work {
+  bookId: string | null;
+  scene: number;
+}
+
+/**
+ * The model the account's calls run on for this work, a 403 past what the house writes for it
+ * (`own_ai_needed`), or a 503 while the AI is offline.
+ */
+export async function modelFor(deps: Deps, login: Login, work: Work): Promise<InUse> {
+  const reach = await houseReach(deps.db, deps.env, login, work.bookId);
+  if (work.scene > reach) {
+    throw ownAiNeeded();
+  }
+  return houseModel(deps, login.id);
+}
+
+/** The model the account picked from the house, or a 503 while the AI is offline. */
+async function houseModel(deps: Deps, userId: string): Promise<InUse> {
   const catalog = deps.catalog;
   if (!catalog) {
     throw offline();
@@ -77,16 +97,21 @@ export async function modelFor(deps: Deps, userId: string): Promise<InUse> {
 /**
  * Tells the scribe to write what's missing from the book, on the account's model: after play
  * changed something, and as the play or the book opens, so a chapter that failed is tried again.
- * Nothing happens while the AI is offline, or where there's no scribe.
+ * On the house it writes only as far as the house writes for the account. Nothing happens while
+ * the AI is offline, or where there's no scribe.
  */
-export async function writeTheBook(deps: Deps, userId: string, bookId: string) {
+export async function writeTheBook(deps: Deps, login: Login, bookId: string) {
   const scribe = deps.scribe;
   if (!scribe) {
     return;
   }
+  const reach = await houseReach(deps.db, deps.env, login, bookId);
+  if (reach < FIRST_SCENE) {
+    return;
+  }
   try {
-    const inUse = await modelFor(deps, userId);
-    scribe.nudge({ db: deps.db, inUse, userId }, bookId);
+    const inUse = await houseModel(deps, login.id);
+    scribe.nudge({ db: deps.db, inUse, userId: login.id }, bookId, reach);
   } catch (err) {
     if (!(err instanceof ApiError)) {
       throw err;

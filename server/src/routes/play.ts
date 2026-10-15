@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { SSEStreamingApi } from 'hono/streaming';
 import { z } from 'zod';
 import { Going, MoveAsk, OpenAsk, type Hints, type PlayEvent, type Undone, type Voice } from '@writer/shared/play';
@@ -7,6 +7,7 @@ import { findBook } from '../books/setup.ts';
 import type { AppEnv, Deps } from '../context.ts';
 import { requireWriter } from '../lib/access.ts';
 import { ApiError, parse, readJson } from '../lib/errors.ts';
+import type { Login } from '../lib/login.ts';
 import { eventStream } from '../lib/sse.ts';
 import { log } from '../log.ts';
 import {
@@ -20,7 +21,10 @@ import {
   makeMove,
   openStory,
   PlayError,
+  sceneAtWork,
+  sceneGoingTo,
   undo,
+  wrapUpOnly,
   type Watch,
 } from '../play/play.ts';
 import { headOf, playView } from '../play/view.ts';
@@ -38,6 +42,9 @@ async function send(stream: SSEStreamingApi, event: PlayEvent) {
 
 /** What play couldn't do, as the owner is told it, or null for the server's own failure. */
 function problemOf(err: unknown): ApiError | null {
+  if (err instanceof ApiError) {
+    return err;
+  }
   if (err instanceof PlayError || err instanceof StoryError) {
     return new ApiError(409, 'play_conflict', err.message);
   }
@@ -75,17 +82,26 @@ export function playRoutes(deps: Deps) {
     return book.id;
   }
 
-  /** Procreator on the account's model, or a 503 while the AI is offline. */
-  async function procreatorFor(userId: string, signal: AbortSignal): Promise<Procreator> {
-    const inUse = await modelFor(deps, userId);
-    return { db: deps.db, inUse, userId, signal };
+  /**
+   * Procreator on the account's model for the scene on the page, or the one going on goes to: a
+   * 403 past what the house writes for the account, or a 503 while the AI is offline.
+   */
+  async function procreatorFor(login: Login, bookId: string, signal: AbortSignal, goingOn = false): Promise<Procreator> {
+    let scene: number;
+    if (goingOn) {
+      scene = await sceneGoingTo(deps.db, bookId);
+    } else {
+      scene = await sceneAtWork(deps.db, bookId);
+    }
+    const inUse = await modelFor(deps, login, { bookId, scene });
+    return { db: deps.db, inUse, userId: login.id, signal };
   }
 
   /**
    * Streams a move's work: the scene's heading when it's set, Procreator's words as it writes them,
    * then the play as it stands, or why it couldn't go on.
    */
-  function streamed(userId: string, bookId: string, stream: SSEStreamingApi, work: (watch: Watch) => Promise<void>) {
+  function streamed(login: Login, bookId: string, stream: SSEStreamingApi, work: (watch: Watch) => Promise<void>) {
     const watch: Watch = {
       onText: (delta) => {
         void send(stream, { type: 'text', delta });
@@ -100,7 +116,7 @@ export function playRoutes(deps: Deps) {
     return (async () => {
       try {
         await alone(bookId, () => work(watch));
-        await writeTheBook(deps, userId, bookId);
+        await writeTheBook(deps, login, bookId);
         await send(stream, { type: 'done', play: await playView(deps.db, bookId) });
       } catch (err) {
         const problem = problemOf(err);
@@ -119,17 +135,17 @@ export function playRoutes(deps: Deps) {
 
   /** The play as the page shows it. */
   r.get('/books/:id/play', async (c) => {
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    await writeTheBook(deps, userId, bookId);
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    await writeTheBook(deps, login, bookId);
     return c.json(await playView(deps.db, bookId));
   });
 
   /** The first scene's openings, asked for unless they're offered already. Answers with the play. */
   r.post('/books/:id/play/openings', async (c) => {
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    const ai = await procreatorFor(userId, c.req.raw.signal);
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    const ai = await procreatorFor(login, bookId, c.req.raw.signal);
     try {
       await alone(bookId, () => askOpenings(ai, bookId));
     } catch (err) {
@@ -141,54 +157,83 @@ export function playRoutes(deps: Deps) {
   /** The owner opens the story with an opening offered, or their own. Streams play's events. */
   r.post('/books/:id/play/open', async (c) => {
     const ask = parse(OpenAsk, await readJson(c));
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    const ai = await procreatorFor(userId, c.req.raw.signal);
-    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => openStory(ai, bookId, ask, watch)));
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    const ai = await procreatorFor(login, bookId, c.req.raw.signal);
+    return eventStream(c, (stream) => streamed(login, bookId, stream, (watch) => openStory(ai, bookId, ask, watch)));
   });
 
   /** The owner's move, or a note as the author. Streams play's events. */
   r.post('/books/:id/play/move', async (c) => {
     const ask = parse(MoveAsk, await readJson(c));
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    const ai = await procreatorFor(userId, c.req.raw.signal);
-    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => makeMove(ai, bookId, ask, watch)));
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    const ai = await procreatorFor(login, bookId, c.req.raw.signal);
+    return eventStream(c, (stream) => streamed(login, bookId, stream, (watch) => makeMove(ai, bookId, ask, watch)));
   });
 
   /** The owner goes on to the next scene. Streams play's events. */
   r.post('/books/:id/play/next', async (c) => {
     const going = parse(Going, await readJson(c));
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    const ai = await procreatorFor(userId, c.req.raw.signal);
-    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => goOn(ai, bookId, going, watch)));
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    const signal = c.req.raw.signal;
+    let ai: Procreator;
+    try {
+      ai = await procreatorFor(login, bookId, signal, true);
+    } catch (err) {
+      if (!(err instanceof ApiError) || err.code !== 'own_ai_needed') {
+        throw err;
+      }
+      return freeChapterEnds(c, login, bookId, signal, err);
+    }
+    return eventStream(c, (stream) => streamed(login, bookId, stream, (watch) => goOn(ai, bookId, going, watch)));
   });
+
+  /**
+   * Going on past the house's free chapter: the scene that ended is still wrapped up on the house,
+   * so its chapter goes into the book, and then the stream says the owner's own AI is needed.
+   */
+  async function freeChapterEnds(c: Context<AppEnv>, login: Login, bookId: string, signal: AbortSignal, refusal: ApiError) {
+    let house: Procreator;
+    try {
+      house = await procreatorFor(login, bookId, signal);
+    } catch {
+      throw refusal;
+    }
+    return eventStream(c, (stream) =>
+      streamed(login, bookId, stream, async (watch) => {
+        await wrapUpOnly(house, bookId, watch);
+        await writeTheBook(deps, login, bookId);
+        throw refusal;
+      }),
+    );
+  }
 
   /** Another reply to the newest turn. Streams play's events. */
   r.post('/books/:id/play/again', async (c) => {
     const going = parse(Going, await readJson(c));
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    const ai = await procreatorFor(userId, c.req.raw.signal);
-    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => another(ai, bookId, going, watch)));
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    const ai = await procreatorFor(login, bookId, c.req.raw.signal);
+    return eventStream(c, (stream) => streamed(login, bookId, stream, (watch) => another(ai, bookId, going, watch)));
   });
 
   /** The story has ended, and the owner finishes the book: its last scene is wrapped up. Streams play's events. */
   r.post('/books/:id/play/finish', async (c) => {
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    const ai = await procreatorFor(userId, c.req.raw.signal);
-    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => finishStory(ai, bookId, watch)));
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    const ai = await procreatorFor(login, bookId, c.req.raw.signal);
+    return eventStream(c, (stream) => streamed(login, bookId, stream, (watch) => finishStory(ai, bookId, watch)));
   });
 
     /** The one about to act is played by their actor this time. Streams play's events. */
   r.post('/books/:id/play/actor', async (c) => {
     const going = parse(Going, await readJson(c));
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    const ai = await procreatorFor(userId, c.req.raw.signal);
-    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => letActorPlay(ai, bookId, going, watch)));
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    const ai = await procreatorFor(login, bookId, c.req.raw.signal);
+    return eventStream(c, (stream) => streamed(login, bookId, stream, (watch) => letActorPlay(ai, bookId, going, watch)));
   });
 
   /** Takes the newest turn back. Answers with the play, and the owner's words for the box again (none for an actor's turn). */
@@ -212,9 +257,9 @@ export function playRoutes(deps: Deps) {
 
   /** Three moves the owner could make next. */
   r.post('/books/:id/play/hints', async (c) => {
-    const userId = c.var.login.id;
-    const bookId = await ownBookId(userId, c.req.param('id'));
-    const ai = await procreatorFor(userId, c.req.raw.signal);
+    const login = c.var.login;
+    const bookId = await ownBookId(login.id, c.req.param('id'));
+    const ai = await procreatorFor(login, bookId, c.req.raw.signal);
     let moves: string[] = [];
     try {
       moves = await alone(bookId, () => hintsFor(ai, bookId));

@@ -1,0 +1,13 @@
+# The server image only needs the workspace manifests, shared/, packages/, server/ and the backup
+# script. Never .backups (the owner's book text; the image is public) or server/.env.
+*
+!package.json
+!package-lock.json
+!frontend/package.json
+!shared/
+!packages/
+!server/
+!infra/backup.sh
+**/node_modules
+server/.env
+server/.env.*

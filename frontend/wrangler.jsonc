@@ -1,0 +1,24 @@
+// The app at breader.site/writer (worker.js), deployed by Workers Builds from the repository's root:
+//   build:  npm ci && npm run build -w frontend   (with VITE_API_URL=https://writer-api.breader.site)
+//   deploy: npx wrangler@4 deploy -c frontend/wrangler.jsonc
+// Paths here are from this file's folder.
+{
+  "name": "breader-writer",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS",
+    // The worker maps /writer/... onto the build, so it goes first, and answers missing files itself.
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  // Only these paths: the rest of breader.site stays breader's Pages site.
+  "routes": [
+    { "pattern": "breader.site/writer", "zone_name": "breader.site" },
+    { "pattern": "breader.site/writer/*", "zone_name": "breader.site" }
+  ],
+  "workers_dev": false,
+  "preview_urls": false
+}

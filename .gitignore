@@ -11,3 +11,5 @@ dist/
 .certs/
 # Local dumps of the writer database. They hold book text: never commit them.
 .backups/
+# Wrangler's local state from wrangler dev.
+.wrangler/

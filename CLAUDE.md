@@ -65,7 +65,10 @@ and changes that reach back reach the chapters too. Its server has tests against
 proxy; the book view was checked in headless Chrome against a stand-in API, and the author was
 tried against the real model on 2026-10-15. That run used up the owner's Antigravity limit for
 Gemini 3.8 Flash, which resets on 2026-10-19 at 04:58 UTC; until then the owner plays on another
-model or waits. The owner has a real book set up locally that they mean to play through
+model or waits. Step 8 (ship) is written and checked here, not deployed (2026-10-15, see "Notes
+for step 8"): the server's image, the laptop's compose stack beside breader's, the nightly backup,
+the Worker that serves the app at `breader.site/writer`, and CI. Setting it up is the owner's, in
+`infra/README.md`. The owner has a real book set up locally that they mean to play through
 before production, so its data must survive every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
@@ -379,7 +382,8 @@ through them all in one local test once everything is built (see "Status").
 8. **Ship.** The ThinkPad's compose services, a Cloudflare route from `breader.site/writer` to
    the writer's app, the writer API behind the tunnel, and the nightly backup. The writer API
    must reach a CLIProxyAPI on the ThinkPad, management routes included, which only answer their
-   own machine unless told otherwise (`allow-remote`); work out how when we get there.
+   own machine unless told otherwise (`allow-remote`): breader's worker runs one with
+   `allow-remote` on, and the writer joins its network (see "Notes for step 8").
 9. **Open to everyone.** A writer's own AI in settings (a key, or a subscription sign-in), and
    everyone's first chapter free on the owner's account. It follows the book, since the free
    chapter needs chapters.
@@ -895,6 +899,60 @@ owner said to finish everything without asking.
   before as `.backups/2026-10-15-before-0012.sql` and tried on a copy first. Their book came
   through whole.
 
+### Notes for step 8
+
+All of step 8's design calls are ours (2026-10-15, the owner can change them). How to set it up,
+check it, back it up and restore it is in `infra/README.md`; nothing is deployed until the owner
+does that.
+
+- **The writer leans on breader's stack.** Its API runs on the laptop as its own compose project
+  (`infra/compose.yml`, project `writer`), joined to breader's network (`breader_default`). There
+  it reaches the CLIProxyAPI breader's worker runs (`worker:8327`), whose management routes answer
+  other containers (`allow-remote`), with keys made from breader's `ADMIN_TOKEN` as breader makes
+  them. So the writer's model picker and breader's admin page sign the same accounts in and out,
+  and the writer and breader's AI marker draw on the same limits. Breader's tunnel sends
+  `writer-api.breader.site` to it (`http://writer-api:8790`), so the writer has no tunnel or token
+  of its own. The service is `writer-api`, never `api`, which is breader's name on that network.
+- **The API's address is `writer-api.breader.site`**, as breader's is `api.`: the app is built with
+  `VITE_API_URL` set to it, and the API allows `https://breader.site`. Breader's login cookie is on
+  `breader.site` and its subdomains, and the two are one site, so it's sent.
+- **`npm run live:env`** (`scripts/live-env.mjs`) writes `infra/.env` from breader's: the
+  transaction pooler as `DATABASE_URL`, the session pooler as `SESSION_DATABASE_URL` (the
+  migrations' advisory lock and the backup's `pg_dump` need a session), `SESSION_SECRET`, the
+  backup key and R2 settings, and the proxy's two keys. Values are copied as breader writes them,
+  quotes and all, since compose reads both files the same way. It prints none of them. It and
+  `dev-env.mjs` share `scripts/env-file.mjs`.
+- **The image** (`server/Dockerfile`, `ghcr.io/anubhav-qt/breader-writer`) runs the server from its
+  TypeScript through tsx, as it runs here, so tsx is a dependency of the server, not a dev one.
+  The same image runs the migrations (`src/migrate.ts`) and the backup (`infra/backup.sh`). CI
+  builds it on every push to dev, amd64 and arm64, after the tests; `infra/update.sh` (breader's,
+  renamed) pulls it on the laptop every 5 minutes, and the compose `migrate` service migrates
+  before the API starts. CI never touches the database.
+- **The nightly backup** is a shell script in its own service (`infra/backup.sh`): every 10
+  minutes it checks, and once a night after 03:00 India time it dumps the `writer` schema with
+  `pg_dump`, encrypts it with `age` to breader's `BACKUP_RECIPIENT`, sends it with `rclone` to
+  breader's backup bucket under `writer/daily/` (and `writer/weekly/` on Sundays; R2's lifecycle
+  rules need two more prefixes) and keeps 14 on the laptop. A backup goes into place only once R2
+  has it, so a failed upload is tried again at the next check.
+- **The app is a Worker on breader.site's routes** (`frontend/worker.js`, `frontend/wrangler.jsonc`),
+  `breader.site/writer` and `breader.site/writer/*`, in front of breader's Pages site, so the app
+  shares breader's origin. It serves the build with `/writer` taken off (the build's files are at
+  its root), sends `/writer` to `/writer/`, answers every page of the app with `index.html` and a
+  missing file with a 404. Cloudflare's Workers Builds builds and deploys it on every push to dev,
+  with no secrets in GitHub. A Worker route running in front of a Pages custom domain is what
+  Cloudflare's docs lead us to expect, not something tried: the README has the check, and the
+  fallback (a Pages Function in breader handing `/writer/*` on) if it doesn't.
+- **Streams say they're still there.** Cloudflare and its tunnel close a connection that's quiet
+  for 100 seconds, and a move, a wrap-up or a rewrite's part can think longer than that before its
+  next words. Every streamed route (`lib/sse.ts`, `eventStream`) sends a comment line every 20
+  seconds, which the app's reader skips.
+- Checked here (2026-10-15): the image built and ran against a throwaway database on the dev
+  Postgres (the migrations, `/health`, a backup made with a throwaway key, decrypted and listed
+  back, the newest 14 kept, and a failed dump leaving nothing in place); the Worker under
+  `wrangler dev` answering every path as above; `wrangler deploy --dry-run` taking the config;
+  `live:env` and `dev:env` on made-up settings. Not tried: anything on Cloudflare, GitHub or the
+  laptop.
+
 ### Later versions
 
 - Send a book straight to the breader library (v1 is an EPUB download).
@@ -1346,6 +1404,7 @@ A Hono API, port 8790, built like breader's server.
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
   `lib/sse.ts` is every streamed route's server-sent events, with a comment every 20 seconds while
   it's quiet, since Cloudflare and its tunnel close a connection that's quiet for 100 seconds.
+- `Dockerfile`: the server's image, run from its TypeScript through tsx (see "Notes for step 8").
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
   an advisory lock, as breader's do. drizzle-kit writes `CREATE SCHEMA "writer"`, which clashes
   with the migrator making the schema first for its table, so the first migration says
@@ -1388,6 +1447,20 @@ A Hono API, port 8790, built like breader's server.
   overtook, renames reaching chapters, a story ending and being finished, the EPUB, and search),
   `test/door.test.ts` breading_ground as the one door, and `test/sse.test.ts` the streams' comments
   while they're quiet.
+
+### `frontend/worker.js`, `infra/`, `scripts/` and CI
+
+- `frontend/worker.js` and `frontend/wrangler.jsonc`: the Worker that serves the app at
+  `breader.site/writer` (see "Notes for step 8").
+- `infra/compose.dev.yml`: the dev and test Postgres (`npm run db`). `infra/compose.yml`: the
+  laptop's stack (`migrate`, `writer-api`, `backup`), with its settings in `infra/.env` (from
+  `infra/.env.example`, written by `npm run live:env`). `infra/backup.sh` the nightly backup,
+  `infra/update.sh` the 5 minute check for a new image, and `infra/README.md` setting it all up.
+- `scripts/dev-env.mjs` (`npm run dev:env`) writes `server/.env` for running here, and
+  `scripts/live-env.mjs` (`npm run live:env`) `infra/.env` for the laptop, both from breader's
+  own `infra/.env` through `scripts/env-file.mjs`, printing nothing they read.
+- `.github/workflows/ci.yml`: type checks, lint and tests on every push and pull request, then the
+  image on pushes to dev.
 
 ### Running it locally
 

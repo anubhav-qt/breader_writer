@@ -9,9 +9,10 @@
  *   BREADER_ENV=<path> npm run dev:env     from somewhere else
  *   CLIPROXY_CONFIG=<path> npm run dev:env the proxy's config from somewhere else
  */
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse, readLines, setLine, unquote, writeSecret } from './env-file.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const breaderEnv = process.env.BREADER_ENV || resolve(root, '../breader/infra/.env');
@@ -26,28 +27,6 @@ const FROM_BREADER = {
   BREADER_DATABASE_URL: 'PRIMARY_URL',
   BREADER_DATABASE_SSL: 'PRIMARY_SSL',
 };
-
-function unquote(value) {
-  const first = value[0];
-  const last = value[value.length - 1];
-  const quoted = first === '"' || first === "'";
-  if (value.length >= 2 && quoted && first === last) return value.slice(1, -1);
-  return value;
-}
-
-/** KEY=value lines as an object. Blank lines and comments are skipped. */
-function parse(text) {
-  const values = {};
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const at = trimmed.indexOf('=');
-    if (at < 0) continue;
-    const key = trimmed.slice(0, at).trim();
-    values[key] = unquote(trimmed.slice(at + 1).trim());
-  }
-  return values;
-}
 
 /** A YAML value without its quotes or a comment after it. */
 function yamlValue(raw) {
@@ -83,16 +62,6 @@ function readProxy(text) {
   return { url: `http://127.0.0.1:${port}`, key };
 }
 
-/** Sets KEY=value where the key already is, or adds it at the end. */
-function setLine(lines, key, value) {
-  const at = lines.findIndex((line) => line.startsWith(`${key}=`));
-  if (at >= 0) {
-    lines[at] = `${key}=${value}`;
-  } else {
-    lines.push(`${key}=${value}`);
-  }
-}
-
 if (!existsSync(breaderEnv)) {
   console.error(`Breader's settings aren't at ${breaderEnv}. Set BREADER_ENV to where they are.`);
   process.exit(1);
@@ -106,7 +75,7 @@ if (missing.length > 0) {
 
 let start = example;
 if (existsSync(target)) start = target;
-const lines = readFileSync(start, 'utf8').replace(/\n$/, '').split('\n');
+const lines = readLines(start);
 for (const [key, from] of Object.entries(FROM_BREADER)) {
   setLine(lines, key, breader[from]);
 }
@@ -118,9 +87,7 @@ if (proxy) {
   setLine(lines, 'CLIPROXY_URL', proxy.url);
   setLine(lines, 'CLIPROXY_API_KEY', proxy.key);
 }
-writeFileSync(target, `${lines.join('\n')}\n`, { mode: 0o600 });
-// The mode above only applies to a new file.
-chmodSync(target, 0o600);
+writeSecret(target, lines);
 
 console.log(`Wrote server/.env with breader's ${Object.values(FROM_BREADER).join(', ')} (values not shown).`);
 if (proxy) {

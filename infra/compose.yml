@@ -1,0 +1,50 @@
+# The writer on the laptop, beside breader's stack: its API, its migrations and its nightly backup.
+# Settings come from infra/.env (npm run live:env writes it from breader's; never commit it). See
+# README.md.
+#   docker compose -f infra/compose.yml up -d
+# The API joins breader's network: breader's worker runs the AI accounts' proxy (worker:8327), and
+# breader's tunnel sends writer-api.breader.site here (http://writer-api:8790). Nothing listens on
+# the home network. Breader's stack has to be up first, since its network is ours too.
+name: writer
+
+x-server: &server
+  image: ${IMAGE:?set IMAGE in infra/.env}
+  env_file: .env
+  restart: unless-stopped
+
+services:
+  # Brings the writer schema to the image's version before the new API starts, then exits.
+  migrate:
+    <<: *server
+    command: ["node", "--import", "tsx", "src/migrate.ts"]
+    restart: "no"
+    environment:
+      # Migrations hold a session lock: Supabase's session pooler, not its transaction pooler.
+      DATABASE_URL: "${SESSION_DATABASE_URL:?set SESSION_DATABASE_URL in infra/.env}"
+
+  # Never called api: that name is breader's on the network we share.
+  writer-api:
+    <<: *server
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    networks: [breader]
+    healthcheck: { test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8790/health"], interval: 10s }
+
+  # Checks every 10 minutes and backs up once a night after 03:00 here (infra/backup.sh).
+  backup:
+    <<: *server
+    command: ["sh", "/app/infra/backup.sh"]
+    environment:
+      # pg_dump needs a real session too.
+      DATABASE_URL: "${SESSION_DATABASE_URL}"
+      PGSSLMODE: require
+      TZ: Asia/Kolkata
+    volumes: ["backups:/data/backups"]
+
+networks:
+  breader:
+    name: breader_default
+    external: true
+
+volumes:
+  backups: {}

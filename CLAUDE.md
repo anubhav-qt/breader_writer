@@ -39,8 +39,8 @@ Procreator's faint text in setup's fields is built, and since 2026-10-07 every b
 shows it at once (see "Notes for step 5"). It was checked in the desktop app's browser against a
 stand-in API; the field by field version was tried against the real model, the blank fields
 all at once not yet. The Suggestions chat is built: its server, tried against the real model
-(2026-10-07), and its panel on the setup page, which hasn't been checked in a browser yet (the
-session that built it had none). Step 5 is done once it has been. Step 6 (play) is under way
+(2026-10-07), and its panel on the setup page, checked in headless Chrome against a stand-in API
+(2026-10-15), so step 5 is done. Step 6 (play) is under way
 (see "Notes for step 6"): breading_ground is the one door for story changes, and play's server
 is built (the openings, moves narrated as they're written, scenes ending and going on, undo,
 another reply, hints, someone joining the cast), and so are the cast's actors (cues, sending an
@@ -528,9 +528,9 @@ through them all in one local test once everything is built (see "Status").
   Vite's proxy doesn't pass that on, so there the call runs to the end.
 - A half-width line field (genre, tone) cuts a long suggestion off at its right edge. A paragraph
   field grows to fit its faint text, as far as it may grow; past that, later lines are cut off.
-- Found while checking it: a sheet's first field (a character's name, a line's bond) asks for
-  the focus, but the dialog (`components/Modal.tsx`, from step 1) takes it just after, so the
-  field never keeps it.
+- A sheet's first field (a character's name, a line's bond) asks for the focus. The dialog
+  (`components/Modal.tsx`, from step 1) used to take it just after, so the field never kept it;
+  since 2026-10-15 the dialog takes the focus only when nothing in it has.
 - Tried against the real model (2026-10-06): Gemini 3.8 Flash through the owner's Antigravity,
   at the model's own thinking (no management key yet), through the server's own code with no
   login, since the desktop app's browser can't load `local.breader.site`. Twelve fields of a
@@ -583,8 +583,10 @@ through them all in one local test once everything is built (see "Status").
   The lists fit the page and kept what each person hides. A tool result followed by the owner's
   next words (two user turns in a row) goes through fine. Under 4,096 tokens in, so nothing
   cached yet.
-- The chat's panel (`SuggestionsChat.tsx`) was built 2026-10-07 in a session with no browser, so
-  it was checked only by the typecheck and by reading it against its CSS. At 1100px and wider
+- The chat's panel (`SuggestionsChat.tsx`) was built 2026-10-07 in a session with no browser, and
+  checked in headless Chrome against a stand-in API on 2026-10-15: the words streaming in, a
+  list, an item redone in place, approving, the changes landing in turn, and the sheet on a
+  phone. At 1100px and wider
   it's a panel fixed on the right, 420px, and the page makes room for it
   (`.setup-page:has(.chat-panel)`); it isn't modal, so the page goes on working beside it.
   Narrower, it's a sheet rising over the page, a dialog that Escape closes once it's the last

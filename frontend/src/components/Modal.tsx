@@ -19,7 +19,12 @@ export function Modal({ title, onClose, children, width = 460, className = '' }:
   closeRef.current = onClose;
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    // A field in the dialog may have asked for the focus already (a sheet's first field), and its
+    // effect runs before this one: the dialog takes it only when nothing in it has.
+    const box = ref.current;
+    if (box && !box.contains(document.activeElement)) {
+      box.focus();
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // A popover or dialog opened over this one closes first, on its own.

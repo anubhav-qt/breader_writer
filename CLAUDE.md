@@ -1299,7 +1299,8 @@ A Hono API, port 8790, built like breader's server.
   passage before and after). Once anything is played, `PUT .../setup` is a 409 too. The book,
   `open` only (`routes/reading.ts`): `GET /v1/books/:id/book` (the book as it's written so far)
   and `GET /v1/books/:id/epub` (the EPUB, as a download). `routes/ai.ts` is the model an
-  account's calls run on, the 503 and 502 every route that calls Procreator gives, and the nudge
+  account's calls run on, the 503 and 502 every route that calls Procreator gives (a 429 instead
+  when the AI account has reached its limit, saying when it resets where the provider says), and the nudge
   to the scribe (`writeTheBook`) that play and the book make.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).

@@ -26,7 +26,7 @@ import { headOf, playView } from '../play/view.ts';
 import { FoldError } from '../procreator/folds.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { StoryError } from '../story/changes.ts';
-import { failed, modelFor, writeTheBook } from './ai.ts';
+import { failedFrom, modelFor, writeTheBook } from './ai.ts';
 
 const notFound = () => new ApiError(404, 'not_found', 'There’s no such book here.');
 
@@ -42,7 +42,7 @@ function problemOf(err: unknown): ApiError | null {
   }
   if (err instanceof ModelError || err instanceof FoldError) {
     log.warn({ err: err.message }, 'Procreator didn’t answer in play');
-    return failed();
+    return failedFrom(err);
   }
   return null;
 }

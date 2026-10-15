@@ -12,6 +12,48 @@ import { ApiError } from '../lib/errors.ts';
 export const offline = () => new ApiError(503, 'ai_offline', 'The AI is offline, so Procreator can’t help right now.');
 export const failed = () => new ApiError(502, 'ai_failed', 'Procreator didn’t answer. Try again in a moment.');
 
+/** A provider's words for an account that has reached its limit, as CLIProxyAPI passes them on. */
+const LIMIT = /RESOURCE_EXHAUSTED|quota|rate.?limit/i;
+/** Antigravity says when it's back: "Resets in 90h20m44s". */
+const RESETS = /Resets in (?:(\d+)h)?(?:(\d+)m)?/i;
+
+/** When a limit resets, as the owner reads it, or null when the provider didn't say. */
+function resetsIn(message: string): string | null {
+  const match = RESETS.exec(message);
+  if (!match) {
+    return null;
+  }
+  const hours = Number(match[1] ?? 0);
+  const minutes = Number(match[2] ?? 0);
+  if (hours > 1) {
+    return `about ${hours} hours`;
+  }
+  if (hours === 1) {
+    return 'about an hour';
+  }
+  if (minutes > 1) {
+    return `${minutes} minutes`;
+  }
+  return null;
+}
+
+/**
+ * What the owner is told when the model didn't answer. An account that reached its limit is told
+ * so, with when it resets where the provider says, since trying again in a moment won't help.
+ */
+export function failedFrom(err: Error): ApiError {
+  if (!LIMIT.test(err.message)) {
+    return failed();
+  }
+  let until = 'for now';
+  const resets = resetsIn(err.message);
+  if (resets) {
+    until = `until it resets in ${resets}`;
+  }
+  const message = `The AI account has reached its limit for this model, ${until}. Pick another model at the top to go on meanwhile.`;
+  return new ApiError(429, 'ai_limit', message);
+}
+
 /** The model the account's calls run on, or a 503 while the AI is offline. */
 export async function modelFor(deps: Deps, userId: string): Promise<{ catalog: Catalog; inUse: InUse }> {
   const catalog = deps.catalog;

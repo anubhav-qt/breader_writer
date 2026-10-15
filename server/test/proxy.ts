@@ -33,6 +33,8 @@ export interface Reply {
   finish?: string;
   /** An HTTP error instead of a reply. */
   status?: number;
+  /** The error's own words, "The model is busy." unless said. */
+  message?: string;
   /** The tokens it says it read, 1200 unless said. */
   read?: number;
   /** Of those, the ones it says came from the cache. */
@@ -332,8 +334,13 @@ async function reply(served: Served, asked: Asked[], model: string, req: Incomin
   asked.push({ model, body });
   const next = nextReply(served);
   if (next.status) {
+    let status = 'UNAVAILABLE';
+    if (next.status === 429) {
+      status = 'RESOURCE_EXHAUSTED';
+    }
+    const message = next.message ?? 'The model is busy.';
     res.writeHead(next.status, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ error: { code: next.status, message: 'The model is busy.', status: 'UNAVAILABLE' } }));
+    res.end(JSON.stringify({ error: { code: next.status, message, status } }));
     return;
   }
   res.writeHead(200, { 'content-type': 'text/event-stream' });

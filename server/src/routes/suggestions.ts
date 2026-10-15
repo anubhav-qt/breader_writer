@@ -14,7 +14,7 @@ import { alone, approve, ChatError, redo, say } from '../suggestions/chat.ts';
 import { bookChat, findChat, readChat, startChat, type ChatRow } from '../suggestions/chats.ts';
 import { suggestField } from '../suggestions/field.ts';
 import type { Helper } from '../suggestions/quick.ts';
-import { failed, modelFor } from './ai.ts';
+import { failedFrom, modelFor } from './ai.ts';
 
 const noChat = () => new ApiError(404, 'not_found', 'There’s no such chat here.');
 
@@ -52,7 +52,7 @@ export function suggestionRoutes(deps: Deps) {
     } catch (err) {
       if (err instanceof ModelError) {
         log.warn({ err: err.message, model: inUse.choice.model }, 'the suggestions for blank fields failed');
-        throw failed();
+        throw failedFrom(err);
       }
       throw err;
     }
@@ -95,7 +95,7 @@ export function suggestionRoutes(deps: Deps) {
     }
     if (err instanceof ModelError) {
       log.warn({ err: err.message }, 'the Suggestions chat got no answer');
-      return failed();
+      return failedFrom(err);
     }
     return null;
   }
@@ -206,7 +206,7 @@ export function suggestionRoutes(deps: Deps) {
     } catch (err) {
       if (err instanceof ModelError) {
         log.warn({ err: err.message, model: inUse.choice.model }, 'a field suggestion failed');
-        throw failed();
+        throw failedFrom(err);
       }
       throw err;
     }

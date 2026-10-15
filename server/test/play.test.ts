@@ -281,6 +281,19 @@ describe('play', () => {
     expect(textsOf(last).some((text) => text.includes('Ren laughs.'))).toBe(false);
   });
 
+  it('says when the AI account has reached its limit, and when it resets', async () => {
+    const limit = { status: 429, message: 'Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 90h20m44s.' };
+    const { app, cookie, bookId } = await opened([limit]);
+    const r = await ask(app, cookie, bookId, 'move', { voice: 'character', text: 'I wave.' });
+    const last = r.events.at(-1);
+    expect(last).toMatchObject({ type: 'error', code: 'ai_limit' });
+    if (last?.type !== 'error') {
+      throw new Error('the stream should end with an error');
+    }
+    expect(last.message).toBe('The AI account has reached its limit for this model, until it resets in about 90 hours. Pick another model at the top to go on meanwhile.');
+    expect(last.play.turns).toHaveLength(1);
+  });
+
   it('takes back a move Procreator couldn’t narrate, and what it changed at it', async () => {
     const joining = { calls: [{ name: 'join_cast', args: { name: 'Corwin', who: 'A lantern seller', personality: '', past: '' } }] };
     const { app, cookie, bookId } = await opened([joining, { status: 400 }]);

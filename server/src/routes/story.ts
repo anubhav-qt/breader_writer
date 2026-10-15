@@ -13,7 +13,7 @@ import { changeStory, reachesBack } from '../play/edits.ts';
 import { alone, PlayError } from '../play/play.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { StoryError } from '../story/changes.ts';
-import { failed, modelFor } from './ai.ts';
+import { failedFrom, modelFor } from './ai.ts';
 
 /*
  * The story mid play, for the Story panel (step 6): what it holds, the owner's changes to it,
@@ -35,7 +35,7 @@ function problemOf(err: unknown): ApiError | null {
   }
   if (err instanceof ModelError) {
     log.warn({ err: err.message }, 'Procreator didn’t answer a rewrite');
-    return failed();
+    return failedFrom(err);
   }
   return null;
 }

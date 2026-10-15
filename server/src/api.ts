@@ -15,7 +15,7 @@ let breaderPool = pool;
 if (env.BREADER_DATABASE_URL) {
   breaderPool = makePool(env.BREADER_DATABASE_URL, { ssl: env.BREADER_DATABASE_SSL === 'require', name: 'breader', max: 2 });
 }
-if (env.WRITER_EMAILS.length === 0) {
+if (env.WRITER_EMAILS.length === 0 && !env.OPEN_TO_ALL) {
   log.warn('WRITER_EMAILS is empty, so nobody can write');
 }
 

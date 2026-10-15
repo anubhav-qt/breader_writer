@@ -44,6 +44,11 @@ const Env = z.object({
    * in WRITER_EMAILS too. No one else sees the accounts.
    */
   OWNER_EMAILS: list.transform((emails) => emails.map((e) => e.toLowerCase())).default([]),
+  /**
+   * Opens the writer to every breader account with a confirmed address (step 9). Those not in
+   * WRITER_EMAILS get their first chapter on the owner's AI, and bring their own after it.
+   */
+  OPEN_TO_ALL: bool.default(false),
 
   /**
    * The CLIProxyAPI the models come through (see CLAUDE.md): its address, like

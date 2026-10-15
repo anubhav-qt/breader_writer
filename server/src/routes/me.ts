@@ -16,7 +16,7 @@ export function meRoutes(deps: Deps) {
     }
     const me: Me = {
       account,
-      access: accessFor(login, deps.env.WRITER_EMAILS),
+      access: accessFor(login, deps.env.WRITER_EMAILS, deps.env.OPEN_TO_ALL),
       owner: isOwner(login, deps.env),
     };
     return c.json(me);

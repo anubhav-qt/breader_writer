@@ -17,6 +17,13 @@ describe('who can write', () => {
     expect(accessFor(login('Owner@Example.COM', true), ['owner@example.com'])).toBe('open');
   });
 
+  it('lets every confirmed account in once the writer is open to all', () => {
+    const list = ['owner@example.com'];
+    expect(accessFor(login('stranger@example.com', true), list, true)).toBe('open');
+    expect(accessFor(login('stranger@example.com', false), list, true)).toBe('unconfirmed');
+    expect(accessFor(null, list, true)).toBe('logged_out');
+  });
+
   it('never says whether an unconfirmed address is on the list', () => {
     const list = ['owner@example.com'];
     expect(accessFor(login('owner@example.com', false), list)).toBe(accessFor(login('stranger@example.com', false), list));
@@ -41,6 +48,15 @@ describe('GET /v1/me', () => {
     expect(waiting.body.access).toBe('unconfirmed');
     const stranger = await call(app, 'GET', '/v1/me', await account(address('stranger'), true));
     expect(stranger.body.access).toBe('invite_only');
+  });
+
+  it('lets a stranger write once the writer is open to all', async () => {
+    const app = writer({ WRITER_EMAILS: [], OPEN_TO_ALL: true });
+    const stranger = await account(address('stranger'), true);
+    const me = await call(app, 'GET', '/v1/me', stranger);
+    expect(me.body).toMatchObject({ access: 'open', owner: false });
+    const books = await call(app, 'GET', '/v1/books', stranger);
+    expect(books.status).toBe(200);
   });
 
   it('tells the owner they are, and no one else', async () => {
@@ -68,6 +84,8 @@ describe('who manages the AI accounts', () => {
 
   it('is never someone who can’t write, or a writer off the owner list', () => {
     expect(isOwner(login('owner@example.com', true), env([], ['owner@example.com']))).toBe(false);
+    const open = { ...env([], ['owner@example.com']), OPEN_TO_ALL: true };
+    expect(isOwner(login('owner@example.com', true), open)).toBe(false);
     expect(isOwner(login('writer@example.com', true), env(['writer@example.com'], []))).toBe(false);
   });
 });

@@ -131,7 +131,7 @@ before production, so its data must survive every change (see "Running it locall
 - **Until then, only invited accounts can play.** Like breader's `SPEECH_EMAILS`: a list of
   emails (`WRITER_EMAILS`), each with a confirmed address. Everyone else can see the writer, with
   a quiet note that it's invite only. A key on its own isn't enough to play, since a key has no
-  email.
+  email. `OPEN_TO_ALL` (off by default) lets every confirmed account in (see "Notes for step 9").
 - **The play reads like a book page** (the owner's pick, 2026-10-07). Procreator's narration
   flows as prose in one centred column, like a reader, and the owner's moves sit between its
   paragraphs as quiet italic lines. The box for a move is pinned at the bottom of the screen,
@@ -953,6 +953,14 @@ does that.
   `live:env` and `dev:env` on made-up settings. Not tried: anything on Cloudflare, GitHub or the
   laptop.
 
+### Notes for step 9
+
+All of step 9's design calls are ours (2026-10-15, the owner can change them).
+
+- **`OPEN_TO_ALL`** (off by default) lets every breader account with a confirmed address write.
+  The invited (`WRITER_EMAILS`) and the owner are as before; `isInvited` tells them apart from
+  everyone else, and the owner must still be invited.
+
 ### Later versions
 
 - Send a book straight to the breader library (v1 is an EPUB download).
@@ -1147,6 +1155,7 @@ A Hono API, port 8790, built like breader's server.
   `BREADER_DATABASE_URL` is where breader's logins are (unset in production, where it's the same
   Supabase). `SESSION_SECRET` and `COOKIE_SECURE` are breader's own values. `WRITER_EMAILS` is
   the invite list, and `OWNER_EMAILS` who signs the AI accounts in and out (each a writer too).
+  `OPEN_TO_ALL` lets every confirmed account write (step 9).
   `CLIPROXY_URL`, `CLIPROXY_API_KEY` and `CLIPROXY_MANAGEMENT_KEY` are the CLIProxyAPI the
   models come through; no URL means the AI is offline, and no management key means no thinking
   levels and no accounts to manage.
@@ -1359,7 +1368,8 @@ A Hono API, port 8790, built like breader's server.
   and its HMAC-SHA256 signature (base64) made with `SESSION_SECRET`. The writer checks the
   signature, then looks the token up in breader's tables. Logging in and out stay breader's job.
 - `src/lib/access.ts`: `accessFor` decides `logged_out`, `unconfirmed`, `invite_only` or
-  `open`; `requireWriter` guards routes that need `open`. An unconfirmed address is told so
+  `open` (every confirmed account is `open` with `OPEN_TO_ALL`), and `isInvited` whether an
+  account is on the invite list; `requireWriter` guards routes that need `open`. An unconfirmed address is told so
   before the list is checked, so nobody learns whether an email they don't own is invited.
   `isOwner` is a writer whose email is in `OWNER_EMAILS`; `requireOwner` guards the accounts.
 - `src/routes/`: `GET /health`; `GET /v1/me` (the account, its access and whether it's the

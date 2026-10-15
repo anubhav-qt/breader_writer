@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
+import type { SSEStreamingApi } from 'hono/streaming';
 import { z } from 'zod';
 import { EditAsk, type EditEvent, type StoryEdit, type Reach } from '@writer/shared/story';
 import { ModelError } from '../ai/call.ts';
@@ -8,6 +8,7 @@ import { rewriteView, storyView } from '../books/story.ts';
 import type { AppEnv, Deps } from '../context.ts';
 import { requireWriter } from '../lib/access.ts';
 import { ApiError, parse, readJson } from '../lib/errors.ts';
+import { eventStream } from '../lib/sse.ts';
 import { log } from '../log.ts';
 import { changeStory, reachesBack } from '../play/edits.ts';
 import { alone, PlayError } from '../play/play.ts';
@@ -88,7 +89,7 @@ export function storyRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const book = await ownBook(userId, c.req.param('id'));
     const ai = await rewriterFor(userId, book, ask.edit, ask.reach, c.req.raw.signal);
-    return streamSSE(c, async (stream) => {
+    return eventStream(c, async (stream) => {
       const onProgress = (done: number, of: number) => {
         void send(stream, { type: 'rewriting', done, of });
       };

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
+import type { SSEStreamingApi } from 'hono/streaming';
 import { z } from 'zod';
 import { Going, MoveAsk, OpenAsk, type Hints, type PlayEvent, type Undone, type Voice } from '@writer/shared/play';
 import { ModelError } from '../ai/call.ts';
@@ -7,6 +7,7 @@ import { findBook } from '../books/setup.ts';
 import type { AppEnv, Deps } from '../context.ts';
 import { requireWriter } from '../lib/access.ts';
 import { ApiError, parse, readJson } from '../lib/errors.ts';
+import { eventStream } from '../lib/sse.ts';
 import { log } from '../log.ts';
 import {
   alone,
@@ -143,7 +144,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => openStory(ai, bookId, ask, watch)));
+    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => openStory(ai, bookId, ask, watch)));
   });
 
   /** The owner's move, or a note as the author. Streams play's events. */
@@ -152,7 +153,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => makeMove(ai, bookId, ask, watch)));
+    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => makeMove(ai, bookId, ask, watch)));
   });
 
   /** The owner goes on to the next scene. Streams play's events. */
@@ -161,7 +162,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => goOn(ai, bookId, going, watch)));
+    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => goOn(ai, bookId, going, watch)));
   });
 
   /** Another reply to the newest turn. Streams play's events. */
@@ -170,7 +171,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => another(ai, bookId, going, watch)));
+    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => another(ai, bookId, going, watch)));
   });
 
   /** The story has ended, and the owner finishes the book: its last scene is wrapped up. Streams play's events. */
@@ -178,7 +179,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => finishStory(ai, bookId, watch)));
+    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => finishStory(ai, bookId, watch)));
   });
 
     /** The one about to act is played by their actor this time. Streams play's events. */
@@ -187,7 +188,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => letActorPlay(ai, bookId, going, watch)));
+    return eventStream(c, (stream) => streamed(userId, bookId, stream, (watch) => letActorPlay(ai, bookId, going, watch)));
   });
 
   /** Takes the newest turn back. Answers with the play, and the owner's words for the box again (none for an actor's turn). */

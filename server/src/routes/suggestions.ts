@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
+import type { SSEStreamingApi } from 'hono/streaming';
 import { z } from 'zod';
 import { ChatApprove, ChatRedo, ChatSay, type BookChat, type ChatEvent } from '@writer/shared/chat';
 import { BlanksAsk, FieldAsk, type BlankSuggestion, type BlankSuggestions, type FieldSuggestion } from '@writer/shared/suggestions';
@@ -8,6 +8,7 @@ import { findBook } from '../books/setup.ts';
 import type { AppEnv, Deps } from '../context.ts';
 import { requireWriter } from '../lib/access.ts';
 import { ApiError, parse, readJson } from '../lib/errors.ts';
+import { eventStream } from '../lib/sse.ts';
 import { log } from '../log.ts';
 import { suggestBlanks } from '../suggestions/blanks.ts';
 import { alone, approve, ChatError, redo, say } from '../suggestions/chat.ts';
@@ -132,7 +133,7 @@ export function suggestionRoutes(deps: Deps) {
     const { catalog, inUse } = await modelFor(deps, userId);
     const chat = await chatToSay(userId, ask);
     const helper: Helper = { db: deps.db, catalog, inUse, userId, bookId: chat.bookId, signal: c.req.raw.signal };
-    return streamSSE(c, async (stream) => {
+    return eventStream(c, async (stream) => {
       await send(stream, { type: 'started', chatId: chat.id });
       try {
         const answered = await alone(chat.id, () =>

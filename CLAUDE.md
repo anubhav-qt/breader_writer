@@ -1344,6 +1344,8 @@ A Hono API, port 8790, built like breader's server.
   to the scribe (`writeTheBook`) that play and the book make.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
+  `lib/sse.ts` is every streamed route's server-sent events, with a comment every 20 seconds while
+  it's quiet, since Cloudflare and its tunnel close a connection that's quiet for 100 seconds.
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
   an advisory lock, as breader's do. drizzle-kit writes `CREATE SCHEMA "writer"`, which clashes
   with the migrator making the schema first for its table, so the first migration says
@@ -1384,7 +1386,8 @@ A Hono API, port 8790, built like breader's server.
   the passages a rename gives it, `test/book.test.ts` the book (reading the author's answer,
   chapters written in order with the one before in view, a chapter that fails and one a rewrite
   overtook, renames reaching chapters, a story ending and being finished, the EPUB, and search),
-  and `test/door.test.ts` breading_ground as the one door.
+  `test/door.test.ts` breading_ground as the one door, and `test/sse.test.ts` the streams' comments
+  while they're quiet.
 
 ### Running it locally
 

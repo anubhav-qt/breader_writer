@@ -52,8 +52,11 @@ another reply, a scene's end and going on), checked in headless Chrome against a
 shows, and every change setup can make, held from now on and told to Procreator, or reaching back
 (a rename, "Always so"), rewritten into what was played by Procreator and kept at once, with the
 sessions and the actors' chats started again from it. Neither has met the real model yet. The
-Story panel is built on it (2026-10-11), checked in headless Chrome against a stand-in API; the
-Notes panel is next. The owner has a real book set up locally that they mean to play through
+Story panel is built on it (2026-10-11), checked in headless Chrome against a stand-in API, and
+so is the Notes panel (2026-10-15), with the owner's edits to pages and memory through the same
+door. On 2026-10-15 the owner said to finish everything left without stopping for design
+questions ("just finish it all, i will review, test and make more changes while using it"), so
+the design calls from then on are ours, each marked so below. The owner has a real book set up locally that they mean to play through
 before production, so its data must survive every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
@@ -164,7 +167,19 @@ before production, so its data must survive every change (see "Running it locall
   over the page, and Procreator's memory, each note editable in place. A character's page is in
   their sheet, below the owner's. Plan and Threads say where the story is going, so opening one
   first asks "This is where Procreator means to take the story. Read it?" (the owner's pick,
-  2026-10-07); once open, they read and edit like any page.
+  2026-10-07); once open, they read and edit like any page. Our calls (2026-10-15, the owner can
+  change them):
+  - A page's change asks "From now on" or "Always so", as a sheet's does, and so does taking a
+    page out. Plan and Threads say where the story is going, not what happened, so they save
+    plainly, from now on; so does Procreator's memory, which is about the work.
+  - A page shows people in the cast as links, `[[Name]]`, as Procreator writes them, with a line
+    under it saying so, so a rename still reaches them.
+  - A character's page reads in their sheet with Edit beside it, which opens it as a page's
+    sheet. The Notes panel doesn't list characters' pages.
+  - New page is at the end of the pages, with its kind picked in its sheet. The story's own pages
+    keep their titles, since Procreator looks for them by name.
+  - A note of memory is a box where it is: Save and Discard show once it's changed, a bin forgets
+    it (asked first), and an empty box at the end adds one.
 - **Your turn is free text, with hints on tap.** One box where you write what you do and say in
   your own words. A tap shows 3 possible moves when you're stuck; otherwise nothing is suggested.
   They show as quiet lines just above the box, and tapping one puts it in the box to change
@@ -751,9 +766,19 @@ through them all in one local test once everything is built (see "Status").
   - An undo after a rename leaves it and its rewrite, and gives the owner's words back as they now
     read. Undoing a turn whose changes a rewrite built on is turned away, as the change log turns
     such undos away, in words the owner can read.
-  - Not rewritten yet: the openings kept with the first scene, a cue kept with a turn
-    (`turns.cue`), and pages' titles. A turn played as someone written out always so still says
-    who played it ("someone no longer in the cast"). The written book joins in step 7.
+  - The openings kept with the first scene, a cue kept with a turn (`turns.cue`) and pages'
+    titles are passages too (2026-10-15): the openings come last in the first scene's part, and
+    are kept together, as one version of the scene; a title can't take a person's name or another
+    page's. Still not rewritten: a turn played as someone written out always so still says who
+    played it ("someone no longer in the cast").
+- The Notes panel (`frontend/src/features/story/NotesPanel.tsx`), on the same story as the Story
+  panel (`useStory`), and the owner's changes to pages and memory through the same route and
+  `ownerEdit` (`page`, `unpage`, `note`, `forget` in `StoryEdit`; `story/notes.ts`). From now on,
+  Procreator is told with a note as for any change; a change to its memory says it's about the
+  work. A page always so is rewritten into what was played like a sheet, and the page itself is
+  left out of the passages (`Untouched.pages`). Plan and Threads never reach back, even asked
+  always so. Owner's titles are checked as Procreator's are, and can't take a cast member's name
+  or another page's.
   - Rewrite calls are recorded as `rewrite`, keyed for the cache by the book
     (`rewrite-<book id>`), so every part starts the same.
   - The owner's local database is at migration 0011 since 2026-10-13 (backed up just before as
@@ -810,9 +835,12 @@ their code, changed where we need, not rewritten to ours.
   (`blankFields`), what's in a field (`fieldText`), changing it (`withFieldText`) and how much
   it holds (`fieldLimit`), the asks and the answers (`FieldAsk`, `FieldSuggestion`, `BlanksAsk`,
   `BlankSuggestions`), and when suggestions start (`filledIn`, against `SUGGEST_AFTER`).
-- `src/story.ts`: the story mid play (step 6), for the Story panel: what it shows (`StoryView`:
-  the setup as it stands, Procreator's page about each person, and whether anything is played),
-  a change the owner makes (`StoryEdit`, with the book's choices and world as `BookChoices`) and
+- `src/story.ts`: the story mid play (step 6), for the Story and Notes panels: what they show
+  (`StoryView`: the setup as it stands, Procreator's page about each person, the reference as
+  `ReferencePage`s and memory as `MemoryNote`s, and whether anything is played), a change the owner
+  makes (`StoryEdit`, with the book's choices and world as `BookChoices`, and a page as a
+  `PageDraft`), the story's own pages (`PLAN`, `THREADS`, `TIMELINE`, and `isAhead` for the two
+  that say where it's going) and
   how far it reaches (`Reach`), asked as `EditAsk`, what one that reached back rewrote
   (`Rewrote`), the edit's streamed events (`EditEvent`), and a rewrite passage by passage, before
   and after (`RewriteView`).
@@ -901,8 +929,9 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   chat's sheet over it on a phone): setup's fields, cast cards and graph, and the panel's end.
   `StorySheets.tsx` is the sheets over the page, setup's own `CharacterSheet` and
   `RelationshipSheet` given a footer of their own (`footer`), held until saved, the ask before
-  removing or untying, and what a rewrite changed. `reach.ts` says how a change saves (plainly,
-  or asking "From now on" or "Always so"). `story.css` is only what setup's and the chat's lack.
+  removing or untying, what a rewrite changed, and a page's sheet. `NotesPanel.tsx` is the Notes
+  panel, opened the same way. `reach.ts` says how a change saves (plainly, or asking "From now
+  on" or "Always so"). `story.css` is only what setup's and the chat's lack.
 - `src/features/models/ModelPicker.tsx` and `src/data/models.ts`: the header's model picker,
   for an account that can write. The chip says the model and its thinking level; it drops down
   the models (`GET /v1/settings`, asked again on each opening) and the thinking levels the
@@ -999,8 +1028,9 @@ A Hono API, port 8790, built like breader's server.
     one is. `cast.ts` brings someone new into the cast (`joinCast`, `seatInCast` with the owner's
     sheet and id) and says who still stands (`standingOf`). `sheets.ts` is the owner's own
     pieces changed mid story: a sheet, someone added, leaving (`leaveCast`) or taken out whole
-    (`removePerson`), a line, two untied, the world and the book's choices. `edits.ts` says what
-    an owner's change did, field by field, for Procreator's note.
+    (`removePerson`), a line, two untied, the world and the book's choices; `notes.ts` the owner's
+    changes from the Notes panel: a page saved or taken out, a note of memory saved or dropped.
+    `edits.ts` says what an owner's change did, field by field, for Procreator's note.
   - Only breading_ground calls the writes in `story/` (see "Notes for step 6").
   - `mentions.ts`: in the structured text (pages, notes, relationship history) a person is
     `<@id>`, and named when it's shown. Procreator writes a person as a link, `[[Name]]`
@@ -1212,8 +1242,8 @@ A Hono API, port 8790, built like breader's server.
   undo, another reply, a turn that fails, hints) and the actors (what a chat holds and is told,
   sending back, undo, and the switch off), `test/session.test.ts` an actor's compaction too,
   `test/edits.test.ts` the owner's changes mid story (the Story panel's story, each change from
-  now on and its note, undo leaving them, someone leaving, before anything is played, and renames
-  and always so reaching back), `test/rewrite.test.ts` Procreator's edits to the passages and
+  now on and its note, undo leaving them, someone leaving, before anything is played, renames
+  and always so reaching back, and the Notes panel's pages and memory), `test/rewrite.test.ts` Procreator's edits to the passages and
   the passages a rename gives it, and `test/door.test.ts` breading_ground as the one door.
 
 ### Running it locally

@@ -1,6 +1,8 @@
 import { inOrder, WORD_GOALS, type Character, type Darkness, type Length, type Pov, type Relationship } from '@writer/shared/book';
-import type { StoryEdit } from '@writer/shared/story';
+import type { PageDraft, StoryEdit } from '@writer/shared/story';
 import { namesOf } from './cast.ts';
+import { linked } from './mentions.ts';
+import type { Page } from './pages.ts';
 import type { Story } from './read.ts';
 import { settingsView } from './view.ts';
 
@@ -25,6 +27,8 @@ export interface ChangedView {
 
 export interface ChangeNoteView {
   changed: ChangedView[];
+  /** The change is to Procreator's memory, its notes on the work, not to the story. */
+  memory: boolean;
 }
 
 /** The fields that differ, each as it was and as it is now. */
@@ -158,6 +162,105 @@ function bookChange(story: Story, edit: Extract<StoryEdit, { kind: 'book' }>): C
   return changed;
 }
 
+const KIND_NAMES: Record<string, string> = {
+  character: 'A character',
+  place: 'A place',
+  group: 'A group',
+  thing: 'A thing',
+  lore: 'Lore',
+  story: 'The story’s own',
+};
+
+function kindName(kind: string): string {
+  return KIND_NAMES[kind] ?? kind;
+}
+
+/** The page a draft changes, as it stood: by its id, or by its person for a character's. */
+export function pageBefore(story: Story, draft: PageDraft): Page | null {
+  if (draft.characterId !== null) {
+    return story.pages.find((page) => page.characterId === draft.characterId) ?? null;
+  }
+  if (draft.id === null) {
+    return null;
+  }
+  return story.pages.find((page) => page.id === draft.id) ?? null;
+}
+
+/** What a page is called in a note: someone's page by their name, any other by its title. */
+function pageSubject(story: Story, page: { characterId: string | null; title: string }): string {
+  if (page.characterId !== null) {
+    return `${possessive(nameOf(story, page.characterId))} page`;
+  }
+  return `The page ${page.title}`;
+}
+
+function pageChange(story: Story, draft: PageDraft): ChangedView[] {
+  const names = namesOf(story.characters);
+  const before = pageBefore(story, draft);
+  const was = { title: '', kind: '', about: '', body: '' };
+  if (before) {
+    was.title = before.title;
+    was.kind = kindName(before.kind);
+    was.about = before.about;
+    was.body = linked(before.body, names);
+  }
+  const fields: { name: string; was: string; now: string }[] = [];
+  if (draft.characterId === null) {
+    fields.push({ name: 'Title', was: was.title, now: draft.title });
+    fields.push({ name: 'Kind', was: was.kind, now: kindName(draft.kind) });
+  }
+  fields.push({ name: 'What it holds', was: was.about, now: draft.about });
+  fields.push({ name: 'The page', was: was.body, now: draft.body });
+  const changed = differing(fields);
+  if (changed.length === 0) {
+    return [];
+  }
+  if (!before && draft.characterId === null) {
+    return [{ subject: `A new page, ${draft.title.trim()}`, fields: changed }];
+  }
+  return [{ subject: pageSubject(story, { characterId: draft.characterId, title: was.title }), fields: changed }];
+}
+
+function unpageChange(story: Story, id: string): ChangedView[] {
+  const page = story.pages.find((each) => each.id === id);
+  if (!page) {
+    return [];
+  }
+  const body = linked(page.body, namesOf(story.characters));
+  return [{ subject: `${pageSubject(story, page)} is taken out of the reference`, fields: differing([{ name: 'The page', was: body, now: '' }]) }];
+}
+
+/** A note as memory keeps it: on one line. */
+function oneLine(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+function noteChange(story: Story, id: number | null, text: string): ChangedView[] {
+  const now = oneLine(text);
+  if (id === null) {
+    return [{ subject: 'A new note in your memory', fields: differing([{ name: 'Note', was: '', now }]) }];
+  }
+  const note = story.notes.find((each) => each.id === id);
+  if (!note) {
+    return [];
+  }
+  const was = linked(note.text, namesOf(story.characters));
+  const fields = differing([{ name: 'Note', was, now }]);
+  if (fields.length === 0) {
+    return [];
+  }
+  return [{ subject: `Note ${id} in your memory`, fields }];
+}
+
+function forgetChange(story: Story, id: number): ChangedView[] {
+  const note = story.notes.find((each) => each.id === id);
+  if (!note) {
+    return [];
+  }
+  const was = linked(note.text, namesOf(story.characters));
+  return [{ subject: `Note ${id} in your memory is forgotten`, fields: differing([{ name: 'Note', was, now: '' }]) }];
+}
+
 /** What the change did, as Procreator is told it, from the story as it stood before. Empty when it changed nothing. */
 export function changeNoteView(before: Story, edit: StoryEdit): ChangeNoteView {
   let changed: ChangedView[] = [];
@@ -172,8 +275,17 @@ export function changeNoteView(before: Story, edit: StoryEdit): ChangeNoteView {
   } else if (edit.kind === 'untie') {
     const [first, second] = inCastOrder(before, edit.a, edit.b);
     changed = [{ subject: `${nameOf(before, first)} and ${nameOf(before, second)} are no longer tied`, fields: [] }];
-  } else {
+  } else if (edit.kind === 'book') {
     changed = bookChange(before, edit);
+  } else if (edit.kind === 'page') {
+    changed = pageChange(before, edit.page);
+  } else if (edit.kind === 'unpage') {
+    changed = unpageChange(before, edit.id);
+  } else if (edit.kind === 'note') {
+    changed = noteChange(before, edit.id, edit.text);
+  } else {
+    changed = forgetChange(before, edit.id);
   }
-  return { changed };
+  const memory = edit.kind === 'note' || edit.kind === 'forget';
+  return { changed, memory };
 }

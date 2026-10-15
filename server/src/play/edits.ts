@@ -5,7 +5,7 @@ import type { Db } from '../db/client.ts';
 import { rewritePast, type RewriteBrief } from '../procreator/rewrite.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { StoryError } from '../story/changes.ts';
-import { changeNoteView } from '../story/edits.ts';
+import { changeNoteView, pageBefore } from '../story/edits.ts';
 import { Cast } from '../story/mentions.ts';
 import { passagesOf, type PassageGroup, type Untouched } from '../story/passages.ts';
 import { readStory, type Story } from '../story/read.ts';
@@ -48,9 +48,16 @@ function namesAfter(story: Story, edit: StoryEdit, reaching: Reaching): Map<stri
 }
 
 /** What the change makes or takes out itself, so Procreator isn't given it to rewrite. */
-function untouchedBy(edit: StoryEdit, reaching: Reaching): Untouched {
-  const untouched: Untouched = { sheets: [], lines: [], world: false, removed: null };
-  if (edit.kind === 'sheet') {
+function untouchedBy(story: Story, edit: StoryEdit, reaching: Reaching): Untouched {
+  const untouched: Untouched = { sheets: [], lines: [], world: false, removed: null, pages: [] };
+  if (edit.kind === 'page') {
+    const before = pageBefore(story, edit.page);
+    if (before) {
+      untouched.pages.push(before.id);
+    }
+  } else if (edit.kind === 'unpage') {
+    untouched.pages.push(edit.id);
+  } else if (edit.kind === 'sheet') {
     untouched.sheets.push(edit.character.id);
   } else if (edit.kind === 'leave' && reaching.always) {
     untouched.removed = edit.id;
@@ -140,7 +147,7 @@ export async function changeStory(
     throw new StoryError('The story changed while this was on its way. Try it again.');
   }
   const names = namesAfter(story, edit, reaching);
-  let groups = await passagesOf(db, story, names, untouchedBy(edit, reaching));
+  let groups = await passagesOf(db, story, names, untouchedBy(story, edit, reaching));
   if (!reaching.always && reaching.rename) {
     groups = mayName(groups, reaching.rename.was);
   }

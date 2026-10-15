@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Api, Model } from '@writer/pi-ai';
-import type { Reach, StoryEdit } from '@writer/shared/story';
+import { isAhead, type Reach, type StoryEdit } from '@writer/shared/story';
 import { undashed } from './ai/dashes.ts';
 import type { Db, Tx } from './db/client.ts';
 import { books } from './db/schema.ts';
@@ -33,8 +33,9 @@ import {
 import { headFor } from './procreator/brief.ts';
 import { render } from './prompts/render.ts';
 import { cutActors } from './story/actors.ts';
-import { changeNoteView, type ChangeNoteView } from './story/edits.ts';
-import { rewritePassage } from './story/passages.ts';
+import { changeNoteView, pageBefore, type ChangeNoteView } from './story/edits.ts';
+import { dropNote, removePage, saveNote, savePage } from './story/notes.ts';
+import { isOwn, rewritePassages } from './story/passages.ts';
 import { copiesOf, restartCopies } from './procreator/rebuild.ts';
 import type { Rewritten } from './procreator/rewrite.ts';
 import { readStory, type Story } from './story/read.ts';
@@ -63,8 +64,9 @@ import {
  *   happened.
  * - someone's sheet, page or relationships changed: their actor is told who they are now with
  *   their next cue (procreator/actor.ts compares what it last told them with what stands).
- * - the owner changed the story mid play, from now on: Procreator is told with a note at the end
- *   of the scene's session, what changed and what it was. Before anything is played, the session
+ * - the owner changed the story mid play, from now on (the Story panel's pieces, a page, a note of
+ *   Procreator's memory): Procreator is told with a note at the end of the scene's session, what
+ *   changed and what it was. Before anything is played, the session
  *   (if the first scene's has opened) starts again from a fresh brief instead.
  *
  * Everything Procreator writes comes through without dashes (ai/dashes.ts). The story's own
@@ -328,12 +330,33 @@ function withoutRename(story: Story, edit: StoryEdit): StoryEdit {
   return { kind: 'sheet', character: { ...edit.character, name: rename.was } };
 }
 
+/** Whether a page change is to where the story is going (Plan, Threads), which holds from now on. */
+function aheadOf(story: Story, edit: StoryEdit): boolean {
+  if (edit.kind === 'page') {
+    const before = pageBefore(story, edit.page);
+    if (before && isAhead(before)) {
+      return true;
+    }
+    return isAhead({ kind: edit.page.kind, characterId: edit.page.characterId, title: edit.page.title });
+  }
+  if (edit.kind === 'unpage') {
+    const page = story.pages.find((each) => each.id === edit.id);
+    return page !== undefined && isAhead(page);
+  }
+  return false;
+}
+
 /**
  * Whether the rest of the change can reach back: the book's title and length never do (the pacing
- * follows a length from now on), nor someone joining, who joins from now on.
+ * follows a length from now on), nor someone joining, who joins from now on, nor Procreator's
+ * memory, which is about the work and not the story, nor the pages that say where the story is
+ * going.
  */
 function canReachBack(story: Story, edit: StoryEdit): boolean {
-  if (edit.kind === 'join') {
+  if (edit.kind === 'join' || edit.kind === 'note' || edit.kind === 'forget') {
+    return false;
+  }
+  if (aheadOf(story, edit)) {
     return false;
   }
   if (edit.kind !== 'book') {
@@ -399,7 +422,45 @@ function whatOf(story: Story, edit: StoryEdit, played: boolean, reaching: Reachi
   if (edit.kind === 'untie') {
     return `Untied ${names.get(edit.a) ?? 'someone'} and ${names.get(edit.b) ?? 'someone'}`;
   }
+  if (edit.kind === 'page') {
+    return pageWhat(story, edit.page, names);
+  }
+  if (edit.kind === 'unpage') {
+    const page = story.pages.find((each) => each.id === edit.id);
+    return `Took out the page ${pageTitle(page, names)}`;
+  }
+  if (edit.kind === 'note' && edit.id === null) {
+    return 'Added a note to Procreator’s memory';
+  }
+  if (edit.kind === 'note') {
+    return `Changed note ${edit.id} in Procreator’s memory`;
+  }
+  if (edit.kind === 'forget') {
+    return `Took note ${edit.id} out of Procreator’s memory`;
+  }
   return 'Changed the book';
+}
+
+/** A page as the change log names it: someone's by their name, any other by its title. */
+function pageTitle(page: { characterId: string | null; title: string } | undefined, names: Map<string, string>): string {
+  if (!page) {
+    return 'that was there';
+  }
+  if (page.characterId !== null) {
+    return `about ${names.get(page.characterId) ?? 'someone'}`;
+  }
+  return page.title;
+}
+
+function pageWhat(story: Story, draft: Extract<StoryEdit, { kind: 'page' }>['page'], names: Map<string, string>): string {
+  const before = pageBefore(story, draft);
+  if (draft.characterId !== null) {
+    return `Changed ${names.get(draft.characterId) ?? 'someone'}’s page`;
+  }
+  if (!before) {
+    return `Wrote the page ${draft.title.trim()}`;
+  }
+  return `Changed the page ${before.title}`;
 }
 
 /** Why the owner made it, as the change log keeps it. */
@@ -434,10 +495,18 @@ async function applyEdit(tx: Tx, change: Change, edit: StoryEdit, keepsPast: boo
     await changeLine(tx, change, edit.relationship);
   } else if (edit.kind === 'untie') {
     await untie(tx, change, edit.a, edit.b, !keepsPast);
-  } else {
+  } else if (edit.kind === 'book') {
     const { world, ...choices } = edit.book;
     await changeBook(tx, change, choices);
     await changeWorld(tx, change, world);
+  } else if (edit.kind === 'page') {
+    await savePage(tx, change, edit.page);
+  } else if (edit.kind === 'unpage') {
+    await removePage(tx, change, edit.id);
+  } else if (edit.kind === 'note') {
+    await saveNote(tx, change, edit.id, edit.text);
+  } else {
+    await dropNote(tx, change, edit.id);
   }
 }
 
@@ -486,8 +555,9 @@ export interface Rewrote {
 
 /**
  * The owner changes the story mid play (step 6): a sheet, someone new, someone leaving, a line,
- * two untied, or the book's choices and world. It's tagged as the owner's at the newest turn, so
- * an undo of that turn leaves it standing.
+ * two untied, the book's choices and world, a page of the reference, or a note of Procreator's
+ * memory. It's tagged as the owner's at the newest turn, so an undo of that turn leaves it
+ * standing.
  *
  * - Before anything is played, the session (if the first scene's has opened) starts afresh.
  * - From now on, Procreator is told with a note at the end of the scene's session.
@@ -530,14 +600,12 @@ export async function ownerEdit(db: Db, bookId: string, edit: StoryEdit, reach: 
     }
 
     const cast = await castByName(tx, bookId);
-    const own = rewrite.passages.filter((each) => each.passage.spot.kind === 'story');
+    const own = rewrite.passages.filter((each) => isOwn(each.passage.spot));
     let rewrote: Rewrote = { change: null, count: 0 };
     if (own.length > 0) {
       const rewriting = await startChange(tx, { bookId, turnId, by: 'owner', what, why: REWROTE });
-      for (const each of own) {
-        await rewritePassage(tx, rewriting, each.passage, each.text, cast);
-      }
-      rewrote = { change: rewriting.id, count: own.length };
+      const count = await rewritePassages(tx, rewriting, own, cast);
+      rewrote = { change: rewriting.id, count };
     }
     await restartCopies(tx, bookId, rewrite.model, copiesOf(rewrite.passages));
     if (!reaching.always) {

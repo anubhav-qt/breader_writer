@@ -6,7 +6,7 @@ import { log } from '../log.ts';
 import { render } from '../prompts/render.ts';
 import type { ChangedView } from '../story/edits.ts';
 import type { Cast } from '../story/mentions.ts';
-import { linkProblem, mayEmpty, type Passage, type PassageGroup } from '../story/passages.ts';
+import { keepProblem, mayEmpty, type Passage, type PassageGroup } from '../story/passages.ts';
 import type { SettingsView } from '../story/view.ts';
 import type { Procreator } from './run.ts';
 
@@ -123,7 +123,7 @@ export function applyEdits(passages: Passage[], edits: PassageEdit[], cast: Cast
       problems.push(`Passage ${number} (${passage.where}) can’t be left empty. Rewrite it instead.`);
       continue;
     }
-    const problem = linkProblem(passage, text, cast);
+    const problem = keepProblem(passage, text, cast);
     if (problem) {
       problems.push(`Passage ${number}: ${problem}`);
     }

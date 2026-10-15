@@ -1,4 +1,4 @@
-import type { BookChoices, StoryView } from '@writer/shared/story';
+import { isAhead, type BookChoices, type PageDraft, type ReferencePage, type StoryView } from '@writer/shared/story';
 import type { Character, Relationship, Side, World } from '@writer/shared/book';
 
 /*
@@ -6,7 +6,8 @@ import type { Character, Relationship, Side, World } from '@writer/shared/book';
  * plain Save, or the owner's pick of "From now on" or "Always so". Before anything is played there's
  * no past to reach back into, so everything saves plainly. A rename always reaches back, so a sheet
  * whose name alone changed saves plainly too, and so do the book's title and length (the pacing
- * follows a length from now on).
+ * follows a length from now on). A page of the reference asks too, unless it says where the story is
+ * going (Plan, Threads), which holds from now on; Procreator's memory always saves plainly.
  */
 
 export type SaveKind = 'unchanged' | 'plain' | 'asks';
@@ -72,4 +73,28 @@ export function bookSaving(played: boolean, was: BookChoices, now: BookChoices):
 export function choicesOf(story: StoryView): BookChoices {
   const setup = story.setup;
   return { title: setup.title, length: setup.length, pov: setup.pov, darkness: setup.darkness, world: setup.world };
+}
+
+/** A page made or changed: a new one (was is null), or one of the reference. */
+export function pageSaving(played: boolean, was: ReferencePage | null, now: PageDraft): SaveKind {
+  let changed = true;
+  if (was) {
+    const fields = differs(was.title, now.title) || differs(was.about, now.about) || differs(was.body, now.body);
+    changed = fields || was.kind !== now.kind;
+  }
+  if (!changed) {
+    return 'unchanged';
+  }
+  if (!played || isAhead(now)) {
+    return 'plain';
+  }
+  if (was && isAhead(was)) {
+    return 'plain';
+  }
+  return 'asks';
+}
+
+/** Whether taking a page out asks how far back it reaches. */
+export function unpageAsks(played: boolean, page: ReferencePage): boolean {
+  return played && !isAhead(page);
 }

@@ -1,4 +1,5 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
+import { PageKind as Kinds, PLAN, THREADS, TIMELINE } from '@writer/shared/story';
 import type { Db, Tx } from '../db/client.ts';
 import { pages } from '../db/schema.ts';
 import { castOf, namesOf, type CharacterRow } from './cast.ts';
@@ -17,13 +18,11 @@ import { Cast, linked, unlinked } from './mentions.ts';
  * leaves no trace, and a retry never doubles anything.
  */
 
-export const PAGE_KINDS = ['character', 'place', 'group', 'thing', 'lore', 'story'] as const;
+export const PAGE_KINDS = Kinds.options;
 export type PageKind = (typeof PAGE_KINDS)[number];
 
 /** The story's own pages. Every brief holds the Plan and the Threads; the Timeline is read when needed. */
-export const PLAN = 'Plan';
-export const THREADS = 'Threads';
-export const TIMELINE = 'Timeline';
+export { PLAN, THREADS, TIMELINE };
 
 export type Page = typeof pages.$inferSelect;
 
@@ -57,13 +56,13 @@ export interface Found {
   page: Page | null;
 }
 
-function isKind(kind: string): kind is PageKind {
+export function isKind(kind: string): kind is PageKind {
   const kinds: readonly string[] = PAGE_KINDS;
   return kinds.includes(kind);
 }
 
 /** A title as it's kept: trimmed, with single spaces. */
-function cleanTitle(title: string): string {
+export function cleanTitle(title: string): string {
   const spaced = title.trim().replace(/\s+/g, ' ');
   if (!spaced) {
     throw new StoryError('The page needs a title.');
@@ -74,7 +73,7 @@ function cleanTitle(title: string): string {
   return spaced;
 }
 
-function cleanAbout(about: string, required: boolean): string {
+export function cleanAbout(about: string, required: boolean): string {
   const line = about.trim().replace(/\s+/g, ' ');
   if (!line && required) {
     throw new StoryError('Say in one line what the page holds, for the index.');

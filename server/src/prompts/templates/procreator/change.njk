@@ -1,10 +1,15 @@
 {#-
   A change the owner made mid story that holds from now on, as Procreator is told it: a note at the
   end of the scene's session, read with the next message (breading_ground.ts). Each thing that
-  changed, and each of its fields as it was and as it is now. Takes a ChangeNoteView.
+  changed, and each of its fields as it was and as it is now. A change to Procreator's memory is
+  about the work, not the story, and says so. Takes a ChangeNoteView.
 -#}
 <owner_change>
+{% if memory %}
+The owner changed your memory, your notes to yourself about the work. Keep to it from now on, as you would to your own notes.
+{% else %}
 The owner changed the story at this point. It holds from now on: play it as something that has just happened, or has just come to light, and keep to it from here. What was played before it stays as it was.
+{% endif %}
 {% for c in changed %}
 <changed subject="{{ c.subject }}">
 {% for f in c.fields %}

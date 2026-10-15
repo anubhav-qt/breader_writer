@@ -1,18 +1,31 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { everyone, type Character, type Relationship } from '@writer/shared/book';
+import { everyone, SHORT_LIMIT, TITLE_LIMIT, type Character, type Relationship } from '@writer/shared/book';
 import { blankRelationship, findRelationship, sidesInCastOrder } from '@writer/shared/setup';
-import type { Reach, RewriteView, StoryEdit, StoryView } from '@writer/shared/story';
+import {
+  PAGE_LIMIT,
+  PLAN,
+  THREADS,
+  TIMELINE,
+  type PageDraft,
+  type PageKind,
+  type Reach,
+  type ReferencePage,
+  type RewriteView,
+  type StoryEdit,
+  type StoryView,
+} from '@writer/shared/story';
 import { IconTrash } from '../../components/icons';
 import { Modal } from '../../components/Modal';
-import { blankCharacter } from '../../data/setup';
+import { blankCharacter, type Choice } from '../../data/setup';
 import { fetchRewrite } from '../../data/story';
 import { failureText } from '../../lib/api';
 import { CharacterSheet } from '../setup/CharacterSheet';
 import { ConfirmDialog } from '../setup/ConfirmDialog';
+import { Choices, Field } from '../setup/Fields';
 import { RelationshipSheet, nameIn } from '../setup/RelationshipSheet';
-import { lineSaving, sheetSaving, type SaveKind } from './reach';
-import type { Saving, StoryState } from './useStory';
+import { lineSaving, pageSaving, sheetSaving, unpageAsks, type SaveKind } from './reach';
+import type { Opened, Saving, StoryState } from './useStory';
 import '../add/add.css';
 import '../setup/setup.css';
 import './story.css';
@@ -21,7 +34,9 @@ import './story.css';
  * The sheets mid story (step 6), over the page: setup's own sheets, held until they're saved.
  * Once one has changed, its Save becomes "From now on" and "Always so", each with a line under it
  * saying what it does; a rename alone, or anything before the story is played, saves plainly (the
- * owner's picks, 2026-10-07 and 2026-10-11). Removing someone or untying two asks the same.
+ * owner's picks, 2026-10-07 and 2026-10-11). Removing someone or untying two asks the same. A page
+ * of the reference, from the Notes panel or someone's sheet, opens as a sheet too, and asks the
+ * same, unless it says where the story is going (our call, 2026-10-15).
  */
 
 /** What each of the two buttons does, as the line under it says. */
@@ -64,6 +79,14 @@ export function StorySheets({ state, bookId, held }: SheetsProps) {
     sheet = <NewPersonSheet key="new" state={state} story={story} held={held} />;
   } else if (story && opened?.kind === 'line') {
     sheet = <LineSheet key={`line ${opened.a} ${opened.b}`} state={state} story={story} a={opened.a} b={opened.b} held={held} />;
+  } else if (story && opened?.kind === 'page') {
+    const page = story.reference.find((each) => each.id === opened.id);
+    // A page taken out since has nothing to show.
+    if (page) {
+      sheet = <PageSheet key={`page ${page.id}`} state={state} story={story} page={page} held={held} />;
+    }
+  } else if (story && opened?.kind === 'newPage') {
+    sheet = <PageSheet key="new page" state={state} story={story} page={null} held={held} />;
   }
   return <AnimatePresence>{sheet}</AnimatePresence>;
 }
@@ -169,7 +192,7 @@ function SheetFooter({ state, held, how, lines, note, left, saveLabel = 'Save', 
     <>
       {note && <p className="add-found">{note}</p>}
       <SaveStatus state={state} held={held} changed={how !== 'unchanged'} />
-      {how === 'asks' && <ReachChoice lines={lines} disabled={stopped} onPick={onSave} />}
+      {how === 'asks' && <ReachChoice lines={lines} disabled={stopped || !canSave} onPick={onSave} />}
       {row}
     </>
   );
@@ -207,32 +230,56 @@ function LeaveDialog({ onGo, onClose }: { onGo: () => void; onClose: () => void 
 
 /** The parts of a sheet's life every sheet shares: making the change, and closing with or without asking. */
 function useSheet(state: StoryState, dirty: boolean) {
-  const [leaving, setLeaving] = useState(false);
+  // Where the owner goes once they say to leave what they changed: nowhere (closed), or another sheet.
+  const [leaving, setLeaving] = useState<{ to: Opened | null } | null>(null);
   const make = async (edit: StoryEdit, reach: Reach) => {
     const kept = await state.edit(edit, reach);
     if (kept) {
       state.close();
     }
   };
-  const close = () => {
+  /** Leaves this sheet for another, or closes it, asking first when it has changes that weren't saved. */
+  const leaveFor = (to: Opened | null) => {
     if (dirty && state.saving === null) {
-      setLeaving(true);
+      setLeaving({ to });
       return;
     }
-    state.close();
+    go(to);
   };
-  const leaveDialog = leaving && <LeaveDialog key="leave" onGo={state.close} onClose={() => setLeaving(false)} />;
-  return { make, close, leaveDialog };
+  const go = (to: Opened | null) => {
+    if (to) {
+      state.open(to);
+    } else {
+      state.close();
+    }
+  };
+  const close = () => leaveFor(null);
+  let leaveDialog = null;
+  if (leaving) {
+    leaveDialog = <LeaveDialog key="leave" onGo={() => go(leaving.to)} onClose={() => setLeaving(null)} />;
+  }
+  return { make, close, leaveFor, leaveDialog };
 }
 
-/** Procreator's page about someone, below the owner's sheet. It's edited in the Notes panel. */
-function PageBlock({ text }: { text: string }) {
+/** Procreator's page about someone, below the owner's sheet, to read; Edit opens it as a sheet of its own. */
+function PageBlock({ text, onEdit }: { text: string; onEdit: (() => void) | null }) {
   if (text.trim() === '') {
     return null;
   }
+  let edit = null;
+  if (onEdit) {
+    edit = (
+      <button type="button" className="btn btn-ghost story-page-edit" onClick={onEdit}>
+        Edit
+      </button>
+    );
+  }
   return (
     <div className="setup-field story-page">
-      <div className="add-label">Procreator’s page</div>
+      <div className="story-page-head">
+        <div className="add-label">Procreator’s page</div>
+        {edit}
+      </div>
       <div className="story-page-text">{text}</div>
     </div>
   );
@@ -279,9 +326,14 @@ function PersonSheet({ state, story, person, held }: PersonProps) {
       </button>
     );
   }
+  const theirPage = story.reference.find((page) => page.characterId === person.id);
+  let editPage: (() => void) | null = null;
+  if (theirPage) {
+    editPage = () => sheet.leaveFor({ kind: 'page', id: theirPage.id });
+  }
   const footer = (
     <>
-      <PageBlock text={story.pages[person.id] ?? ''} />
+      <PageBlock text={story.pages[person.id] ?? ''} onEdit={editPage} />
       <SheetFooter state={state} held={held} how={how} lines={lines} left={left} onSave={save} onDone={state.close} />
     </>
   );
@@ -480,4 +532,137 @@ export function passagesText(count: number): string {
     return '1 passage';
   }
   return `${count} passages`;
+}
+
+/** The kinds of page the owner can make, as radio cards. A character's page is in their sheet. */
+const PAGE_KINDS: Choice<PageKind>[] = [
+  { id: 'place', name: 'A place', about: 'A house, a city, a road.' },
+  { id: 'group', name: 'A group', about: 'A family, a guild, a crew.' },
+  { id: 'thing', name: 'A thing', about: 'An object that matters.' },
+  { id: 'lore', name: 'Lore', about: 'The world’s history, rules, magic or customs.' },
+  { id: 'story', name: 'The story’s own', about: 'Where it’s going, what it set up, what happened when.' },
+];
+
+/** The story's own pages keep their titles: Procreator looks for them by name. */
+const OWN_TITLES = [PLAN, THREADS, TIMELINE].map((title) => title.toLowerCase());
+
+function draftOf(page: ReferencePage | null): PageDraft {
+  if (!page) {
+    return { id: null, characterId: null, kind: 'place', title: '', about: '', body: '' };
+  }
+  return { id: page.id, characterId: page.characterId, kind: page.kind, title: page.title, about: page.about, body: page.body };
+}
+
+const PAGE_LINES: ReachLines = {
+  now: 'It holds from here, and the story plays it as something that just came to light.',
+  always: 'It was always so: what was played is rewritten to match.',
+};
+
+/**
+ * A page of the reference, or a new one, over the page: its title and kind, what it holds, and the
+ * page itself, in Procreator's Markdown with people in the cast as links (our call, 2026-10-15).
+ */
+function PageSheet({ state, story, page, held }: { state: StoryState; story: StoryView; page: ReferencePage | null; held: boolean }) {
+  const [draft, setDraft] = useState<PageDraft>(() => draftOf(page));
+  const [removing, setRemoving] = useState(false);
+  const how = pageSaving(story.played, page, draft);
+  const sheet = useSheet(state, how !== 'unchanged');
+  const someones = draft.characterId !== null;
+  const own = page !== null && OWN_TITLES.includes(page.title.toLowerCase());
+
+  let title = 'A new page';
+  if (page && someones) {
+    title = `${page.title}’s page`;
+  } else if (page) {
+    title = page.title;
+  }
+
+  const save = (reach: Reach) => void sheet.make({ kind: 'page', page: draft }, reach);
+  const remove = (reach: Reach) => {
+    setRemoving(false);
+    if (page) {
+      void sheet.make({ kind: 'unpage', id: page.id }, reach);
+    }
+  };
+  const askRemove = () => {
+    if (page && unpageAsks(story.played, page)) {
+      setRemoving(true);
+    } else {
+      remove('now');
+    }
+  };
+
+  let left = null;
+  if (page) {
+    left = (
+      <button type="button" className="btn btn-ghost sheet-remove" disabled={state.saving !== null || held} onClick={askRemove}>
+        <IconTrash /> Take out
+      </button>
+    );
+  }
+  let canSave = draft.body.trim() !== '';
+  if (!someones && draft.title.trim() === '') {
+    canSave = false;
+  }
+  let saveLabel = 'Save';
+  if (!page) {
+    saveLabel = 'Add the page';
+  }
+  // A new page with nothing typed yet is just a sheet to close.
+  let saving = how;
+  if (!page && draft.title.trim() === '' && draft.body.trim() === '' && draft.about.trim() === '') {
+    saving = 'unchanged';
+  }
+
+  // Someone's page goes by their name, and the story's own pages keep theirs: the sheet's title says it.
+  let titleField = null;
+  if (!someones && !own) {
+    titleField = (
+      <Field
+        label="Title"
+        value={draft.title}
+        max={TITLE_LIMIT}
+        autoFocus={!page}
+        placeholder="The Lamp House, the Weavers’ Guild"
+        onChange={(value) => setDraft({ ...draft, title: value })}
+      />
+    );
+  }
+  let kindField = null;
+  if (!someones && !own) {
+    kindField = <Choices label="Kind" choices={PAGE_KINDS} value={draft.kind} onPick={(kind) => setDraft({ ...draft, kind })} />;
+  }
+  const removeLines: ReachLines = {
+    now: 'It’s gone from here. What was played stays.',
+    always: 'It was never so: what was played is rewritten without it.',
+  };
+
+  return (
+    <>
+      <Modal title={title} onClose={sheet.close} width={600}>
+        <div className="add sheet page-sheet">
+          {titleField}
+          {kindField}
+          <Field label="What it holds" value={draft.about} max={SHORT_LIMIT} placeholder="One line for the index" onChange={(about) => setDraft({ ...draft, about })} />
+          <Field label="The page" size="notes" value={draft.body} max={PAGE_LIMIT} placeholder="What the story knows about it" onChange={(body) => setDraft({ ...draft, body })} />
+          <SheetFooter
+            state={state}
+            held={held}
+            how={saving}
+            lines={PAGE_LINES}
+            note="People in the cast are written [[Name]], so a rename reaches them."
+            left={left}
+            saveLabel={saveLabel}
+            canSave={canSave}
+            onSave={save}
+            onDone={state.close}
+          />
+        </div>
+      </Modal>
+      <AnimatePresence>
+        {removing && <ReachDialog key="unpage" title={`Take out ${title}?`} lines={removeLines} onPick={remove} onClose={() => setRemoving(false)} />}
+        {sheet.leaveDialog}
+      </AnimatePresence>
+    </>
+  );
 }

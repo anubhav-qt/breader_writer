@@ -29,4 +29,7 @@ export const IconStar = (p: P) => (
 export const IconChat = (p: P) => (
   <svg {...base} strokeWidth={1.9} {...p}><path d="M6.5 4.5h11a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-5.2L8 20.5v-3.5H6.5a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3Z" /></svg>
 );
+export const IconNotes = (p: P) => (<svg {...base} strokeWidth={1.9} {...p}><rect x="5" y="3.5" width="14" height="17" rx="2.5" /><path d="M9 8.5h6M9 12h6M9 15.5h3.5" /></svg>);
+export const IconBook = (p: P) => (<svg {...base} strokeWidth={1.9} {...p}><path d="M12 6.5c-1.8-1.3-4.3-2-7.5-2v13c3.2 0 5.7.7 7.5 2 1.8-1.3 4.3-2 7.5-2v-13c-3.2 0-5.7.7-7.5 2Z" /><path d="M12 6.5v13" /></svg>);
+export const IconDownload = (p: P) => (<svg {...base} strokeWidth={1.9} {...p}><path d="M12 4.5V15M7.5 10.5 12 15l4.5-4.5" /><path d="M4.5 14.5v3a2.5 2.5 0 0 0 2.5 2.5h10a2.5 2.5 0 0 0 2.5-2.5v-3" /></svg>);
 export const IconUndo = (p: P) => (<svg {...base} strokeWidth={1.9} {...p}><path d="M9 14 4.5 9.5 9 5" /><path d="M4.5 9.5H15a4.5 4.5 0 0 1 0 9h-3" /></svg>);

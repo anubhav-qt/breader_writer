@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Character, Relationship } from '@writer/shared/book';
-import { EditEvent, type StoryEdit } from '@writer/shared/story';
+import { EditEvent, type MemoryNote, type PageDraft, type ReferencePage, type StoryEdit } from '@writer/shared/story';
 import { users } from '../src/db/breader.ts';
 import {
   actorMessages,
@@ -10,6 +10,7 @@ import {
   calls,
   changes,
   characters,
+  pages,
   relationshipHistory,
   relationships,
   scenes,
@@ -20,6 +21,8 @@ import {
 } from '../src/db/schema.ts';
 import { REWROTE } from '../src/breading_ground.ts';
 import { startChange } from '../src/story/changes.ts';
+import { remember } from '../src/story/memory.ts';
+import { writePage } from '../src/story/pages.ts';
 import { mention } from '../src/story/mentions.ts';
 import { shiftRelationship } from '../src/story/relationships.ts';
 import { ORIGIN, account, address, call, deps, send, writer, type Writer } from './helpers.ts';
@@ -640,5 +643,186 @@ describe('a change before anything is played', () => {
     const r = await change(app, cookie, bookId, { kind: 'sheet', character: { ...ren, name: 'Renji' } });
     expect(r.status).toBe(200);
     expect((await personOf(bookId, ren.id)).name).toBe('Renji');
+  });
+});
+
+/** Pages and a note Procreator wrote as it played, at no turn: Aiko's, the Lamp House, the Plan, and a note. */
+async function noted(bookId: string) {
+  const by = { bookId, turnId: null, by: 'agent' as const };
+  return db.transaction(async (tx) => {
+    const aikoPage = await writePage(tx, by, { title: 'Aiko', kind: 'character', about: '', body: 'Afraid of deep water.' });
+    const lamp = await writePage(tx, by, {
+      title: 'The Lamp House',
+      kind: 'place',
+      about: 'Where the lamps are kept.',
+      body: 'A narrow house of oil and wicks. [[Ren]] owes its keeper money.',
+    });
+    const plan = await writePage(tx, by, { title: 'Plan', kind: 'story', about: 'Where the story is heading.', body: '[[Aiko]] crosses the river.' });
+    const note = await remember(tx, by, 'The owner wants [[Ren]] kept likeable.');
+    return { aikoPage: aikoPage.page, lamp: lamp.page, plan: plan.page, note: note.note };
+  });
+}
+
+/** A page as the owner saves it, from one of the reference. */
+function draftOf(page: { id: string; characterId: string | null; kind: string; title: string; about: string }, body: string, over: Partial<PageDraft> = {}): PageDraft {
+  return { id: page.id, characterId: page.characterId, kind: page.kind as PageDraft['kind'], title: page.title, about: page.about, body, ...over };
+}
+
+async function pageNow(id: string) {
+  const [page] = await db.select().from(pages).where(eq(pages.id, id));
+  return page;
+}
+
+describe('the Notes panel', () => {
+  it('shows the reference and memory, people as links, and someone’s page under their name', async () => {
+    const { app, cookie, bookId, aiko } = await opened([]);
+    const { note } = await noted(bookId);
+    const r = await call(app, 'GET', `/v1/books/${bookId}/story`, cookie);
+    expect(r.status).toBe(200);
+    expect(r.body.reference.map((page: ReferencePage) => [page.kind, page.title])).toEqual([
+      ['character', 'Aiko'],
+      ['place', 'The Lamp House'],
+      ['story', 'Plan'],
+    ]);
+    expect(r.body.reference[0]).toMatchObject({ characterId: aiko.id, body: 'Afraid of deep water.' });
+    expect(r.body.reference[1].body).toBe('A narrow house of oil and wicks. [[Ren]] owes its keeper money.');
+    expect(r.body.memory).toEqual([{ id: note.id, text: 'The owner wants [[Ren]] kept likeable.' }]);
+  });
+
+  it('changes a page from now on: kept with people as mentions, and told to Procreator', async () => {
+    const { app, cookie, bookId, sora } = await opened([]);
+    const { lamp } = await noted(bookId);
+    const r = await change(app, cookie, bookId, { kind: 'page', page: draftOf(lamp, 'A narrow house. [[Sora]] keeps it.') });
+    expect(r.status).toBe(200);
+    expect(r.rewrote).toBeNull();
+    expect((await pageNow(lamp.id)).body).toBe(`A narrow house. ${mention(sora.id)} keeps it.`);
+    const made = await changeWhat(bookId, 'Changed the page The Lamp House');
+    expect(made).toMatchObject({ by: 'owner', why: 'from now on' });
+    const [told] = await notesIn(bookId);
+    expect(noteText(told)).toContain('<changed subject="The page The Lamp House">');
+    expect(noteText(told)).toContain('<was>A narrow house of oil and wicks. [[Ren]] owes its keeper money.</was>');
+    expect(noteText(told)).toContain('<now>A narrow house. [[Sora]] keeps it.</now>');
+  });
+
+  it('writes a new page, and turns away a title someone or another page has, and a link to no one', async () => {
+    const { app, cookie, bookId } = await opened([]);
+    await noted(bookId);
+    const fresh: PageDraft = { id: null, characterId: null, kind: 'thing', title: 'The Brass Key', about: 'A key to the Lamp House.', body: 'Cold to the touch.' };
+    const r = await change(app, cookie, bookId, { kind: 'page', page: fresh });
+    expect(r.status).toBe(200);
+    expect(r.body.reference.map((page: ReferencePage) => page.title)).toContain('The Brass Key');
+    expect(await changeWhat(bookId, 'Wrote the page The Brass Key')).toBeDefined();
+
+    const named = await change(app, cookie, bookId, { kind: 'page', page: { ...fresh, title: 'Ren' } });
+    expect(named.status).toBe(409);
+    expect(named.body.message).toContain('Ren is someone in the cast');
+    const twice = await change(app, cookie, bookId, { kind: 'page', page: { ...fresh, title: 'the lamp house' } });
+    expect(twice.status).toBe(409);
+    expect(twice.body.message).toBe('There’s a page called The Lamp House already.');
+    const nobody = await change(app, cookie, bookId, { kind: 'page', page: { ...fresh, title: 'The Oar', body: '[[Kenji]] carved it.' } });
+    expect(nobody.status).toBe(409);
+    expect(nobody.body.message).toContain('No one in the cast is called Kenji');
+  });
+
+  it('rewrites what was played when a page holds always so, leaving the page itself to the change', async () => {
+    const { app, cookie, bookId, proxy } = await opened([rewriting([{ passage: 4, text: 'The river is warm.' }]), rewriting([])]);
+    const { lamp } = await noted(bookId);
+    const r = await change(app, cookie, bookId, { kind: 'page', page: draftOf(lamp, 'A narrow house by the warm river.') }, 'always');
+    expect(r.status).toBe(200);
+    expect(r.rewrote?.count).toBe(1);
+    const asked = rewriteCalls(proxy);
+    expect(asked).toHaveLength(2);
+    expect(promptOf(asked[0]).user).toContain('<changed subject="The page The Lamp House">');
+    const rest = promptOf(asked[1]).user;
+    expect(rest).toContain('where="The page Plan: its title"');
+    expect(rest).not.toContain('where="The page The Lamp House');
+    const [opening] = await standingTurns(bookId);
+    expect(opening.reply).toBe('The river is warm.');
+    expect(await notesIn(bookId)).toEqual([]);
+  });
+
+  it('keeps the pages that say where the story is going from now on, even asked always so', async () => {
+    const { app, cookie, bookId, proxy } = await opened([]);
+    const { plan } = await noted(bookId);
+    const r = await change(app, cookie, bookId, { kind: 'page', page: draftOf(plan, '[[Aiko]] stays on this side of the river.') }, 'always');
+    expect(r.status).toBe(200);
+    expect(r.rewrote).toBeNull();
+    expect(rewriteCalls(proxy)).toEqual([]);
+    const [told] = await notesIn(bookId);
+    expect(noteText(told)).toContain('<changed subject="The page Plan">');
+
+    const renamed = await change(app, cookie, bookId, { kind: 'page', page: draftOf(plan, 'Anything.', { title: 'Hopes' }) });
+    expect(renamed.status).toBe(409);
+    expect(renamed.body.message).toBe('Plan keeps its title: Procreator looks for it by name.');
+  });
+
+  it('takes a page out, and adds, changes and forgets Procreator’s notes, telling it each time', async () => {
+    const { app, cookie, bookId, proxy } = await opened([]);
+    const { lamp, note } = await noted(bookId);
+    const out = await change(app, cookie, bookId, { kind: 'unpage', id: lamp.id }, 'now');
+    expect(out.status).toBe(200);
+    expect(out.body.reference.map((page: ReferencePage) => page.title)).not.toContain('The Lamp House');
+
+    const added = await change(app, cookie, bookId, { kind: 'note', id: null, text: 'Keep  the chapters\nshort.' }, 'always');
+    expect(added.status).toBe(200);
+    expect(added.body.memory.map((each: MemoryNote) => each.text)).toEqual(['The owner wants [[Ren]] kept likeable.', 'Keep the chapters short.']);
+    const changed = await change(app, cookie, bookId, { kind: 'note', id: note.id, text: 'The owner wants [[Ren]] kept a mystery.' });
+    expect(changed.body.memory[0].text).toBe('The owner wants [[Ren]] kept a mystery.');
+    const forgot = await change(app, cookie, bookId, { kind: 'forget', id: note.id });
+    expect(forgot.body.memory.map((each: MemoryNote) => each.text)).toEqual(['Keep the chapters short.']);
+    expect(await changeWhat(bookId, `Took note ${note.id} out of Procreator’s memory`)).toBeDefined();
+    // Memory is about the work, not the story: always so has nothing to rewrite.
+    expect(rewriteCalls(proxy)).toEqual([]);
+
+    const told = (await notesIn(bookId)).map(noteText);
+    expect(told).toHaveLength(4);
+    expect(told[0]).toContain('The Lamp House is taken out of the reference');
+    expect(told[1]).toContain('The owner changed your memory');
+    expect(told[1]).toContain('<now>Keep the chapters short.</now>');
+    expect(told[3]).toContain(`<changed subject="Note ${note.id} in your memory is forgotten">`);
+  });
+});
+
+describe('a rename reaching back', () => {
+  it('reaches the openings offered, a cue kept with a turn, and a page’s title', async () => {
+    const { app, cookie, bookId, ren, proxy } = await opened([
+      { text: 'Aiko turns to the stern.', calls: [{ name: 'cue', args: { who: 'Ren', sees: 'Aiko asks you to row, Ren.' } }] },
+      rewriting([
+        { passage: 1, find: 'Ren', text: 'Renji' },
+        { passage: 2, find: 'Ren', text: 'Renji' },
+        { passage: 3, find: 'Ren.', text: 'Renji.' },
+        { passage: 4, find: 'Ren', text: 'Renji' },
+      ]),
+      rewriting([{ passage: 1, text: 'Renji’s Boat' }]),
+    ]);
+    await db.transaction((tx) =>
+      writePage(tx, { bookId, turnId: null, by: 'agent' }, { title: 'Ren’s Boat', kind: 'thing', about: 'A rowing boat.', body: 'Flat and old.' }),
+    );
+    await play(app, cookie, bookId, 'move', { voice: 'character', text: 'I ask Ren to row.', playOthers: true });
+    const r = await change(app, cookie, bookId, { kind: 'sheet', character: { ...ren, name: 'Renji' } });
+    expect(r.status).toBe(200);
+
+    const [scene, rest] = rewriteCalls(proxy);
+    expect(promptOf(scene).user).toContain('where="Scene 1, turn 2: what Procreator told Renji as it cued them">\nAiko asks you to row, Ren.');
+    expect(promptOf(scene).user).toContain('where="Scene 1: opening 2 offered, its words">\nRen pulls Aiko from the river.');
+    expect(promptOf(rest).user).toContain('where="The page Ren’s Boat: its title">\nRen’s Boat');
+
+    const [first] = await db.select().from(scenes).where(and(eq(scenes.bookId, bookId), eq(scenes.number, 1)));
+    expect((first.openings as { text: string }[])[1].text).toBe('Renji pulls Aiko from the river.');
+    const [, cued] = await standingTurns(bookId);
+    expect(cued.cue).toEqual({ who: ren.id, sees: 'Aiko asks you to row, Renji.' });
+    const [boat] = await db.select().from(pages).where(and(eq(pages.bookId, bookId), eq(pages.kind, 'thing')));
+    expect(boat.title).toBe('Renji’s Boat');
+
+    // Five of the story's own: two turns' words, the cue, the openings kept together, and the page's title.
+    expect(r.rewrote?.count).toBe(5);
+    const listed = await call(app, 'GET', `/v1/books/${bookId}/story/rewrites/${r.rewrote?.change}`, cookie);
+    const wheres = listed.body.passages.map((passage: { where: string }) => passage.where);
+    expect(wheres).toContain('Scene 1: the openings offered');
+    expect(wheres).toContain('Scene 1, turn 2: what Procreator told Renji as it cued them');
+    expect(wheres).toContain('The page Renji’s Boat: its title');
+    const offered = listed.body.passages.find((passage: { where: string }) => passage.where === 'Scene 1: the openings offered');
+    expect(offered.before).toContain('Ren pulls Aiko from the river.\n(The ferry, Dawn)');
+    expect(offered.after).toContain('Renji pulls Aiko from the river.');
   });
 });

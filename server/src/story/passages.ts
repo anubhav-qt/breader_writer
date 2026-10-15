@@ -9,23 +9,31 @@ import { edit, remove, StoryError, type Change, type StoryTable } from './change
 import { Cast, linked, unlinked } from './mentions.ts';
 import type { Story } from './read.ts';
 import { currentSegment } from './session.ts';
-import type { Scene, Turn } from './scenes.ts';
+import { cueOf, type Scene, type Turn } from './scenes.ts';
 
 /*
  * The story's passages: every text a change that reaches back may have to rewrite, so what was
  * played reads as if it was always so (see "Changing the past" in CLAUDE.md). The turns, each
- * scene's place, time and summary, the reference, Procreator's memory, the relationships' history,
- * and the owner's own sheets, lines and world; and the working copies that will be sent again, the
- * owner's notes in a scene's session and the actors' chats.
+ * scene's place, time and summary, the openings offered for the first scene and what Procreator
+ * told someone as it stopped a turn for the owner (a cue), the reference (titles too), Procreator's
+ * memory, the relationships' history, and the owner's own sheets, lines and world; and the working
+ * copies that will be sent again, the owner's notes in a scene's session and the actors' chats.
  *
  * They're read in groups, a scene at a time and then the rest, as Procreator rewrites them. A
  * story passage is kept back through the change log, so it keeps the version it replaced; a
  * working copy isn't the story, and is rebuilt with its new words (procreator/rebuild.ts).
  */
 
-/** Where a passage is kept: a column of one of the story's rows, or a working copy. */
+/** A part of one of the openings offered for the first scene. */
+export type OpeningField = 'text' | 'place' | 'time';
+
+/** Where a passage is kept: a column of one of the story's rows, part of one, or a working copy. */
 export type Spot =
   | { kind: 'story'; table: StoryTable; key: Record<string, unknown>; column: string; linked: boolean }
+  /** Part of one of the openings offered for the first scene, kept together on the scene. */
+  | { kind: 'opening'; sceneId: string; index: number; field: OpeningField }
+  /** What Procreator told someone as it stopped a turn for the owner to say who plays them. */
+  | { kind: 'cue'; turnId: string }
   /** A note in a scene's session: a change the owner made from now on. */
   | { kind: 'note'; id: number }
   /** A message of an actor's chat: a cue, or their answer. */
@@ -39,6 +47,13 @@ export interface Passage {
   where: string;
   /** Its text, with people as links ([[Name]]) where it's structured. */
   text: string;
+  /** For a page's title: every other page's title, in lower case, which it can't take. */
+  taken?: string[];
+}
+
+/** Whether a passage is the story's own, kept back through the change log, rather than a working copy. */
+export function isOwn(spot: Spot): boolean {
+  return spot.kind === 'story' || spot.kind === 'opening' || spot.kind === 'cue';
 }
 
 /** A scene's passages, or the rest of the story's (scene null). */
@@ -57,9 +72,11 @@ export interface Untouched {
   world: boolean;
   /** Someone it takes out of the story whole: their page, lines and history go with them. */
   removed: string | null;
+  /** The pages it writes or takes out, by id. */
+  pages: string[];
 }
 
-export const NOTHING_UNTOUCHED: Untouched = { sheets: [], lines: [], world: false, removed: null };
+export const NOTHING_UNTOUCHED: Untouched = { sheets: [], lines: [], world: false, removed: null, pages: [] };
 
 const SHEET_FIELDS = [
   { column: 'who', label: 'who they are' },
@@ -145,6 +162,42 @@ function inputLabel(turn: Turn, names: Names, protagonist: string): string {
   return 'your move';
 }
 
+/** One of the openings offered for the first scene, as the story keeps it. */
+interface Offered {
+  text: string;
+  place: string;
+  time: string;
+  present: string[];
+}
+
+const OPENING_PARTS: { field: OpeningField; label: string }[] = [
+  { field: 'text', label: 'its words' },
+  { field: 'place', label: 'where it opens' },
+  { field: 'time', label: 'when' },
+];
+
+/** The openings offered for the first scene, kept to show again if the owner takes the opening back. */
+function openingPassages(scene: Scene): Passage[] {
+  if (!scene.openings) {
+    return [];
+  }
+  const passages: Passage[] = [];
+  const offers = scene.openings as Offered[];
+  offers.forEach((offer, index) => {
+    for (const part of OPENING_PARTS) {
+      const text = offer[part.field];
+      if (text) {
+        passages.push({
+          spot: { kind: 'opening', sceneId: scene.id, index, field: part.field },
+          where: `Scene ${scene.number}: opening ${index + 1} offered, ${part.label}`,
+          text,
+        });
+      }
+    }
+  });
+  return passages;
+}
+
 /** A scene's own passages: where and when it is, its summary, and its turns that still stand. */
 async function scenePassages(db: Db | Tx, scene: Scene, names: Names, protagonist: string): Promise<Passage[]> {
   const passages: Passage[] = [];
@@ -170,6 +223,10 @@ async function scenePassages(db: Db | Tx, scene: Scene, names: Names, protagonis
     }
     if (turn.reply) {
       passages.push({ spot: storySpot(turns, { id: turn.id }, 'reply'), where: `${at}: the narration`, text: turn.reply });
+    }
+    const cue = cueOf(turn);
+    if (cue && cue.sees) {
+      passages.push({ spot: { kind: 'cue', turnId: turn.id }, where: `${at}: what Procreator told ${names.of(cue.who)} as it cued them`, text: cue.sees });
     }
   });
   return passages;
@@ -234,13 +291,20 @@ async function actorPassages(db: Db | Tx, story: Story, names: Names, untouched:
 function restPassages(story: Story, names: Names, untouched: Untouched): Passage[] {
   const passages: Passage[] = [];
   const removed = untouched.removed;
+  const titles = story.pages.filter((page) => page.characterId === null).map((page) => page.title.toLowerCase());
   for (const page of story.pages) {
     if (page.characterId !== null && page.characterId === removed) {
+      continue;
+    }
+    if (untouched.pages.includes(page.id)) {
       continue;
     }
     let title = `The page ${page.title}`;
     if (page.characterId !== null) {
       title = `${names.of(page.characterId)}’s page`;
+    } else {
+      const taken = titles.filter((other) => other !== page.title.toLowerCase());
+      passages.push({ spot: storySpot(pages, { id: page.id }, 'title'), where: `${title}: its title`, text: page.title, taken });
     }
     if (page.about) {
       passages.push({ spot: storySpot(pages, { id: page.id }, 'about'), where: `${title}: what it holds`, text: page.about });
@@ -324,6 +388,8 @@ export async function passagesOf(db: Db | Tx, story: Story, names: Map<string, s
     const passages = await scenePassages(db, scene, named, protagonist);
     passages.push(...(await notePassages(db, scene)));
     passages.push(...(actors.byScene.get(scene.id) ?? []));
+    // Last, as they matter least: they only show again if the owner takes the opening back.
+    passages.push(...openingPassages(scene));
     if (passages.length > 0) {
       groups.push({ scene: scene.number, passages });
     }
@@ -342,15 +408,37 @@ export function spotKey(table: string, key: Record<string, unknown>, column: str
   return `${table} ${JSON.stringify(entries)} ${column}`;
 }
 
+/** Where a passage of the story's own is kept, as spotKey has it: openings and a cue are kept whole on their rows. */
+function keyOfSpot(spot: Spot): string | null {
+  if (spot.kind === 'story') {
+    return spotKey(getTableName(spot.table), spot.key, spot.column);
+  }
+  if (spot.kind === 'opening') {
+    return spotKey('scenes', { id: spot.sceneId }, 'openings');
+  }
+  if (spot.kind === 'cue') {
+    return spotKey('turns', { id: spot.turnId }, 'cue');
+  }
+  return null;
+}
+
+/** Where the openings offered are, as the owner reads it. */
+export const OPENINGS_WHERE = 'Scene 1: the openings offered';
+
 /** Where each of the story's own passages is, as the owner reads it, by spotKey: for looking a rewrite over. */
 export async function wheresOf(db: Db | Tx, story: Story): Promise<Map<string, string>> {
   const groups = await passagesOf(db, story, namesOf(story.characters), NOTHING_UNTOUCHED);
   const wheres = new Map<string, string>();
   for (const group of groups) {
     for (const passage of group.passages) {
-      const spot = passage.spot;
-      if (spot.kind === 'story') {
-        wheres.set(spotKey(getTableName(spot.table), spot.key, spot.column), passage.where);
+      const key = keyOfSpot(passage.spot);
+      if (key === null) {
+        continue;
+      }
+      if (passage.spot.kind === 'opening') {
+        wheres.set(key, OPENINGS_WHERE);
+      } else {
+        wheres.set(key, passage.where);
       }
     }
   }
@@ -365,8 +453,34 @@ export function mayEmpty(passage: Passage): boolean {
   return passage.spot.table === notes || passage.spot.table === relationshipHistory;
 }
 
-/** Whether a story passage's new text can be kept: its links name people in the cast as it will stand. Null when it can. */
-export function linkProblem(passage: Passage, text: string, cast: Cast): string | null {
+function isTitle(spot: Spot): boolean {
+  return spot.kind === 'story' && spot.table === pages && spot.column === 'title';
+}
+
+/** Why a page's new title can't be kept: what any title needs, and not a person's name or another page's. Null when it can. */
+function titleProblem(passage: Passage, text: string, cast: Cast): string | null {
+  const title = text.trim().replace(/\s+/g, ' ');
+  if (/[[\]]/.test(title)) {
+    return 'A page’s title is written without brackets.';
+  }
+  if (cast.idsOf(title).length > 0) {
+    return `${title} is someone in the cast, whose page goes by their name. Give the page another title.`;
+  }
+  const taken = passage.taken ?? [];
+  if (taken.includes(title.toLowerCase())) {
+    return `Another page is called ${title} already.`;
+  }
+  return null;
+}
+
+/**
+ * Whether a story passage's new text can be kept: its links name people in the cast as it will
+ * stand, and a page's title is one a page can have. Null when it can.
+ */
+export function keepProblem(passage: Passage, text: string, cast: Cast): string | null {
+  if (isTitle(passage.spot)) {
+    return titleProblem(passage, text, cast);
+  }
   if (passage.spot.kind !== 'story' || !passage.spot.linked) {
     return null;
   }
@@ -381,20 +495,30 @@ export function linkProblem(passage: Passage, text: string, cast: Cast): string 
   }
 }
 
-/** A text as its column keeps it: a memory note and a page's line for the index on one line. */
+/** A text as its column keeps it: a memory note, a page's title and its line for the index on one line. */
 function keptText(passage: Passage, text: string): string {
   const spot = passage.spot;
-  if (spot.kind === 'story' && (spot.table === notes || (spot.table === pages && spot.column === 'about'))) {
+  if (spot.kind !== 'story') {
+    return text.trim();
+  }
+  const oneLine = spot.table === notes || (spot.table === pages && (spot.column === 'about' || spot.column === 'title'));
+  if (oneLine) {
     return text.trim().replace(/\s+/g, ' ');
   }
   return text.trim();
 }
 
-/** A story passage rewritten, as part of the change. An emptied note or history entry goes. Only breading_ground calls this. */
-export async function rewritePassage(tx: Tx, change: Change, passage: Passage, text: string, cast: Cast) {
+/** A passage and its new words. */
+export interface NewWords {
+  passage: Passage;
+  text: string;
+}
+
+/** A column of one of the story's rows rewritten. An emptied note or history entry goes. */
+async function rewriteColumn(tx: Tx, change: Change, passage: Passage, text: string, cast: Cast) {
   const spot = passage.spot;
   if (spot.kind !== 'story') {
-    throw new Error('Only the story’s own passages are kept through the change log.');
+    throw new Error('Only a column of the story’s rows is rewritten here.');
   }
   let kept = keptText(passage, text);
   if (kept === '') {
@@ -408,4 +532,67 @@ export async function rewritePassage(tx: Tx, change: Change, passage: Passage, t
     kept = unlinked(kept, cast);
   }
   await edit(tx, change, spot.table, spot.key, { [spot.column]: kept });
+}
+
+/** The openings offered for a scene, rewritten where Procreator rewrote them, kept as one edit to the scene. */
+async function rewriteOpenings(tx: Tx, change: Change, sceneId: string, words: NewWords[]) {
+  const [scene] = await tx.select().from(scenes).where(eq(scenes.id, sceneId));
+  if (!scene || !scene.openings) {
+    return;
+  }
+  const offers = (scene.openings as Offered[]).map((offer) => ({ ...offer }));
+  for (const each of words) {
+    const spot = each.passage.spot;
+    if (spot.kind !== 'opening' || !offers[spot.index]) {
+      continue;
+    }
+    const kept = each.text.trim();
+    if (kept === '') {
+      throw new StoryError(`${each.passage.where} can’t be left empty.`);
+    }
+    offers[spot.index][spot.field] = kept;
+  }
+  await edit(tx, change, scenes, { id: sceneId }, { openings: offers });
+}
+
+/** What Procreator told someone as it cued them, rewritten. */
+async function rewriteCue(tx: Tx, change: Change, turnId: string, text: string) {
+  const [turn] = await tx.select().from(turns).where(eq(turns.id, turnId));
+  if (!turn) {
+    return;
+  }
+  const cue = cueOf(turn);
+  if (!cue) {
+    return;
+  }
+  await edit(tx, change, turns, { id: turnId }, { cue: { ...cue, sees: text.trim() } });
+}
+
+/**
+ * The story's own passages rewritten, as part of the change: each column, the openings offered
+ * (kept together on their scene) and the cues. Answers with how many of the story's rows it
+ * changed. Only breading_ground calls this.
+ */
+export async function rewritePassages(tx: Tx, change: Change, words: NewWords[], cast: Cast): Promise<number> {
+  let rows = 0;
+  const openings = new Map<string, NewWords[]>();
+  for (const each of words) {
+    const spot = each.passage.spot;
+    if (spot.kind === 'story') {
+      await rewriteColumn(tx, change, each.passage, each.text, cast);
+      rows += 1;
+    } else if (spot.kind === 'cue') {
+      await rewriteCue(tx, change, spot.turnId, each.text);
+      rows += 1;
+    } else if (spot.kind === 'opening') {
+      const list = openings.get(spot.sceneId) ?? [];
+      list.push(each);
+      openings.set(spot.sceneId, list);
+    }
+  }
+  for (const [sceneId, list] of openings) {
+    await rewriteOpenings(tx, change, sceneId, list);
+    rows += 1;
+  }
+  return rows;
 }

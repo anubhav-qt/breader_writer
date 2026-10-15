@@ -4,18 +4,23 @@ import { changeStory, fetchStory } from '../../data/story';
 import { failureText } from '../../lib/api';
 
 /*
- * The story mid play as the play page holds it, for the Story panel and the sheets it opens: the
- * story as the server last said, the sheet open over the page, and a change on its way. The page
- * holds it rather than the panel, so closing the panel doesn't stop a change, and the quiet lines
- * in the play's page can open a sheet too.
+ * The story mid play as the play page holds it, for the Story and Notes panels and the sheets they
+ * open: the story as the server last said, the sheet open over the page, and a change on its way.
+ * The page holds it rather than a panel, so closing a panel doesn't stop a change, and the quiet
+ * lines in the play's page can open a sheet too.
  */
 
-/** A sheet open over the page: someone's, someone new's, the line between two, or what a rewrite changed. */
+/**
+ * A sheet open over the page: someone's, someone new's, the line between two, what a rewrite
+ * changed, a page of the reference, or a new page.
+ */
 export type Opened =
   | { kind: 'person'; id: string }
   | { kind: 'new' }
   | { kind: 'line'; a: string; b: string }
-  | { kind: 'rewrite'; change: number };
+  | { kind: 'rewrite'; change: number }
+  | { kind: 'page'; id: string }
+  | { kind: 'newPage' };
 
 /** A change on its way: once Procreator is rewriting what was played, how many parts are done. */
 export interface Saving {

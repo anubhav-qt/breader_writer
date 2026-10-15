@@ -19,6 +19,7 @@ const WRITES: Record<string, string[]> = {
   'story/relationships.ts': ['shiftRelationship', 'shiftOnce'],
   'story/cast.ts': ['joinCast', 'seatInCast'],
   'story/sheets.ts': ['changeSheet', 'addPerson', 'leaveCast', 'removePerson', 'changeLine', 'untie', 'changeWorld', 'changeBook'],
+  'story/notes.ts': ['savePage', 'removePage', 'saveNote', 'dropNote'],
   'story/scenes.ts': [
     'startScene',
     'prepareScene',
@@ -33,7 +34,7 @@ const WRITES: Record<string, string[]> = {
   ],
   'story/session.ts': ['cutSession'],
   'story/actors.ts': ['cutActors'],
-  'story/passages.ts': ['rewritePassage'],
+  'story/passages.ts': ['rewritePassages'],
 };
 
 function sourceFiles(dir: string): string[] {

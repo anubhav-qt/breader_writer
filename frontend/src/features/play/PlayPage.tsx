@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence } from 'motion/react';
 import type { Mark, Opening, Person, Play, PlayTurn, SceneHead } from '@writer/shared/play';
-import { IconBack, IconClose, IconPeople, IconUndo } from '../../components/icons';
+import { IconBack, IconClose, IconNotes, IconPeople, IconUndo } from '../../components/icons';
 import { useMedia } from '../../lib/useMedia';
 import { ModelPicker } from '../models/ModelPicker';
+import { NotesPanel } from '../story/NotesPanel';
 import { StoryPanel } from '../story/StoryPanel';
 import { SavingLine, StorySheets, passagesText } from '../story/StorySheets';
 import { useStory, type StoryState } from '../story/useStory';
@@ -29,8 +30,11 @@ interface Props {
 /** How near the end the owner has to be for the page to keep to the end as words come in. */
 const NEAR_END = 120;
 
-/** Wide enough for the Story panel to sit beside the play instead of over it. */
+/** Wide enough for the Story and Notes panels to sit beside the play instead of over it. */
 const WIDE = '(min-width: 1100px)';
+
+/** The panel open beside the play, if one is: the Story panel or the Notes panel, one at a time. */
+type PanelName = 'story' | 'notes';
 
 const BLANK_DRAFT: Draft = { text: '', voice: 'character' };
 
@@ -50,13 +54,13 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
   refreshPlay.current = state.refresh;
   const [draft, setDraft] = useState<Draft>(BLANK_DRAFT);
   const [playingCue, setPlayingCue] = useState(false);
-  const [storyOpen, setStoryOpen] = useState(false);
+  const [panel, setPanel] = useState<PanelName | null>(null);
   const wide = useMedia(WIDE);
   const play = state.play;
   const writing = state.pending !== null || state.asking !== null;
 
-  // The story is read again as the panel or a sheet opens, and whenever the play changed.
-  const showing = storyOpen || story.opened !== null;
+  // The story is read again as a panel or a sheet opens, and whenever the play changed.
+  const showing = panel !== null || story.opened !== null;
   useEffect(() => {
     if (showing) {
       void story.reload();
@@ -81,6 +85,15 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
   useEffect(() => {
     setPlayingCue(false);
   }, [cueId]);
+
+  /** Opens a panel, or closes it when it's the one open. */
+  const togglePanel = (name: PanelName) => {
+    if (panel === name) {
+      setPanel(null);
+    } else {
+      setPanel(name);
+    }
+  };
 
   const putBack = (words: string, voice: Draft['voice']) => {
     setDraft((now) => ({ text: withWordsBack(words, now.text), voice }));
@@ -155,10 +168,19 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
             type="button"
             className="btn btn-ghost play-tool"
             aria-label="Story"
-            aria-expanded={storyOpen}
-            onClick={() => setStoryOpen(!storyOpen)}
+            aria-expanded={panel === 'story'}
+            onClick={() => togglePanel('story')}
           >
             <IconPeople /> <span className="play-tool-label">Story</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost play-tool"
+            aria-label="Notes"
+            aria-expanded={panel === 'notes'}
+            onClick={() => togglePanel('notes')}
+          >
+            <IconNotes /> <span className="play-tool-label">Notes</span>
           </button>
           <ModelPicker owner={owner} />
         </div>
@@ -191,8 +213,11 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
       </footer>
 
       <AnimatePresence>
-        {storyOpen && (
-          <StoryPanel key={wide ? 'panel' : 'sheet'} state={story} wide={wide} held={writing} onClose={() => setStoryOpen(false)} />
+        {panel === 'story' && (
+          <StoryPanel key={wide ? 'story panel' : 'story sheet'} state={story} wide={wide} held={writing} onClose={() => setPanel(null)} />
+        )}
+        {panel === 'notes' && (
+          <NotesPanel key={wide ? 'notes panel' : 'notes sheet'} state={story} wide={wide} held={writing} onClose={() => setPanel(null)} />
         )}
       </AnimatePresence>
       <StorySheets state={story} bookId={bookId} held={writing} />
@@ -219,7 +244,7 @@ function canUndo(state: PlayState): boolean {
 interface FootProps {
   state: PlayState;
   story: StoryState;
-  /** Whether the Story panel or a sheet is open, and says how a change stands itself. */
+  /** Whether a panel or a sheet is open, and says how a change stands itself. */
   showing: boolean;
   onHint: (move: string) => void;
 }

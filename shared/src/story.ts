@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BookSetup, Character, Darkness, Id, Length, Pov, Relationship, TITLE_LIMIT, World } from './book.ts';
+import { BookSetup, Character, Darkness, Id, Length, LONG_LIMIT, Pov, Relationship, SHORT_LIMIT, TITLE_LIMIT, World } from './book.ts';
 
 /*
  * The story mid play, as the Story panel shows it and changes it (step 6). The owner can change
@@ -8,6 +8,10 @@ import { BookSetup, Character, Darkness, Id, Length, Pov, Relationship, TITLE_LI
  * change but a rename, a title or a length asks how far back it reaches (see CLAUDE.md, "A change
  * can reach back to the start"). One that reaches back is rewritten into what was played at once,
  * and listed after (the owner's pick, 2026-10-11).
+ *
+ * The Notes panel changes the rest the same way: the reference's pages and Procreator's memory.
+ * A page asks how far back it reaches too, unless it says where the story is going (Plan,
+ * Threads); memory is Procreator's notes on the work, not the story, so it always saves plainly.
  */
 
 /**
@@ -28,6 +32,65 @@ export const BookChoices = z.object({
 });
 export type BookChoices = z.infer<typeof BookChoices>;
 
+/**
+ * The kinds of page in the reference. A character's goes by the person it's about; the owner makes
+ * and changes any other kind in the Notes panel.
+ */
+export const PageKind = z.enum(['character', 'place', 'group', 'thing', 'lore', 'story']);
+export type PageKind = z.infer<typeof PageKind>;
+
+/** The story's own pages, by title: where it's going, what it set up, and what happened when. */
+export const PLAN = 'Plan';
+export const THREADS = 'Threads';
+export const TIMELINE = 'Timeline';
+
+/**
+ * The most characters a page the owner saves holds. Procreator's pages have no limit of their own;
+ * this only keeps an edit inside what a request can carry (the server takes 1 MB).
+ */
+export const PAGE_LIMIT = 200_000;
+
+/** A page of the reference as the owner reads and edits it, people in the cast as links, [[Name]]. */
+export const ReferencePage = z.object({
+  id: z.uuid(),
+  kind: PageKind,
+  /** On a character's page, the person it's about. */
+  characterId: Id.nullable(),
+  /** What it's called: on a character's page, their name. */
+  title: z.string(),
+  /** One line for the index: what it holds. */
+  about: z.string(),
+  body: z.string(),
+});
+export type ReferencePage = z.infer<typeof ReferencePage>;
+
+/** A note in Procreator's memory, as the owner reads and edits it. */
+export const MemoryNote = z.object({ id: z.number().int(), text: z.string() });
+export type MemoryNote = z.infer<typeof MemoryNote>;
+
+/**
+ * A page as the owner saves it: one of the reference changed (its id), or a new one (no id). A
+ * character's page goes by the person it's about, and keeps their name as its title.
+ */
+export const PageDraft = z.object({
+  id: z.uuid().nullable(),
+  characterId: Id.nullable(),
+  kind: PageKind,
+  title: z.string().trim().max(TITLE_LIMIT),
+  about: z.string().trim().max(SHORT_LIMIT),
+  body: z.string().trim().min(1, 'A page needs something on it.').max(PAGE_LIMIT),
+});
+export type PageDraft = z.infer<typeof PageDraft>;
+
+/** Whether a page says where the story is going (Plan, Threads), which the owner is asked before reading. */
+export function isAhead(page: { kind: string; characterId: string | null; title: string }): boolean {
+  if (page.kind !== 'story' || page.characterId !== null) {
+    return false;
+  }
+  const title = page.title.trim().toLowerCase();
+  return title === PLAN.toLowerCase() || title === THREADS.toLowerCase();
+}
+
 /** One change the owner makes mid story. */
 export const StoryEdit = z.discriminatedUnion('kind', [
   /** Someone's sheet, as it stands after the change. */
@@ -42,6 +105,14 @@ export const StoryEdit = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('untie'), a: Id, b: Id }),
   /** The book's own choices and its world. */
   z.object({ kind: z.literal('book'), book: BookChoices }),
+  /** A page of the reference, made or changed. */
+  z.object({ kind: z.literal('page'), page: PageDraft }),
+  /** A page taken out of the reference. */
+  z.object({ kind: z.literal('unpage'), id: z.uuid() }),
+  /** A note in Procreator's memory, new (no id) or changed. */
+  z.object({ kind: z.literal('note'), id: z.number().int().nullable(), text: z.string().trim().min(1, 'The note is empty.').max(LONG_LIMIT) }),
+  /** A note taken out of Procreator's memory. */
+  z.object({ kind: z.literal('forget'), id: z.number().int() }),
 ]);
 export type StoryEdit = z.infer<typeof StoryEdit>;
 
@@ -55,6 +126,10 @@ export const StoryView = z.object({
   setup: BookSetup,
   /** Procreator's page about each person, by id, as the owner reads it. */
   pages: z.record(z.string(), z.string()),
+  /** The reference, every page, characters' included, as the Notes panel reads and edits it. */
+  reference: z.array(ReferencePage),
+  /** Procreator's memory, oldest first. */
+  memory: z.array(MemoryNote),
   /** Whether anything has been played yet: before then, a change has no past to reach back into. */
   played: z.boolean(),
 });

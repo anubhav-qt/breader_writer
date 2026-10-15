@@ -1,10 +1,11 @@
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, gt } from 'drizzle-orm';
 import type { Api, Model } from '@writer/pi-ai';
 import { isAhead, type Reach, type StoryEdit } from '@writer/shared/story';
 import { undashed } from './ai/dashes.ts';
 import type { Db, Tx } from './db/client.ts';
-import { books } from './db/schema.ts';
+import { books, changes } from './db/schema.ts';
 import { castByName, castOf, joinCast as castJoin, standingOf, type CharacterRow, type Newcomer } from './story/cast.ts';
+import { keepChapter, recountChapters, type Chapter, type Written as WrittenChapter } from './story/chapters.ts';
 import { standingAt, startChange, StoryError, takeBack, type Change, type Writer } from './story/changes.ts';
 import { forget as forgetNote, remember as rememberNote, type Note } from './story/memory.ts';
 import { editPage as pageEdit, writePage as pageWrite, type PageEdit, type PageWrite, type Written } from './story/pages.ts';
@@ -219,6 +220,12 @@ export async function endScene(tx: Tx, writer: Writer, scene: Scene, next: Frame
   return prepareScene(tx, change, keptFrame(writer, next));
 }
 
+/** The scene being played ends, and with it the story: no scene waits after it. */
+export async function endStory(tx: Tx, writer: Writer, scene: Scene): Promise<Scene> {
+  const change = await startChange(tx, { ...writer, what: `Ended the story with scene ${scene.number}` });
+  return sceneEnd(tx, change, await sceneNow(tx, scene.id));
+}
+
 /** An ended scene's summary, from its wrap-up. A scene summed up already stays as it is. */
 export async function summarize(tx: Tx, writer: Writer, scene: Scene, summary: string): Promise<Scene> {
   const current = await lockedScene(tx, scene.id);
@@ -227,6 +234,45 @@ export async function summarize(tx: Tx, writer: Writer, scene: Scene, summary: s
   }
   const change = await startChange(tx, { ...writer, what: `Wrapped up scene ${scene.number}` });
   return sceneSummarize(tx, change, current, kept(writer, summary));
+}
+
+// The book.
+
+/** The newest change to a book's story, by id: where the scribe starts from, to tell whether a rewrite came after. */
+export async function newestChange(db: Db | Tx, bookId: string): Promise<number> {
+  const [newest] = await db
+    .select({ id: changes.id })
+    .from(changes)
+    .where(eq(changes.bookId, bookId))
+    .orderBy(desc(changes.id))
+    .limit(1);
+  return newest?.id ?? 0;
+}
+
+/** Whether a change of the owner's reached back into the story after the given one: what was read since is out of date. */
+async function rewroteSince(tx: Tx, bookId: string, since: number): Promise<boolean> {
+  const [later] = await tx
+    .select({ id: changes.id })
+    .from(changes)
+    .where(and(eq(changes.bookId, bookId), gt(changes.id, since), eq(changes.why, REWROTE)))
+    .limit(1);
+  return later !== undefined;
+}
+
+/**
+ * A scene written into the book as a chapter, by Procreator, tagged at the scene's last turn. It's
+ * read from the story as it stood at `since`: if a change of the owner's has rewritten the past
+ * since, the chapter is out of date, nothing is kept, and the answer is null, so it's written again.
+ */
+export async function writeChapter(db: Db, writer: Writer, scene: Scene, written: WrittenChapter, since: number): Promise<Chapter | null> {
+  return db.transaction(async (tx) => {
+    if (await rewroteSince(tx, scene.bookId, since)) {
+      return null;
+    }
+    const change = await startChange(tx, { ...writer, what: `Wrote chapter ${scene.number}` });
+    const clean: WrittenChapter = { title: kept(writer, written.title), body: kept(writer, written.body) };
+    return keepChapter(tx, change, scene, clean);
+  });
 }
 
 // The cast.
@@ -604,8 +650,13 @@ export async function ownerEdit(db: Db, bookId: string, edit: StoryEdit, reach: 
     let rewrote: Rewrote = { change: null, count: 0 };
     if (own.length > 0) {
       const rewriting = await startChange(tx, { bookId, turnId, by: 'owner', what, why: REWROTE });
-      const count = await rewritePassages(tx, rewriting, own, cast);
-      rewrote = { change: rewriting.id, count };
+      const kept = await rewritePassages(tx, rewriting, own, cast);
+      rewrote = { change: rewriting.id, count: kept.rows };
+      if (kept.chapters.length > 0) {
+        // Apart from the rewrite, so the passages it lists are only the words it changed.
+        const counting = await startChange(tx, { bookId, turnId, by: 'owner', what: 'Counted the book’s words again' });
+        await recountChapters(tx, counting, kept.chapters);
+      }
     }
     await restartCopies(tx, bookId, rewrite.model, copiesOf(rewrite.passages));
     if (!reaching.always) {

@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence } from 'motion/react';
 import type { Mark, Opening, Person, Play, PlayTurn, SceneHead } from '@writer/shared/play';
-import { IconBack, IconClose, IconNotes, IconPeople, IconUndo } from '../../components/icons';
+import { IconBack, IconBook, IconClose, IconNotes, IconPeople, IconUndo } from '../../components/icons';
+import { chaptersSeen } from '../../data/book';
 import { useMedia } from '../../lib/useMedia';
 import { ModelPicker } from '../models/ModelPicker';
 import { NotesPanel } from '../story/NotesPanel';
@@ -25,6 +26,8 @@ interface Props {
   /** Whether the account is the owner, for the model picker's AI accounts. */
   owner: boolean;
   onClose: () => void;
+  /** Opens the book as it's written. */
+  onBook: () => void;
 }
 
 /** How near the end the owner has to be for the page to keep to the end as words come in. */
@@ -46,7 +49,7 @@ function withWordsBack(words: string, box: string): string {
   return `${words}\n\n${box}`;
 }
 
-export function PlayPage({ bookId, owner, onClose }: Props) {
+export function PlayPage({ bookId, owner, onClose, onBook }: Props) {
   // The story's changes and the play's moves wait for each other: one exchange at a time in a book.
   const refreshPlay = useRef<() => Promise<void>>(async () => {});
   const story = useStory(bookId, () => void refreshPlay.current());
@@ -147,6 +150,16 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
     title = play.title;
   }
 
+  // A chapter the owner hasn't seen in the book yet: a quiet mark on Book.
+  let newChapter = false;
+  if (play && play.chapters > chaptersSeen(bookId)) {
+    newChapter = true;
+  }
+  let bookLabel = 'Book';
+  if (newChapter) {
+    bookLabel = 'Book, a new chapter';
+  }
+
   return (
     <div className="play">
       <header className="play-bar">
@@ -182,11 +195,15 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
           >
             <IconNotes /> <span className="play-tool-label">Notes</span>
           </button>
+          <button type="button" className="btn btn-ghost play-tool play-book" aria-label={bookLabel} onClick={onBook}>
+            <IconBook /> <span className="play-tool-label">Book</span>
+            {newChapter && <span className="play-new" aria-hidden="true" />}
+          </button>
           <ModelPicker owner={owner} />
         </div>
       </header>
 
-      <PageBody state={state} onMark={openMark} />
+      <PageBody state={state} onMark={openMark} onBook={onBook} />
 
       <footer className="play-foot">
         <div className="play-foot-inner">
@@ -229,6 +246,10 @@ export function PlayPage({ bookId, owner, onClose }: Props) {
 function canUndo(state: PlayState): boolean {
   const play = state.play;
   if (!play || state.busy) {
+    return false;
+  }
+  // Once the story is finished, its last scene is in the book, and settled.
+  if (play.stage === 'finished') {
     return false;
   }
   const newest = newestOf(play.turns);
@@ -295,7 +316,7 @@ function Foot({ state, story, showing, onHint }: FootProps) {
 }
 
 /** The scrolling page: the scene's heading and its turns, and what Procreator is writing now. */
-function PageBody({ state, onMark }: { state: PlayState; onMark: (mark: Mark) => void }) {
+function PageBody({ state, onMark, onBook }: { state: PlayState; onMark: (mark: Mark) => void; onBook: () => void }) {
   const scrollRef = useRef<HTMLElement>(null);
   const nearEnd = useRef(true);
   const pending = state.pending;
@@ -340,7 +361,7 @@ function PageBody({ state, onMark }: { state: PlayState; onMark: (mark: Mark) =>
   if (state.loaded.state === 'failed') {
     content = <p className="play-error play-failed">{state.loaded.message}</p>;
   } else if (play) {
-    content = <ScenePage play={play} state={state} onMark={onMark} />;
+    content = <ScenePage play={play} state={state} onMark={onMark} onBook={onBook} />;
   }
 
   return (
@@ -351,7 +372,7 @@ function PageBody({ state, onMark }: { state: PlayState; onMark: (mark: Mark) =>
 }
 
 /** The scene on the page: its heading, its turns, and what's under them as the play stands. */
-function ScenePage({ play, state, onMark }: { play: Play; state: PlayState; onMark: (mark: Mark) => void }) {
+function ScenePage({ play, state, onMark, onBook }: { play: Play; state: PlayState; onMark: (mark: Mark) => void; onBook: () => void }) {
   const pending = state.pending;
 
   // Going on: the page starts fresh under the next scene's heading.
@@ -391,8 +412,12 @@ function ScenePage({ play, state, onMark }: { play: Play; state: PlayState; onMa
     under = <OpeningsView openings={play.openings} state={state} />;
   } else if (play.stage === 'opening') {
     under = <NotOpened play={play} state={state} />;
-  } else if (play.stage === 'ended') {
+  } else if (play.stage === 'ended' && play.next) {
     under = <SceneEnd play={play} state={state} />;
+  } else if (play.stage === 'ended') {
+    under = <StoryEnd state={state} />;
+  } else if (play.stage === 'finished') {
+    under = <BookDone onBook={onBook} />;
   }
 
   let canAgain = false;
@@ -683,6 +708,34 @@ function SceneEnd({ play, state }: { play: Play; state: PlayState }) {
     <div className="play-end">
       <p className="play-quiet">End of Scene {number}. It’s going into the book.</p>
       {on}
+    </div>
+  );
+}
+
+/**
+ * The story has ended (Procreator ended it with its last scene). Until the owner finishes the book,
+ * the ending can still be taken back; finishing it puts the last scene into the book (our call,
+ * 2026-10-15).
+ */
+function StoryEnd({ state }: { state: PlayState }) {
+  return (
+    <div className="play-end">
+      <p className="play-quiet">The end. Undo or another reply still change it, until you finish the book.</p>
+      <button type="button" className="btn btn-primary play-on" disabled={state.busy} onClick={() => void state.finish()}>
+        Finish the book
+      </button>
+    </div>
+  );
+}
+
+/** The story is over, and its last scene goes into the book like any other. */
+function BookDone({ onBook }: { onBook: () => void }) {
+  return (
+    <div className="play-end">
+      <p className="play-quiet">The end.</p>
+      <button type="button" className="btn btn-primary play-on" onClick={onBook}>
+        Read the book
+      </button>
     </div>
   );
 }

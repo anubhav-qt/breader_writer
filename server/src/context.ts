@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import type { Catalog } from './ai/catalog.ts';
+import type { Scribe } from './book/scribe.ts';
 import type { BreaderDb, Db } from './db/client.ts';
 import type { Env } from './env.ts';
 import type { Login } from './lib/login.ts';
@@ -13,6 +14,8 @@ export interface Deps {
   breader: BreaderDb;
   /** The models the shared proxy serves, or null where there's no proxy and the AI is offline. */
   catalog: Catalog | null;
+  /** Who writes the book in the background as scenes are wrapped up, or null for none (tests). */
+  scribe: Scribe | null;
 }
 
 export type AppEnv = {

@@ -39,6 +39,7 @@ function writeParam(name: string, value: string, fallback: string) {
 const NewBook = lazy(() => import('./features/setup/NewBook').then((m) => ({ default: m.NewBook })));
 const EditSetup = lazy(() => import('./features/setup/EditSetup').then((m) => ({ default: m.EditSetup })));
 const PlayPage = lazy(() => import('./features/play/PlayPage').then((m) => ({ default: m.PlayPage })));
+const BookPage = lazy(() => import('./features/book/BookPage').then((m) => ({ default: m.BookPage })));
 
 /** What Google adds to the address when it sends the owner back. */
 const RETURN_PARAMS = ['login', 'error'];
@@ -196,7 +197,11 @@ export default function App() {
     const given = (books ?? []).map((b) => b.color);
     page = <NewBook color={pickColor(given)} onMade={onMade} onClose={toLibrary} />;
   } else if (route.page === 'play' && canWrite) {
-    page = <PlayPage key={route.bookId} bookId={route.bookId} owner={account.me?.owner === true} onClose={toLibrary} />;
+    const bookId = route.bookId;
+    page = <PlayPage key={bookId} bookId={bookId} owner={account.me?.owner === true} onClose={toLibrary} onBook={() => go({ page: 'read', bookId })} />;
+  } else if (route.page === 'read' && canWrite) {
+    const bookId = route.bookId;
+    page = <BookPage key={bookId} bookId={bookId} onBack={() => go({ page: 'play', bookId })} />;
   } else if (route.page === 'setup' && canWrite) {
     page = <EditSetup key={route.bookId} bookId={route.bookId} onSaved={onSaved} onClose={toLibrary} />;
   } else {

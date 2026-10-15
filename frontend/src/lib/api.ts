@@ -155,6 +155,11 @@ function client(base: Base) {
 export const writer = client('writer');
 export const breader = client('breader');
 
+/** The address of something on the writer's API, for a link the browser follows itself (a download). */
+export function writerUrl(path: string): string {
+  return BASES.writer + path;
+}
+
 /** What to tell the owner when a request failed: the server's own words, or that it's offline. */
 export function failureText(e: unknown): string {
   if (e instanceof ApiError || e instanceof OfflineError) {

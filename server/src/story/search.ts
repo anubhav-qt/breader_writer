@@ -1,15 +1,15 @@
 import { and, asc, eq, or, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { Db, Tx } from '../db/client.ts';
-import { scenes, turns } from '../db/schema.ts';
+import { chapters, scenes, turns } from '../db/schema.ts';
 import { castOf, namesOf } from './cast.ts';
 import { StoryError } from './changes.ts';
 import { linked } from './mentions.ts';
 import { pagesOf } from './pages.ts';
 
 /*
- * Recall: exact words in the reference, the scene summaries and every turn that still stands, for
- * when a summary isn't enough. The words match as given, in any case and however the text breaks
+ * Recall: exact words in the reference, the scene summaries, every turn that still stands and the
+ * book as it's written, for when a summary isn't enough. The words match as given, in any case and however the text breaks
  * its lines. Pages are searched as Procreator reads them, people as [[Name]]. Every match can be
  * reached: a search shows a dozen at a time, and the next dozen are a search away, since a common
  * name could otherwise pour hundreds into the session.
@@ -146,9 +146,25 @@ async function inTurns(db: Db | Tx, bookId: string, words: string): Promise<Matc
   return matches;
 }
 
+async function inChapters(db: Db | Tx, bookId: string, words: string): Promise<Match[]> {
+  const rows = await db
+    .select()
+    .from(chapters)
+    .where(and(eq(chapters.bookId, bookId), or(holds(chapters.title, words), holds(chapters.body, words))))
+    .orderBy(asc(chapters.number));
+  const matches: Match[] = [];
+  for (const chapter of rows) {
+    const text = excerpt(inParagraphs([chapter.title, chapter.body]), words);
+    if (text) {
+      matches.push({ where: `Chapter ${chapter.number} of the book`, text });
+    }
+  }
+  return matches;
+}
+
 /**
- * Where the words are: pages first, then summaries and turns in story order. Shows a dozen
- * matches, starting from match number `from`.
+ * Where the words are: pages first, then summaries, turns and the book in story order. Shows a
+ * dozen matches, starting from match number `from`.
  */
 export async function searchStory(db: Db | Tx, bookId: string, words: string, from = 1): Promise<Recall> {
   const clean = cleanWords(words);
@@ -156,6 +172,7 @@ export async function searchStory(db: Db | Tx, bookId: string, words: string, fr
     ...(await inPages(db, bookId, clean)),
     ...(await inSummaries(db, bookId, clean)),
     ...(await inTurns(db, bookId, clean)),
+    ...(await inChapters(db, bookId, clean)),
   ];
   const start = from - 1;
   const matches = found.slice(start, start + SHOWN);

@@ -18,6 +18,7 @@ describe('the writer schema', () => {
       'books',
       'calls',
       'changes',
+      'chapters',
       'characters',
       'migrations',
       'notes',

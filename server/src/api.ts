@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Catalog } from './ai/catalog.ts';
 import { proxyFrom } from './ai/proxy.ts';
+import { backgroundScribe } from './book/scribe.ts';
 import { makeApp } from './app.ts';
 import { breaderDb, makePool, writerDb } from './db/client.ts';
 import { loadEnv } from './env.ts';
@@ -27,7 +28,7 @@ if (proxy) {
   log.warn('CLIPROXY_URL is unset, so the AI is offline');
 }
 
-const deps = { env, db: writerDb(pool), pool, breader: breaderDb(breaderPool), catalog };
+const deps = { env, db: writerDb(pool), pool, breader: breaderDb(breaderPool), catalog, scribe: backgroundScribe() };
 const server = serve({ fetch: makeApp(deps).fetch, port: env.PORT, hostname: '0.0.0.0' }, (info) => {
   log.info({ port: info.port, release: env.RELEASE }, 'writer api listening');
 });

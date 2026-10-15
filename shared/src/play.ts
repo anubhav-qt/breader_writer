@@ -62,9 +62,11 @@ export type PlayTurn = z.infer<typeof PlayTurn>;
  * - opening: a scene has begun and is waiting for Procreator to open it.
  * - playing: a scene is being played.
  * - cue: someone in the cast is about to act, and the owner says who plays them this time.
- * - ended: a scene has ended, and the next waits for the owner to go on.
+ * - ended: a scene has ended, and the next waits for the owner to go on; or with no next, the
+ *   story has ended, and waits for the owner to finish the book.
+ * - finished: the story has ended and its last scene is going into the book.
  */
-export const Stage = z.enum(['start', 'openings', 'opening', 'playing', 'cue', 'ended']);
+export const Stage = z.enum(['start', 'openings', 'opening', 'playing', 'cue', 'ended', 'finished']);
 export type Stage = z.infer<typeof Stage>;
 
 /** The play as the page shows it: the scene on the page and its turns. */
@@ -81,6 +83,8 @@ export const Play = z.object({
   cue: Person.nullable(),
   /** Once a scene has ended, the one waiting for the owner to go on to it. */
   next: SceneHead.nullable(),
+  /** How many chapters the book has: the play shows a quiet mark when a new one lands. */
+  chapters: z.number().int(),
 });
 export type Play = z.infer<typeof Play>;
 

@@ -1,7 +1,7 @@
 import type { AgentTool } from '@writer/pi-agent';
 import { Type } from '@writer/pi-ai';
 import { undashed } from '../ai/dashes.ts';
-import { endScene, joinCast, setScene, type Offer } from '../breading_ground.ts';
+import { endScene, endStory, joinCast, setScene, type Offer } from '../breading_ground.ts';
 import { castOf, standingByName } from '../story/cast.ts';
 import { StoryError } from '../story/changes.ts';
 import type { Cast } from '../story/mentions.ts';
@@ -11,7 +11,7 @@ import type { Procreator } from './run.ts';
 import { bareName, guarded, memoryTools, personNamed, writerOf, type Result, type ToolContext } from './tools.ts';
 
 /*
- * Procreator's play tools: set_scene, join_cast, cue, send_back and end_scene while it plays, and
+ * Procreator's play tools: set_scene, join_cast, cue, send_back, end_scene and end_story while it plays, and
  * offer_openings and offer_moves when the owner asks for openings or hints. They're declared in
  * every call of a session beside the memory tools, the same each time, or the cache misses; each
  * turns down a call made outside its time, saying what to do instead.
@@ -21,6 +21,8 @@ import { bareName, guarded, memoryTools, personNamed, writerOf, type Result, typ
 export interface Outcome {
   /** The scene ended, and this one waits for the owner to go on to it. */
   ended: Scene | null;
+  /** The scene ended, and the story with it. */
+  storyEnded: boolean;
   /** The turn stopped here for the owner to say who plays someone about to act. */
   cued: Cue | null;
   /** The openings offered for the first scene. */
@@ -30,7 +32,7 @@ export interface Outcome {
 }
 
 export function noOutcome(): Outcome {
-  return { ended: null, cued: null, openings: null, moves: null };
+  return { ended: null, storyEnded: false, cued: null, openings: null, moves: null };
 }
 
 export interface PlayContext extends ToolContext {
@@ -46,9 +48,9 @@ export interface PlayContext extends ToolContext {
   onScene: (scene: Scene) => void;
 }
 
-/** Whether the run has stopped: the scene ended, or the owner is saying who plays someone. */
+/** Whether the run has stopped: the scene ended (or the story), or the owner is saying who plays someone. */
 export function stopped(outcome: Outcome): boolean {
-  return outcome.ended !== null || outcome.cued !== null;
+  return outcome.ended !== null || outcome.storyEnded || outcome.cued !== null;
 }
 
 /** Playing the story's tools work only while it's being played, and not once the turn has stopped. */
@@ -56,7 +58,7 @@ function mustPlay(context: PlayContext, tool: string) {
   if (context.mode !== 'play') {
     throw new StoryError(`${tool} is for playing the story. Do what was asked of you now.`);
   }
-  if (context.outcome.ended) {
+  if (context.outcome.ended || context.outcome.storyEnded) {
     throw new StoryError('This scene has ended. Write nothing more.');
   }
   if (context.outcome.cued) {
@@ -259,6 +261,27 @@ function endSceneTool(context: PlayContext): AgentTool<typeof EndScene> {
   };
 }
 
+const EndStory = Type.Object({});
+
+function endStoryTool(context: PlayContext): AgentTool<typeof EndStory> {
+  return {
+    name: 'end_story',
+    label: 'End the story',
+    description:
+      'Ends the story: the scene being played is its last, once its last moment is written. Use it when the story reaches its ending, as your brief says where it stands against its length, or when the owner asks for the end. The owner sees the end and finishes the book. It’s the last thing you do in a turn.',
+    parameters: EndStory,
+    execute: async () => {
+      const result = await guarded('end_story', async () => {
+        mustPlay(context, 'end_story');
+        await context.db.transaction((tx) => endStory(tx, writerOf(context), context.scene));
+        context.outcome.storyEnded = true;
+        return `The story has ended with scene ${context.scene.number}. The owner sees its end. Write nothing more.`;
+      });
+      return { ...result, terminate: true };
+    },
+  };
+}
+
 const Opening = Type.Object({
   opening: Type.String({ description: 'The opening as the owner reads it, in a line or two.' }),
   where: Where,
@@ -320,6 +343,7 @@ export function toolsFor(context: PlayContext): AgentTool[] {
     cueTool(context),
     sendBackTool(context),
     endSceneTool(context),
+    endStoryTool(context),
     offerOpeningsTool(context),
     offerMovesTool(context),
   ];

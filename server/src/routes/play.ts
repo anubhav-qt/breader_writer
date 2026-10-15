@@ -12,6 +12,7 @@ import {
   alone,
   another,
   askOpenings,
+  finishStory,
   goOn,
   hintsFor,
   letActorPlay,
@@ -25,7 +26,7 @@ import { headOf, playView } from '../play/view.ts';
 import { FoldError } from '../procreator/folds.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { StoryError } from '../story/changes.ts';
-import { failed, modelFor } from './ai.ts';
+import { failed, modelFor, writeTheBook } from './ai.ts';
 
 const notFound = () => new ApiError(404, 'not_found', 'There’s no such book here.');
 
@@ -83,7 +84,7 @@ export function playRoutes(deps: Deps) {
    * Streams a move's work: the scene's heading when it's set, Procreator's words as it writes them,
    * then the play as it stands, or why it couldn't go on.
    */
-  function streamed(bookId: string, stream: SSEStreamingApi, work: (watch: Watch) => Promise<void>) {
+  function streamed(userId: string, bookId: string, stream: SSEStreamingApi, work: (watch: Watch) => Promise<void>) {
     const watch: Watch = {
       onText: (delta) => {
         void send(stream, { type: 'text', delta });
@@ -98,6 +99,7 @@ export function playRoutes(deps: Deps) {
     return (async () => {
       try {
         await alone(bookId, () => work(watch));
+        await writeTheBook(deps, userId, bookId);
         await send(stream, { type: 'done', play: await playView(deps.db, bookId) });
       } catch (err) {
         const problem = problemOf(err);
@@ -116,7 +118,9 @@ export function playRoutes(deps: Deps) {
 
   /** The play as the page shows it. */
   r.get('/books/:id/play', async (c) => {
-    const bookId = await ownBookId(c.var.login.id, c.req.param('id'));
+    const userId = c.var.login.id;
+    const bookId = await ownBookId(userId, c.req.param('id'));
+    await writeTheBook(deps, userId, bookId);
     return c.json(await playView(deps.db, bookId));
   });
 
@@ -139,7 +143,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(bookId, stream, (watch) => openStory(ai, bookId, ask, watch)));
+    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => openStory(ai, bookId, ask, watch)));
   });
 
   /** The owner's move, or a note as the author. Streams play's events. */
@@ -148,7 +152,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(bookId, stream, (watch) => makeMove(ai, bookId, ask, watch)));
+    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => makeMove(ai, bookId, ask, watch)));
   });
 
   /** The owner goes on to the next scene. Streams play's events. */
@@ -157,7 +161,7 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(bookId, stream, (watch) => goOn(ai, bookId, going, watch)));
+    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => goOn(ai, bookId, going, watch)));
   });
 
   /** Another reply to the newest turn. Streams play's events. */
@@ -166,16 +170,24 @@ export function playRoutes(deps: Deps) {
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(bookId, stream, (watch) => another(ai, bookId, going, watch)));
+    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => another(ai, bookId, going, watch)));
   });
 
-  /** The one about to act is played by their actor this time. Streams play's events. */
+  /** The story has ended, and the owner finishes the book: its last scene is wrapped up. Streams play's events. */
+  r.post('/books/:id/play/finish', async (c) => {
+    const userId = c.var.login.id;
+    const bookId = await ownBookId(userId, c.req.param('id'));
+    const ai = await procreatorFor(userId, c.req.raw.signal);
+    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => finishStory(ai, bookId, watch)));
+  });
+
+    /** The one about to act is played by their actor this time. Streams play's events. */
   r.post('/books/:id/play/actor', async (c) => {
     const going = parse(Going, await readJson(c));
     const userId = c.var.login.id;
     const bookId = await ownBookId(userId, c.req.param('id'));
     const ai = await procreatorFor(userId, c.req.raw.signal);
-    return streamSSE(c, (stream) => streamed(bookId, stream, (watch) => letActorPlay(ai, bookId, going, watch)));
+    return streamSSE(c, (stream) => streamed(userId, bookId, stream, (watch) => letActorPlay(ai, bookId, going, watch)));
   });
 
   /** Takes the newest turn back. Answers with the play, and the owner's words for the box again (none for an actor's turn). */

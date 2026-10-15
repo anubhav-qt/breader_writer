@@ -1,0 +1,113 @@
+{#-
+  What the author is asked for a chapter (procreator/author.ts): the story as it stood when the
+  scene began (the brief's world, story so far, Procreator's notes, cast, relationships and the
+  scene's places), the chapter before it in full for the book's voice, then the scene as it was
+  played, turn by turn, and the task last, after the long context. Takes a ChapterAskView.
+-#}
+{% from "partials/page.njk" import person, page %}
+{% from "partials/scene.njk" import turns as playedTurns %}
+{% macro when(number) %}{% if number === null %}Before the story{% else %}Scene {{ number }}{% endif %}{% endmacro %}
+{% set b = brief %}
+{% if b.world.genre or b.world.tone or b.world.setting or b.world.rules or b.world.notes %}
+<world>
+{% if b.world.genre %}
+Genre: {{ b.world.genre }}
+{% endif %}
+{% if b.world.tone %}
+Tone: {{ b.world.tone }}
+{% endif %}
+{% if b.world.setting %}
+Setting: {{ b.world.setting }}
+{% endif %}
+{% if b.world.rules %}
+Rules: {{ b.world.rules }}
+{% endif %}
+{% if b.world.notes %}
+Notes: {{ b.world.notes }}
+{% endif %}
+</world>
+{% endif %}
+
+<story_so_far>
+{% for s in b.earlier %}
+<scene number="{{ s.number }}"{% if s.place %} where="{{ s.place }}"{% endif %}{% if s.time %} when="{{ s.time }}"{% endif %}>
+{% if s.summary %}
+{{ s.summary }}
+{% else %}
+Not summed up.
+{% endif %}
+</scene>
+{% else %}
+Nothing yet: this is the first chapter.
+{% endfor %}
+</story_so_far>
+{% if b.memory.length %}
+
+<your_notes>
+Your notes to yourself about the work, including what the owner likes:
+{% for note in b.memory %}
+- {{ note.text }}
+{% endfor %}
+</your_notes>
+{% endif %}
+
+<cast>
+{% for c in b.present %}
+{{ person(c) -}}
+{% endfor %}
+{% for c in b.others %}
+{% if c.line %}
+<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}{% if c.left %} status="has left the story"{% endif %}>{{ c.line }}</character>
+{% else %}
+<character name="{{ c.name }}"{% if c.protagonist %} played_by="the owner"{% endif %}{% if c.left %} status="has left the story"{% endif %}/>
+{% endif %}
+{% endfor %}
+</cast>
+{% if b.close.length %}
+
+<relationships>
+{% for r in b.close %}
+<relationship between="{{ r.a.name }} and {{ r.b.name }}">
+{% if r.bond %}
+Bond: {{ r.bond }}
+{% endif %}
+{% if r.a.sees %}
+How {{ r.a.name }} sees {{ r.b.name }}: {{ r.a.sees }}
+{% endif %}
+{% if r.a.hides %}
+What {{ r.a.name }} hides from {{ r.b.name }}: {{ r.a.hides }}
+{% endif %}
+{% if r.b.sees %}
+How {{ r.b.name }} sees {{ r.a.name }}: {{ r.b.sees }}
+{% endif %}
+{% if r.b.hides %}
+What {{ r.b.name }} hides from {{ r.a.name }}: {{ r.b.hides }}
+{% endif %}
+{% if r.history.length %}
+How they got here:
+{% for h in r.history %}
+- {{ when(h.scene) }}: {{ h.text }}
+{% endfor %}
+{% endif %}
+</relationship>
+{% endfor %}
+</relationships>
+{% endif %}
+{% for p in b.places %}
+
+{{ page(p) -}}
+{% endfor %}
+{% if previous %}
+
+<previous_chapter number="{{ previous.number }}" title="{{ previous.title }}">
+{{ previous.body }}
+</previous_chapter>
+{% endif %}
+
+<scene number="{{ number }}"{% if place %} where="{{ place }}"{% endif %}{% if time %} when="{{ time }}"{% endif %}>
+{{ playedTurns(turns) -}}
+</scene>
+
+<task>
+Based on everything above, write chapter {{ number }} of the book from scene {{ number }} as it was played: its title in <title> tags, then the chapter in <chapter> tags.
+</task>

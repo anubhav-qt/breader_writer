@@ -32,3 +32,23 @@ export async function modelFor(deps: Deps, userId: string): Promise<{ catalog: C
   }
   return { catalog, inUse };
 }
+
+/**
+ * Tells the scribe to write what's missing from the book, on the account's model: after play
+ * changed something, and as the play or the book opens, so a chapter that failed is tried again.
+ * Nothing happens while the AI is offline, or where there's no scribe.
+ */
+export async function writeTheBook(deps: Deps, userId: string, bookId: string) {
+  const scribe = deps.scribe;
+  if (!scribe) {
+    return;
+  }
+  try {
+    const { catalog, inUse } = await modelFor(deps, userId);
+    scribe.nudge({ db: deps.db, catalog, inUse, userId }, bookId);
+  } catch (err) {
+    if (!(err instanceof ApiError)) {
+      throw err;
+    }
+  }
+}

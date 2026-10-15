@@ -22,6 +22,9 @@
   text-overflow: ellipsis;
 }
 .play-actions { position: relative; flex: none; margin-left: auto; display: flex; align-items: center; gap: 4px; }
+/* A chapter landed in the book that the owner hasn't seen: a small dot in the book's corner. */
+.btn.play-book { position: relative; }
+.play-new { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
 
 /* The page. */
 .play-scroll { overflow-y: auto; overscroll-behavior: contain; }
@@ -136,4 +139,13 @@ button.chip.play-voice:hover:not(:disabled) { color: var(--ink); background: var
   .play-page { max-width: calc(100% - 32px); padding-top: 16px; font-size: 19px; }
   .play-head-where { font-size: 24px; }
   .play-foot { padding: 0 10px max(10px, env(safe-area-inset-bottom)); }
+}
+
+/* Narrow phones: the tools close up and the model's chip keeps to a short name, so the title keeps
+   some room, cut short (the owner's pick, 2026-10-07). */
+@media (max-width: 480px) {
+  .play-title { flex: 1 1 0; min-width: 56px; font-size: 26px; }
+  .play-actions { gap: 0; }
+  .btn.play-tool { width: 36px; }
+  .play-bar .pick-btn { max-width: 104px; padding-left: 8px; padding-right: 6px; }
 }

@@ -93,6 +93,7 @@ const TOOLS = [
   'cue',
   'send_back',
   'end_scene',
+  'end_story',
   'offer_openings',
   'offer_moves',
 ];

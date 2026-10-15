@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { Going, MoveAsk, OpenAsk } from '@writer/shared/play';
 import { ModelError } from '../ai/call.ts';
 import {
@@ -19,6 +19,7 @@ import { log } from '../log.ts';
 import { cueActor, tellActor, type Moment } from '../procreator/actor.ts';
 import { turnMessage } from '../procreator/brief.ts';
 import { askForOpenings, converse } from '../procreator/converse.ts';
+import { wrapUp } from '../procreator/folds.ts';
 import type { Procreator } from '../procreator/run.ts';
 import { render } from '../prompts/render.ts';
 import { castOf, standingOf, type CharacterRow } from '../story/cast.ts';
@@ -124,17 +125,29 @@ async function pendingCue(db: Db, scene: Scene): Promise<Cue | null> {
   return cueOf(newest);
 }
 
-/** The scene on the page: the one being played, or the one that just ended while the next waits. */
+/** The book's last scene, or null before the first is made. */
+async function lastScene(db: Db, bookId: string): Promise<Scene | null> {
+  const [last] = await db.select().from(scenes).where(eq(scenes.bookId, bookId)).orderBy(desc(scenes.number)).limit(1);
+  return last ?? null;
+}
+
+/**
+ * The scene on the page: the one being played, the one that just ended while the next waits, or
+ * the last, once the story has ended.
+ */
 async function sceneOnPage(db: Db, bookId: string): Promise<Scene | null> {
   const playing = await playingScene(db, bookId);
   if (playing) {
     return playing;
   }
   const waiting = await nextScene(db, bookId);
-  if (!waiting || waiting.number === 1) {
+  if (waiting && waiting.number === 1) {
     return null;
   }
-  return sceneNumbered(db, bookId, waiting.number - 1);
+  if (waiting) {
+    return sceneNumbered(db, bookId, waiting.number - 1);
+  }
+  return lastScene(db, bookId);
 }
 
 /** A turn to make: its voice, the owner's words, who it's played as, and the cue it answers, if any. */
@@ -339,11 +352,14 @@ export async function goOn(ai: Procreator, bookId: string, going: Going, watch: 
   await narrate(ai, scene, move, going, watch);
 }
 
-/** The newest turn of the scene on the page, and the scene. */
+/** The newest turn of the scene on the page, and the scene. A scene in the book is settled. */
 async function newestOnPage(db: Db, bookId: string): Promise<{ scene: Scene; turn: Turn }> {
   const scene = await sceneOnPage(db, bookId);
   if (!scene) {
     throw new PlayError('There’s nothing to take back.');
+  }
+  if (scene.status === 'ended' && scene.summary !== '') {
+    throw new PlayError(`Scene ${scene.number} is going into the book, so it’s settled.`);
   }
   const turn = await newestTurn(db, scene.id);
   if (!turn) {
@@ -378,6 +394,26 @@ export async function another(ai: Procreator, bookId: string, going: Going, watc
   }
   const move: Move = { voice: turn.voice as Voice, input, played: turn.played, cue };
   await narrate(ai, current, move, going, watch);
+}
+
+/**
+ * The story has ended, and the owner finishes the book: the last scene is wrapped up, so it can be
+ * written into the book. Until then its last move can be taken back, as a scene's can until the
+ * owner goes on from it.
+ */
+export async function finishStory(ai: Procreator, bookId: string, watch: Watch): Promise<void> {
+  if ((await playingScene(ai.db, bookId)) || (await nextScene(ai.db, bookId))) {
+    throw new PlayError('The story hasn’t ended.');
+  }
+  const last = await lastScene(ai.db, bookId);
+  if (!last || last.status !== 'ended') {
+    throw new PlayError('The story hasn’t ended.');
+  }
+  if (last.summary !== '') {
+    return;
+  }
+  watch.onFinishing(last.number);
+  await wrapUp(ai, last);
 }
 
 /**

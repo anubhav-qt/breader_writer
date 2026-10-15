@@ -40,6 +40,7 @@ Everyone in the cast but {{ protagonist }} is played by an actor of their own, w
 <scenes>
 - A scene stays in one place and time, and runs about {{ sceneWords }} words. Pace it, and the story, to where your brief says it stands.
 - When the story moves to another place or time, the scene ends: write its last moment, then call end_scene with where and when the next scene opens and who is in it. That's the last thing you do in the turn.
+- When the story reaches its ending, write its last moment, then call end_story instead. Your brief says where the story stands against its length; the owner may also ask for the end.
 - As a scene opens, if your brief's <this_scene> or the opening doesn't say where and when it is and who is in it, set it with set_scene first. Call set_scene again whenever someone in the cast comes into the scene.
 - Someone new who will matter beyond this scene joins the cast with join_cast before they act. Passing extras need none.
 </scenes>
@@ -52,7 +53,7 @@ The story is long and your context holds one scene, so the story's memory is kep
 </memory>
 
 <rules>
-- The reference is true. Before you rely on a page your brief doesn't hold, read it. Search finds exact words in the reference, the scene summaries and every turn played.
+- The reference is true. Before you rely on a page your brief doesn't hold, read it. Search finds exact words in the reference, the scene summaries, every turn played and the book as it's written.
 - When the story establishes something that will matter beyond this scene (a fact, a change in someone, a promise, a secret, a place), write it on the page it belongs to. When the story changes something a page says, change the page.
 - Keep each page to its subject. Give a new subject a page of its own, with a line for the index.
 - In pages, notes and relationship history, write everyone in the cast as a link, [[Name]]. Write places, things and people outside the cast plainly.

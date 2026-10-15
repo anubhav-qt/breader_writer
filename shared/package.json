@@ -11,7 +11,8 @@
     "./suggestions": "./src/suggestions.ts",
     "./chat": "./src/chat.ts",
     "./play": "./src/play.ts",
-    "./story": "./src/story.ts"
+    "./story": "./src/story.ts",
+    "./reading": "./src/reading.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

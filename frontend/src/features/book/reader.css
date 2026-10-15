@@ -1,0 +1,235 @@
+/*
+ * The book as it reads: breader's reader.css (features/reader/reader.css), cut to a book of text,
+ * with the writer's own few lines at the end.
+ */
+
+.rd {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--r-bg);
+  color: var(--r-fg);
+  overflow: hidden;
+  transition: background-color 250ms linear, color 250ms linear;
+  /* No double-tap zoom: quick taps turn pages. */
+  touch-action: manipulation;
+}
+/* Everything but the design switch: the page, and the controls layered over it. */
+.rd-body { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.rd-chrome { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.rd-chrome > * { pointer-events: auto; }
+.rd ::selection { background: var(--r-acc-soft); }
+
+/* Panel */
+.pnl { padding: 22px 20px 28px; }
+.pnl-h { font: var(--ui-w-strong) 13.5px/1 var(--ui); color: var(--r-mu); margin-bottom: 18px; }
+.p-title { font-family: var(--read); font-weight: 700; font-size: 32px; line-height: 0.98; text-wrap: balance; }
+.p-auth { font: var(--ui-w) 13px/1.3 var(--ui); color: var(--r-mu); margin-top: 8px; }
+.p-bar { height: 3px; border-radius: 2px; background: var(--r-line); margin-top: 16px; overflow: hidden; }
+.p-bar i { display: block; height: 100%; background: var(--r-acc); border-radius: inherit; transition: width 400ms ease; }
+.p-meta { display: flex; justify-content: space-between; margin-top: 8px; font: var(--ui-w) 12.5px/1 var(--ui); color: var(--r-mu); }
+.p-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; margin-top: 18px; }
+.p-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+.p-item:hover { background: var(--r-fill); }
+.p-item.is-link { color: inherit; text-decoration: none; }
+.p-item.is-link .p-item-t, .p-item.is-away .p-item-t { color: var(--r-mu); }
+.p-item-t { font-family: var(--read); font-size: 22px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.p-item-s { flex: none; font: var(--ui-w) 11.5px/1 var(--ui); color: var(--r-mu); display: flex; }
+.p-item-s svg { width: 15px; height: 15px; color: var(--r-acc); }
+.p-item.is-done .p-item-t { color: var(--r-mu); }
+.p-item.is-now { background: var(--r-acc-soft); }
+.p-item.is-now .p-item-s { color: var(--r-acc); }
+.p-empty, .p-note { margin: 6px 0 0; font: var(--ui-w) 12.5px/1.5 var(--ui); color: var(--r-mu); }
+.p-remove { margin-top: 20px; color: var(--r-mu); }
+
+/* The library's segmented control (components/segmented.css), in the page's colours. */
+.rd .ctl { margin-bottom: 18px; }
+.rd .clbl { font: var(--ui-w) 12px/1 var(--ui); color: var(--r-mu); margin-bottom: 9px; }
+.rd .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 3px; border-radius: 11px; background: var(--r-fill); }
+.rd .seg button {
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font: var(--ui-w) 13px/1 var(--ui);
+  color: var(--r-mu);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.rd .seg button:hover:not(:disabled, .is-muted) { color: var(--r-fg); }
+.rd .seg button.is-on { background: var(--r-bg); color: var(--r-fg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--r-line); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sws { display: flex; gap: 10px; }
+.sw {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--r-bg);
+  color: var(--r-fg);
+  font-family: var(--read);
+  font-weight: 700;
+  font-size: 21px;
+  box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.4);
+  transition: box-shadow 160ms ease;
+}
+.sw.t-auto { background: linear-gradient(135deg, #FFFFFF 50%, #000000 50%); }
+.sw.is-on { box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.4), 0 0 0 2px var(--r-bg), 0 0 0 4px var(--r-acc); }
+.tfs { display: grid; gap: 2px; padding: 3px; border-radius: 11px; background: var(--r-fill); }
+.tfs button {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 21px;
+  line-height: 1;
+  color: var(--r-fg);
+  transition: background-color 140ms ease;
+}
+.tfs button:hover { background: var(--r-bg); }
+.tfs button small { font: var(--ui-w) 11px/1 var(--ui); color: var(--r-mu); }
+.tfs button.is-on { background: var(--r-bg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--r-line); }
+.tfs button.is-on::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--r-acc); }
+.tfs button.is-on small { display: none; }
+.stp { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; padding: 3px; border-radius: 11px; background: var(--r-fill); }
+.stp button { height: 32px; border-radius: 8px; font: var(--ui-w-strong) 14px/1 var(--ui); transition: background-color 140ms ease; }
+.stp button:hover:not(:disabled) { background: var(--r-bg); }
+.stp button:disabled { opacity: 0.3; }
+.stp-v { text-align: center; font: var(--ui-w-strong) 15px/1 var(--ui); }
+.tgrow { display: flex; align-items: center; justify-content: space-between; }
+.tgrow .clbl { margin: 0; }
+.tg { position: relative; width: 44px; height: 26px; border-radius: 13px; background: var(--r-line); transition: background-color 160ms ease; }
+.tg::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 300ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.tg[aria-checked="true"] { background: var(--r-acc); }
+.tg[aria-checked="true"]::after { transform: translateX(18px); background: var(--r-bg); }
+
+/* Stage */
+.rd-stage { position: absolute; inset: 0; }
+
+/* Flow view */
+.fv { position: absolute; inset: 0; }
+.fv-rh, .fv-folio {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: var(--ui-w) 12.5px/1 var(--ui);
+  color: var(--r-mu);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 80px;
+  pointer-events: none;
+}
+.fv-rh { top: 32px; }
+.fv-folio { bottom: 30px; font-variant-numeric: tabular-nums; }
+/* Pages are turned by taps and swipes, and text size is a setting, so the page itself neither pans
+   nor zooms: a stray pinch would leave it sliding off both sides. PDFs can still be zoomed. */
+.fv.is-pages { touch-action: none; }
+.fv.is-scroll { touch-action: pan-y; }
+/* The window onto the strip of pages. */
+.fv.is-pages .fv-view {
+  position: absolute;
+  top: 76px;
+  bottom: 76px;
+  left: 50%;
+  width: var(--vw);
+  margin-left: calc(var(--vw) / -2);
+  overflow: hidden;
+}
+.fv.is-scroll .fv-view { position: absolute; inset: 0; overflow-y: auto; scrollbar-width: thin; }
+.fv-flow {
+  font-family: var(--rf);
+  font-size: var(--rs);
+  line-height: var(--rl);
+  overflow-wrap: break-word;
+}
+.fv.is-pages .fv-flow { height: 100%; column-width: var(--cw); column-gap: var(--gap); column-fill: auto; }
+.fv.is-scroll .fv-flow { width: var(--cw); max-width: calc(100% - 48px); margin: 0 auto; padding: 88px 0 24px; }
+@media (max-width: 639.98px) {
+  .fv.is-scroll .fv-flow { max-width: calc(100% - 24px); }
+}
+.fv.is-justified .fv-flow { text-align: justify; -webkit-hyphens: auto; hyphens: auto; }
+.fv-flow p { margin: 0; text-wrap: pretty; }
+.fv-flow h1, .fv-flow h2, .fv-flow h3, .fv-flow h4 { font-weight: 700; line-height: 1.05; margin: 1.4em 0 0.6em; break-after: avoid; text-wrap: balance; }
+.fv-flow h1 { font-size: 1.9em; }
+.fv-flow h2 { font-size: 1.6em; }
+.fv-flow h3 { font-size: 1.3em; }
+.fv-flow h4 { font-size: 1.1em; }
+.fv-flow > :first-child { margin-top: 0; }
+.fv-flow a { color: var(--r-acc); text-decoration: none; border-bottom: 1px solid var(--r-acc-soft); }
+.fv-flow blockquote { margin: 1em 0 1em 1.4em; color: var(--r-mu); }
+.fv-flow hr { border: 0; border-top: 1px solid var(--r-line); margin: 1.5em 25%; }
+
+/* Book style: indents, centred chapter heads, a drop cap. Modern: spaced paragraphs, left heads. */
+.st-book .fv-flow p + p { text-indent: 1.5em; }
+.st-book .fv-flow h1, .st-book .fv-flow h2, .st-book .fv-flow h3 { text-align: center; }
+/* A chapter's prose starts with a drop cap under its heading; the line after the book's end isn't prose. */
+.st-book .fv-flow :is(h1, h2) + p:not(.fv-end)::first-letter { -webkit-initial-letter: 2; initial-letter: 2; font-weight: 700; margin-right: 0.08em; }
+.st-modern .fv-flow p { margin-bottom: 0.8em; }
+.st-modern .fv-flow h1, .st-modern .fv-flow h2 { font-size: 2em; }
+
+.fv-prev { width: var(--cw); max-width: calc(100% - 48px); margin: 0 auto; padding-top: 28px; }
+.fv-prev + .fv-flow { padding-top: 32px; }
+.fv-next { display: flex; justify-content: center; padding: 16px 24px 96px; font: var(--ui-w) 13px/1 var(--ui); color: var(--r-mu); }
+.rd .btn-quiet { background: var(--r-fill); color: var(--r-fg); }
+.rd .btn-ghost { color: var(--r-mu); }
+.rd .btn-ghost:hover { background: var(--r-fill); color: var(--r-fg); }
+
+/* Page-turn zones: the outer fifth of the page, and the margin beyond it. */
+.fv-zone {
+  position: absolute;
+  top: 76px;
+  bottom: 76px;
+  width: calc(50% - var(--vw) / 2 + var(--vw) * 0.2);
+  display: flex;
+  align-items: center;
+  z-index: 2;
+  cursor: pointer;
+}
+.fv-zone.is-prev { left: 0; justify-content: flex-start; padding-left: 18px; }
+.fv-zone.is-next { right: 0; justify-content: flex-end; padding-right: 18px; }
+.fv-zone span { font: var(--ui-w-strong) 30px/1 var(--ui); color: var(--r-mu); opacity: 0; transition: opacity 160ms ease, transform 200ms cubic-bezier(0.2, 0.9, 0.25, 1); }
+.fv-zone.is-prev span { transform: translateX(6px); }
+.fv-zone.is-next span { transform: translateX(-6px); }
+@media (hover: hover) {
+  .fv-zone:hover span { opacity: 0.8; transform: none; }
+}
+
+/* The writer's: a chapter's number over its title, a line at the book's end saying what's still to
+   come, and under the contents, the download and what's being written. */
+.rd .fv-flow h1 { margin-bottom: 0.9em; font: var(--ui-w) 13px/1.2 var(--ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--r-mu); }
+.rd .fv-flow h1 + h2 { margin-top: 0; }
+.fv-flow .fv-end { margin: 2.4em 0 0; text-align: center; text-indent: 0; font: var(--ui-w) 12.5px/1.6 var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--r-mu); }
+.p-down { display: flex; align-items: center; justify-content: center; gap: 8px; height: 40px; margin-top: 18px; border-radius: 11px; background: var(--r-fill); font: var(--ui-w) 13px/1 var(--ui); color: var(--r-fg); text-decoration: none; transition: background-color 140ms ease; }
+.p-down:hover { background: var(--r-line); }
+.p-down svg { width: 16px; height: 16px; }
+.p-coming { margin: 12px 2px 0; font: var(--ui-w) 12.5px/1.5 var(--ui); color: var(--r-mu); }
+/* No chapters yet: the line above with only the way back, and why in the middle of the page. */
+.rd .bk-head { width: min(720px, calc(100% - 32px)); grid-template-columns: 1fr; }
+.rd .bk-head .i3-side:first-child { justify-self: start; }
+.bk-none { position: absolute; top: 50%; left: 50%; translate: -50% -50%; width: min(420px, calc(100% - 48px)); margin: 0; text-align: center; font: var(--ui-w) 13px/1.6 var(--ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--r-mu); }

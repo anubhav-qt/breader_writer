@@ -2,9 +2,10 @@ import type { Message } from '@writer/pi-ai';
 import { and, asc, eq, getTableName } from 'drizzle-orm';
 import { pairKey } from '@writer/shared/book';
 import type { Db, Tx } from '../db/client.ts';
-import { characters, notes, pages, relationshipHistory, relationships, scenes, sessionMessages, turns, worlds } from '../db/schema.ts';
+import { chapters, characters, notes, pages, relationshipHistory, relationships, scenes, sessionMessages, turns, worlds } from '../db/schema.ts';
 import { actorSegmentMessages, currentActorSegment } from './actors.ts';
 import { isStanding, namesOf } from './cast.ts';
+import { chapterOf } from './chapters.ts';
 import { edit, remove, StoryError, type Change, type StoryTable } from './changes.ts';
 import { Cast, linked, unlinked } from './mentions.ts';
 import type { Story } from './read.ts';
@@ -14,8 +15,9 @@ import { cueOf, type Scene, type Turn } from './scenes.ts';
 /*
  * The story's passages: every text a change that reaches back may have to rewrite, so what was
  * played reads as if it was always so (see "Changing the past" in CLAUDE.md). The turns, each
- * scene's place, time and summary, the openings offered for the first scene and what Procreator
- * told someone as it stopped a turn for the owner (a cue), the reference (titles too), Procreator's
+ * scene's place, time and summary, its chapter in the book, the openings offered for the first
+ * scene and what Procreator told someone as it stopped a turn for the owner (a cue), the reference
+ * (titles too), Procreator's
  * memory, the relationships' history, and the owner's own sheets, lines and world; and the working
  * copies that will be sent again, the owner's notes in a scene's session and the actors' chats.
  *
@@ -229,6 +231,12 @@ async function scenePassages(db: Db | Tx, scene: Scene, names: Names, protagonis
       passages.push({ spot: { kind: 'cue', turnId: turn.id }, where: `${at}: what Procreator told ${names.of(cue.who)} as it cued them`, text: cue.sees });
     }
   });
+  const chapter = await chapterOf(db, scene.id);
+  if (chapter) {
+    const where = `Chapter ${chapter.number} of the book`;
+    passages.push({ spot: storySpot(chapters, { id: chapter.id }, 'title'), where: `${where}: its title`, text: chapter.title });
+    passages.push({ spot: storySpot(chapters, { id: chapter.id }, 'body'), where, text: chapter.body });
+  }
   return passages;
 }
 
@@ -501,7 +509,9 @@ function keptText(passage: Passage, text: string): string {
   if (spot.kind !== 'story') {
     return text.trim();
   }
-  const oneLine = spot.table === notes || (spot.table === pages && (spot.column === 'about' || spot.column === 'title'));
+  const pageLine = spot.table === pages && (spot.column === 'about' || spot.column === 'title');
+  const chapterTitle = spot.table === chapters && spot.column === 'title';
+  const oneLine = spot.table === notes || pageLine || chapterTitle;
   if (oneLine) {
     return text.trim().replace(/\s+/g, ' ');
   }
@@ -568,19 +578,28 @@ async function rewriteCue(tx: Tx, change: Change, turnId: string, text: string) 
   await edit(tx, change, turns, { id: turnId }, { cue: { ...cue, sees: text.trim() } });
 }
 
+/** What a rewrite kept: how many of the story's rows it changed, and the chapters it rewrote, by id. */
+export interface Kept {
+  rows: number;
+  chapters: string[];
+}
+
 /**
  * The story's own passages rewritten, as part of the change: each column, the openings offered
- * (kept together on their scene) and the cues. Answers with how many of the story's rows it
- * changed. Only breading_ground calls this.
+ * (kept together on their scene) and the cues. Only breading_ground calls this.
  */
-export async function rewritePassages(tx: Tx, change: Change, words: NewWords[], cast: Cast): Promise<number> {
+export async function rewritePassages(tx: Tx, change: Change, words: NewWords[], cast: Cast): Promise<Kept> {
   let rows = 0;
   const openings = new Map<string, NewWords[]>();
+  const chaptersTouched = new Set<string>();
   for (const each of words) {
     const spot = each.passage.spot;
     if (spot.kind === 'story') {
       await rewriteColumn(tx, change, each.passage, each.text, cast);
       rows += 1;
+      if (spot.table === chapters) {
+        chaptersTouched.add(String(spot.key.id));
+      }
     } else if (spot.kind === 'cue') {
       await rewriteCue(tx, change, spot.turnId, each.text);
       rows += 1;
@@ -594,5 +613,5 @@ export async function rewritePassages(tx: Tx, change: Change, words: NewWords[],
     await rewriteOpenings(tx, change, sceneId, list);
     rows += 1;
   }
-  return rows;
+  return { rows, chapters: [...chaptersTouched] };
 }

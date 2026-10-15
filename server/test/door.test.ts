@@ -20,6 +20,7 @@ const WRITES: Record<string, string[]> = {
   'story/cast.ts': ['joinCast', 'seatInCast'],
   'story/sheets.ts': ['changeSheet', 'addPerson', 'leaveCast', 'removePerson', 'changeLine', 'untie', 'changeWorld', 'changeBook'],
   'story/notes.ts': ['savePage', 'removePage', 'saveNote', 'dropNote'],
+  'story/chapters.ts': ['keepChapter', 'recountChapters', 'recountBook'],
   'story/scenes.ts': [
     'startScene',
     'prepareScene',

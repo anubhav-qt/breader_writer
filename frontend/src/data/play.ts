@@ -63,6 +63,11 @@ export function goOn(bookId: string, going: Going, onEvent: OnEvent, signal: Abo
   return streamPlay(bookId, '/next', going, onEvent, signal);
 }
 
+/** The story has ended, and the owner finishes the book: its last scene is wrapped up. */
+export function finishBook(bookId: string, onEvent: OnEvent, signal: AbortSignal): Promise<void> {
+  return streamPlay(bookId, '/finish', {}, onEvent, signal);
+}
+
 /** Another reply to the newest turn. */
 export function another(bookId: string, going: Going, onEvent: OnEvent, signal: AbortSignal): Promise<void> {
   return streamPlay(bookId, '/again', going, onEvent, signal);

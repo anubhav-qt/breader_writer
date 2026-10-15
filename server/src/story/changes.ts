@@ -4,6 +4,7 @@ import type { Db, Tx } from '../db/client.ts';
 import {
   books,
   changes,
+  chapters,
   characters,
   notes,
   pages,
@@ -47,7 +48,7 @@ type Row = Record<string, unknown>;
 /** Something the story asked of the log that it can't do, said so the caller can tell the owner or the model. */
 export class StoryError extends Error {}
 
-const STORY_TABLES = [scenes, turns, pages, notes, relationshipHistory, worlds, characters, relationships, books];
+const STORY_TABLES = [scenes, turns, chapters, pages, notes, relationshipHistory, worlds, characters, relationships, books];
 
 export type StoryTable = (typeof STORY_TABLES)[number];
 

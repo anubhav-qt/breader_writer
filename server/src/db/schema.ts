@@ -212,6 +212,29 @@ export const turns = writer.table(
   (t) => [uniqueIndex('turns_book_number').on(t.bookId, t.number), index('turns_scene_idx').on(t.sceneId, t.number)],
 );
 
+/**
+ * A chapter of the book: a scene played, written up as finished prose once it's wrapped up
+ * (procreator/author.ts). One scene is one chapter, numbered as its scene is. Its words count
+ * towards the book's goal, and a change that reaches back rewrites it with the turns.
+ */
+export const chapters = writer.table(
+  'chapters',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bookId: bookRef(),
+    sceneId: uuid('scene_id')
+      .notNull()
+      .references(() => scenes.id),
+    /** Its scene's number. */
+    number: integer('number').notNull(),
+    title: text('title').notNull().default(''),
+    /** The chapter: plain prose, paragraphs a blank line apart. */
+    body: text('body').notNull().default(''),
+    words: integer('words').notNull().default(0),
+  },
+  (t) => [uniqueIndex('chapters_scene').on(t.sceneId), uniqueIndex('chapters_book_number').on(t.bookId, t.number)],
+);
+
 /** One change to the story, by the owner or the agent, at a turn. */
 export const changes = writer.table(
   'changes',

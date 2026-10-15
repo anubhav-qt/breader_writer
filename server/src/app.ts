@@ -10,6 +10,7 @@ import { bookRoutes } from './routes/books.ts';
 import { healthRoutes } from './routes/health.ts';
 import { meRoutes } from './routes/me.ts';
 import { playRoutes } from './routes/play.ts';
+import { readingRoutes } from './routes/reading.ts';
 import { storyRoutes } from './routes/story.ts';
 import { settingsRoutes } from './routes/settings.ts';
 import { suggestionRoutes } from './routes/suggestions.ts';
@@ -61,6 +62,7 @@ export function makeApp(deps: Deps) {
   app.route('/v1', bookRoutes(deps));
   app.route('/v1', playRoutes(deps));
   app.route('/v1', storyRoutes(deps));
+  app.route('/v1', readingRoutes(deps));
   app.route('/v1', settingsRoutes(deps));
   app.route('/v1', accountRoutes(deps));
   app.route('/v1', suggestionRoutes(deps));

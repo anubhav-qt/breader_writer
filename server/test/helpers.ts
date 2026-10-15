@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Catalog } from '../src/ai/catalog.ts';
+import type { Scribe } from '../src/book/scribe.ts';
 import { makeApp } from '../src/app.ts';
 import type { Deps } from '../src/context.ts';
 import { users } from '../src/db/breader.ts';
@@ -10,12 +11,12 @@ import { makeBreader, signUp } from './breader.ts';
 export const ORIGIN = 'http://localhost:5174';
 export const env = loadEnv();
 export const pool = makePool(env.DATABASE_URL, { ssl: false, name: 'test' });
-export const deps: Deps = { env, db: writerDb(pool), pool, breader: breaderDb(pool), catalog: null };
+export const deps: Deps = { env, db: writerDb(pool), pool, breader: breaderDb(pool), catalog: null, scribe: null };
 export const breader = makeBreader(pool, { secure: false });
 
-/** The writer, with some settings changed for one test, and its models from this catalog. */
-export function writer(over: Partial<Env> = {}, catalog: Catalog | null = null) {
-  return makeApp({ ...deps, env: { ...env, ...over }, catalog });
+/** The writer, with some settings changed for one test, its models from this catalog, and a scribe when a test wants the book written. */
+export function writer(over: Partial<Env> = {}, catalog: Catalog | null = null, scribe: Scribe | null = null) {
+  return makeApp({ ...deps, env: { ...env, ...over }, catalog, scribe });
 }
 
 export type Writer = ReturnType<typeof writer>;

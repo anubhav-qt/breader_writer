@@ -207,7 +207,7 @@ function searchTool(context: ToolContext): AgentTool<typeof Search> {
     name: 'search',
     label: 'Search',
     description:
-      "Finds exact words in the reference, the scene summaries and every turn played, and gives each place they come with the paragraph they're in, a dozen places at a time. Use it when a summary isn't enough: what exactly was said or promised, or when something first came up.",
+      "Finds exact words in the reference, the scene summaries, every turn played and the book as it's written, and gives each place they come with the paragraph they're in, a dozen places at a time. Use it when a summary isn't enough: what exactly was said or promised, or when something first came up.",
     parameters: Search,
     execute: (_id, params) =>
       guarded('search', async () => {

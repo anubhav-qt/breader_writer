@@ -5,6 +5,7 @@ import {
   askHints,
   askOpenings,
   fetchPlay,
+  finishBook,
   goOn,
   letActorPlay,
   openStory,
@@ -237,6 +238,13 @@ export function usePlay(bookId: string, held = false) {
     return run(start, (onEvent, signal) => goOn(bookId, { playOthers }, onEvent, signal));
   };
 
+  /** The story has ended, and the owner finishes the book: its last scene goes into it. */
+  const finish = (): Promise<boolean> => {
+    if (!play) return Promise.resolve(false);
+    const start = blankPending('opening', null, '', play.scene);
+    return run(start, (onEvent, signal) => finishBook(bookId, onEvent, signal));
+  };
+
   /** Another reply to the newest turn. */
   const again = (): Promise<boolean> => {
     if (!play) return Promise.resolve(false);
@@ -310,6 +318,7 @@ export function usePlay(bookId: string, held = false) {
     pickOpening,
     ownOpening,
     goOn: goOnToNext,
+    finish,
     again,
     letActor,
     undo,

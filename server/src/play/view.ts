@@ -2,7 +2,7 @@ import { and, asc, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Mark, Opening, Person, Play, PlayTurn, SceneHead, Stage } from '@writer/shared/play';
 import { REWROTE, type Offer } from '../breading_ground.ts';
 import type { Db } from '../db/client.ts';
-import { books, changes, scenes, versions } from '../db/schema.ts';
+import { books, changes, chapters, scenes, versions } from '../db/schema.ts';
 import { castOf, namesOf } from '../story/cast.ts';
 import { GONE, named } from '../story/mentions.ts';
 import { cueOf, turnsOf, type Scene, type Turn, type Voice } from '../story/scenes.ts';
@@ -202,6 +202,10 @@ async function standingOf(db: Db, all: Scene[]): Promise<Standing> {
   if (!last) {
     return { stage: 'start', onPage: null, next: null, cue: null };
   }
+  // No scene waits after it: the story has ended, and is finished once its last scene is wrapped up.
+  if (last.summary !== '') {
+    return { stage: 'finished', onPage: last, next: null, cue: null };
+  }
   return { stage: 'ended', onPage: last, next: null, cue: null };
 }
 
@@ -234,6 +238,7 @@ export async function playView(db: Db, bookId: string): Promise<Play> {
   if (standing.cue) {
     cue = { id: standing.cue, name: nameOf(index.names, standing.cue) };
   }
+  const [written] = await db.select({ count: count(chapters.id) }).from(chapters).where(eq(chapters.bookId, bookId));
   return {
     bookId,
     title: book.title,
@@ -244,5 +249,6 @@ export async function playView(db: Db, bookId: string): Promise<Play> {
     turns: await turnsShown(db, standing.onPage, index),
     cue,
     next,
+    chapters: written?.count ?? 0,
   };
 }

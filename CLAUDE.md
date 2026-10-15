@@ -56,7 +56,13 @@ Story panel is built on it (2026-10-11), checked in headless Chrome against a st
 so is the Notes panel (2026-10-15), with the owner's edits to pages and memory through the same
 door. On 2026-10-15 the owner said to finish everything left without stopping for design
 questions ("just finish it all, i will review, test and make more changes while using it"), so
-the design calls from then on are ours, each marked so below. The owner has a real book set up locally that they mean to play through
+the design calls from then on are ours, each marked so below. Step 7 (the book) is built
+(2026-10-15, see "Notes for step 7"): each scene, once the owner goes on from it, is written up as
+a chapter in the background, a story ends and the book is finished, the book view (breader's
+reader, cut down) is a tap away from the play with a mark for a new chapter, the EPUB download,
+and changes that reach back reach the chapters too. Its server has tests against a stand-in
+proxy; the book view was checked in headless Chrome against a stand-in API. The author hasn't
+met the real model yet. The owner has a real book set up locally that they mean to play through
 before production, so its data must survive every change (see "Running it locally"). See "The code" below for what exists.
 
 ### Decided
@@ -687,8 +693,7 @@ through them all in one local test once everything is built (see "Status").
     picked opening nowhere (it's offered again). An actor's turn gives nothing back.
   - Leaving the page stops what Procreator is writing, which takes the move back, as closing the
     Suggestions chat's page does.
-  - Story is in the top bar after undo; Notes and Book join it with what they open (the Notes
-    panel next, the book in step 7).
+  - Story is in the top bar after undo, then Notes and Book.
 - The Story panel (`frontend/src/features/story/`), as the owner's picks have it (see "The story
   is a panel away mid story"). Our calls where they didn't say (the owner can change them):
   - Before anything is played, everything saves plainly, and removing or untying doesn't ask:
@@ -781,9 +786,72 @@ through them all in one local test once everything is built (see "Status").
   or another page's.
   - Rewrite calls are recorded as `rewrite`, keyed for the cache by the book
     (`rewrite-<book id>`), so every part starts the same.
-  - The owner's local database is at migration 0011 since 2026-10-13 (backed up just before as
+  - The owner's local database was at migration 0011 from 2026-10-13 (backed up just before as
     `.backups/2026-10-13-before-0008.sql`). Their book came through whole: 10 characters, 16
     relationships, nothing played yet.
+
+### Notes for step 7
+
+All of step 7's design calls are ours (2026-10-15, the owner can change them), made after the
+owner said to finish everything without asking.
+
+- **A chapter is a scene.** Once a scene is wrapped up (the owner went on from it, so it can't be
+  taken back), the scribe (`server/src/book/scribe.ts`) has Procreator write it into the book as a
+  chapter, in the background: the book trails the play and the play never waits for it. Chapters
+  are written in order, the lowest scene first, each with the one before in view, and a chapter
+  has its scene's number. One book at a time per server, as play is. The scribe is nudged after
+  every play exchange, and whenever the play or the book is opened, so a chapter that failed (no
+  answer, cut off, nothing written, or the AI offline) is tried again then; nothing writes it
+  meanwhile. Tests run without it (`Deps.scribe` is null) and write chapters through
+  `writeMissing`.
+- **The author's call** (`procreator/author.ts`) is one call on the account's own model and
+  thinking level, recorded as `author` and keyed for the cache by the book (`author-<book id>`):
+  its instructions (`author/system.njk`: the book's settings, how a chapter is made from the play,
+  the title, the format), then the ask (`author/ask.njk`): the brief's world, story so far,
+  Procreator's notes, cast, relationships and the scene's places, the chapter before whole, the
+  scene's turns word for word, and the task last. It's asked for about 2,000 words, more or fewer
+  as the scene holds, and for `<title>` and `<chapter>` tags; an answer without a chapter tag
+  gives its first line as the title (unless it had one) and the rest as the chapter. A conventional book's
+  chapters get short titles, a light novel's long descriptive ones. Written to Google's Gemini
+  3.8 Flash guides (fetched 2026-10-15): no sampling settings, context first and the task last,
+  the length asked for, tags used the same way throughout.
+- **A chapter is the story's** (`chapters` table, `story/chapters.ts`, through breading_ground's
+  `writeChapter`), so its title and prose are passages: a rename or an always so rewrites them with
+  the turns, and a new point of view rewrites them whole. A chapter read before such a rewrite
+  landed isn't kept (`writeChapter` answers null when a rewrite came after the scribe started),
+  and the scribe writes it again from the story as it now reads. The book's words written are
+  its chapters' words, counted again whenever a chapter is kept or rewritten (the card's bar
+  fills with them); the recount after a rewrite is a change of its own ("Counted the book's words
+  again"), so a rewrite lists only passages. Procreator's `search` reaches the book too.
+- **A story ends** when Procreator calls `end_story` (its instructions say to, once the story
+  reaches its ending, as the brief says where it stands against its length, or when the owner
+  asks). The scene being played ends with no next one, and the play's stage is `ended` with no
+  `next`: "The end", with "Finish the book" under it. Until then, undo and another reply still
+  work, so the ending can be taken back like any scene's. Finishing (`POST .../play/finish`)
+  wraps the last scene up, which puts it in line for the book, and the stage is `finished`: the
+  box takes nothing, there's no undo, and "Read the book" under "The end".
+- **The book view** (`frontend/src/features/book/`, `/writer/books/<id>/book`) is breader's reader
+  copied and cut down to a book of text: pages or scrolling, the contents, Appearance (theme,
+  typeface, size, spacing, margins, layout, justify), full screen, the progress dots and minutes
+  left, keys and swipes, with no voices, Immersive, comments, search, AI or pictures. Its settings
+  are its own (`writer.reader.v1`), apart from breader's. Each chapter is a section: "Chapter 4"
+  small over its title, then its paragraphs. A line after the last chapter says what's still to
+  come ("Chapter 5 is being written.", "The end."), and the contents end with it and "Download as
+  EPUB". While a chapter is being written the page asks again every 5 seconds, and every minute
+  while one waits that isn't (each ask nudges the scribe). The place is kept in this browser
+  (`writer.place.v1`). Back (or Escape) goes to the play.
+- **The play's Book button** has a dot while the book has more chapters than the owner has seen in
+  the book view in this browser (`writer.bookSeen.v1`, against the play's `chapters`). On a
+  narrow phone the tools close up and the model chip keeps to a short name, so the title keeps
+  some room, cut short.
+- **The EPUB** (`server/src/book/epub.ts`, a store-only zip of our own in `book/zip.ts`) is EPUB 3:
+  the mimetype first, a title page, a contents page (`nav.xhtml`, which breader reads its chapters
+  from), and a page a chapter (`<section epub:type="chapter">` with "Chapter 4" as its `h1` and its
+  title as its `h2`), with no styling of its own. Its author is the owner's name on breader, and
+  its file name the book's title.
+- The owner's local database is at migration 0012 (the chapters) since 2026-10-15, backed up just
+  before as `.backups/2026-10-15-before-0012.sql` and tried on a copy first. Their book came
+  through whole.
 
 ### Later versions
 
@@ -851,7 +919,11 @@ their code, changed where we need, not rewritten to ours.
   (`Play`, with who is about to act), the asks (`MoveAsk`, with `as` for a move as someone cued,
   `OpenAsk`, and `Going` for going on, another reply and letting an actor play, each with
   `playOthers`), what undo and hints answer (`Undone`, `Hints`), and the streamed events
-  (`PlayEvent`).
+  (`PlayEvent`). The stage is `finished` once the story has ended and its last scene is wrapped
+  up, and the play says how many chapters the book has (`chapters`).
+- `src/reading.ts`: the book as it's written (step 7): a chapter (`ChapterView`) and the book as
+  the book view shows it (`BookView`: its chapters, the scenes waiting to be written, whether one
+  is being written now, and whether the story is finished).
 - `src/chat.ts`: the Suggestions chat. A change exactly as it will land (`SetupChange`: a field's
   whole new text, one of the book's choices, someone new, someone removed, two untied) and making
   it (`applyChange`, which ties two first for a line's field, and is null when it doesn't fit),
@@ -871,7 +943,7 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   on first use (`lazy`), and only for an account that can write; anyone else gets the library
   and its note.
 - `src/lib/route.ts`: the pages by address under `/writer/`: the library, `new`, a book's play
-  (`books/<id>`) and its setup (`books/<id>/setup`). Moving between them uses the history, so
+  (`books/<id>`), its book (`books/<id>/book`) and its setup (`books/<id>/setup`). Moving between them uses the history, so
   back and links work.
 - `src/lib/api.ts`: two servers. The writer's API (`VITE_API_URL`, default `/writer/api` on the
   app's own address; the dev server proxies it to port 8790) and breader's (`VITE_BREADER_API_URL`,
@@ -910,18 +982,29 @@ Vite, `motion`. Served under `/writer/` (`base` in `vite.config.ts`).
   beside the page or over it (`chat.css`); `landing.ts` is how an approved list lands on the
   page (see "Notes for step 5").
 - `src/data/play.ts`: play's server calls (the play, the openings and hints, a move and the rest
-  streamed, undo), and the switch "Main character and author only" as this browser keeps it.
+  streamed, finishing the book, undo), and the switch "Main character and author only" as this
+  browser keeps it.
 - `src/features/play/`: the play page (see "Notes for step 6"). `usePlay.ts` holds the play as
   the server last said it, and while Procreator writes, what was sent and its words so far
   (`Pending`): a move shows at once, its narration comes in word by word, and a move that fails
   puts the play back as the server answers and the owner's words back in the box.
-  `PlayPage.tsx` is the page: the top bar (back, the title, undo, Story, the model picker), the scene
+  `PlayPage.tsx` is the page: the top bar (back, the title, undo, Story, Notes, Book with its new
+  chapter mark, the model picker), the scene
   under its heading with its turns (moves as quiet italic lines, notes folded into marks, the
   quiet lines for the cast and relationships, "Another reply" under the newest), what's under
-  them as the play stands (the openings, a scene's end and "On to Scene 5"), and the hints and
+  them as the play stands (the openings, a scene's end and "On to Scene 5", the story's end and
+  "Finish the book", "Read the book"), and the hints and
   errors above the box. The page keeps to its end as words come in, unless the owner scrolled
   up. `MoveBox.tsx` is the pinned box, or its ask while someone cued is about to act. `play.css`
   is only what the library's buttons, chips and switch and Add a book's cards and spinner lack.
+- `src/data/book.ts` and `src/features/book/`: the book view (see "Notes for step 7"), breader's
+  reader cut down. `BookPage.tsx` reads the book (`fetchBook`), makes its chapters a book for the
+  reader (`FlowBook`, `types.ts`), and keeps the place and the chapters seen; `Reader.tsx` is the
+  reader, `FlowView.tsx` the text in pages or scrolled, `Panels.tsx` the contents and Appearance,
+  `chrome/` the lines of controls above and below the text, `chapters.ts` the chapters as
+  stretches of the book, `settings.ts` how it reads, `focus.ts` and `fullscreen.ts` full screen,
+  `turn.ts` page turns, and `reader.css` and `instrument.css` breader's styles for them, cut down.
+  `lib/glide.ts` and `lib/bars.ts` come with them from breader.
 - `src/data/story.ts` and `src/features/story/`: the Story panel (see "Notes for step 6").
   `useStory.ts` holds the story as the server last said it, the sheet open over the page and a
   change on its way, for the play page, so closing the panel doesn't stop a change and the quiet
@@ -980,7 +1063,8 @@ A Hono API, port 8790, built like breader's server.
   log), `pages` (the reference: a page per subject, by title, or by character for a cast
   member's), `notes` (Procreator's memory), `relationship_history`, `session_segments` and
   `session_messages` (each scene's session), `actor_segments` and `actor_messages` (each
-  actor's chat), and `calls` (each model call and the tokens it used). A turn that stopped for
+  actor's chat), `chapters` (the book: a chapter per scene written up, by its number, with its
+  title, prose and words), and `calls` (each model call and the tokens it used). A turn that stopped for
   the owner to say who plays someone keeps the cue (`turns.cue`). The Suggestions chat's are `setup_chats` (an account's, with its book once there is one,
   and the page as Procreator last saw it), `setup_chat_messages` and `setup_chat_entries`. The story's tables keep no times of their own; the change that made a row has it. A
   session is raw history like turns, only ever added to. drizzle-kit only sees this file and this
@@ -1049,8 +1133,8 @@ A Hono API, port 8790, built like breader's server.
     twice (in any case) is kept once. Remembering and forgetting are changes.
   - `relationships.ts`: shifting a relationship (tying the two first if they weren't, and adding
     to the line's history); `shiftOnce` does nothing when the shift is in place already.
-  - `search.ts`: exact words in the pages (as Procreator reads them), the scene summaries and
-    every standing turn, in any case and across line breaks, each match as the paragraph it's
+  - `search.ts`: exact words in the pages (as Procreator reads them), the scene summaries, every
+    standing turn and the book's chapters, in any case and across line breaks, each match as the paragraph it's
     in. It shows a dozen at a time and the next dozen are a search away (`from`), so every match
     can be reached without a common name pouring hundreds into the session.
   - `session.ts`: a scene's session as it's kept: segments (`startSegment`, `currentSegment`),
@@ -1063,8 +1147,10 @@ A Hono API, port 8790, built like breader's server.
     are as it told them, and what they remember after a compaction), and messages of kind `play`
     or `fold`, each at a turn in a scene, with who they are when a message told them it changed.
     `cutActors` is undo's side.
+  - `chapters.ts`: the book's chapters (step 7), kept (`keepChapter`) and counted, with the
+    book's words written counted again from them (`recountBook`). breading_ground's alone.
   - `passages.ts`: the story's passages, every text a change that reaches back may rewrite, in
-    parts (a scene at a time, then the rest), each with where it is (`passagesOf`), and keeping
+    parts (a scene at a time, its chapter included, then the rest), each with where it is (`passagesOf`), and keeping
     one rewritten through the change log (`rewritePassage`, breading_ground's alone). `wheresOf`
     says where each is, for looking a rewrite over.
   - `read.ts` reads everything a book's story knows in one go (`readStory`), and `view.ts`
@@ -1085,10 +1171,12 @@ A Hono API, port 8790, built like breader's server.
     refusals reach the model as they are; any other failure is logged and the model is told
     it's the writer's.
   - `play.ts`: the play tools (`set_scene`, `join_cast`, `cue`, `send_back`, `end_scene`,
-    `offer_openings`, `offer_moves`), and what they did in a run (`Outcome`, and `stopped`, when
-    the scene ended or a cue waits for the owner). `toolsFor` is every tool of a run.
+    `end_story`, `offer_openings`, `offer_moves`), and what they did in a run (`Outcome`, and
+    `stopped`, when the scene or the story ended or a cue waits for the owner). `toolsFor` is every tool of a run.
   - `actor.ts`: the cast's actors (see "Notes for step 6"): `cueActor`, `sendBack`, `tellActor`
     (what the owner played them doing), and their chats' compaction.
+  - `author.ts`: Procreator as the author (step 7): a scene written up as a chapter (`writeUp`),
+    its instructions (`authorView`), the ask (`chapterAsk`) and reading the answer (`chapterFrom`).
   - `run.ts`: one exchange (`exchange`): the session sent as it stands (instructions and tool
     declarations, the head, the segment's messages) plus one message, through pi's agent loop,
     tools run one at a time, with no cap on calls or time (a stuck run is stopped by hand,
@@ -1137,6 +1225,9 @@ A Hono API, port 8790, built like breader's server.
   keeps a list's items that still fit the page (`stillFitting`), and
   `chat.ts` runs it (`say`, `redo`, `approve`, and `alone`, one exchange at a time), with its
   tools `propose_changes` and `revise_change`.
+- `src/book/`: the book (step 7). `scribe.ts` writes it in the background (`backgroundScribe`,
+  `writeMissing`), `view.ts` is the book as the book view shows it (`bookView`), `epub.ts` the
+  EPUB, and `zip.ts` a plain zip for it.
 - `src/ai/call.ts`: keeping account of model calls (`recordCall`): each in `calls`, with what it
   was for (narrator, author, hints, fold, actor, rewrite, or setup for setup help), the tokens the writer
   counted before sending (`counted`) and what the model says it used, cache reads included. A
@@ -1194,7 +1285,8 @@ A Hono API, port 8790, built like breader's server.
   page shows it), `POST .../play/openings` (asks for the first scene's openings, once),
   `.../play/open` (the owner's pick or their own opening), `.../play/move` (a move or an author
   note), `.../play/next` (on to the next scene), `.../play/again` (another reply) and
-  `.../play/actor` (the one about to act is played by their actor), each streamed: the scene's heading when it's set, `finishing` while the scene before is wrapped
+  `.../play/actor` (the one about to act is played by their actor) and `.../play/finish` (the
+  story has ended and the owner finishes the book), each streamed: the scene's heading when it's set, `finishing` while the scene before is wrapped
   up, Procreator's words, then the play, or why it couldn't go on (with the play as it stands).
   `.../play/undo` gives the play and the owner's words back, and `.../play/hints` three moves.
   What play can't do as the story stands is a 409. The Story panel, `open` only:
@@ -1202,9 +1294,11 @@ A Hono API, port 8790, built like breader's server.
   owner's change, streamed: how far a rewrite has got, then the story and what was rewritten, or
   why not with the story as it stands; a 503 before it starts when it reaches back while the AI
   is offline) and `GET /v1/books/:id/story/rewrites/:change` (what a rewrite changed, each
-  passage before and after). Once anything is played, `PUT .../setup` is a 409 too. `routes/ai.ts`
-  is the model an account's calls run on, and the 503 and 502 every route that calls Procreator
-  gives.
+  passage before and after). Once anything is played, `PUT .../setup` is a 409 too. The book,
+  `open` only (`routes/reading.ts`): `GET /v1/books/:id/book` (the book as it's written so far)
+  and `GET /v1/books/:id/epub` (the EPUB, as a download). `routes/ai.ts` is the model an
+  account's calls run on, the 503 and 502 every route that calls Procreator gives, and the nudge
+  to the scribe (`writeTheBook`) that play and the book make.
 - `src/app.ts`: CORS with credentials for `ALLOWED_ORIGINS`, writes only from those origins
   (`lib/http.ts`, copied from breader), a 1 MB body limit, JSON errors (`lib/errors.ts`).
 - `src/migrate.ts` and `drizzle/`: migrations go in their own table, `writer.migrations`, under
@@ -1244,7 +1338,10 @@ A Hono API, port 8790, built like breader's server.
   `test/edits.test.ts` the owner's changes mid story (the Story panel's story, each change from
   now on and its note, undo leaving them, someone leaving, before anything is played, renames
   and always so reaching back, and the Notes panel's pages and memory), `test/rewrite.test.ts` Procreator's edits to the passages and
-  the passages a rename gives it, and `test/door.test.ts` breading_ground as the one door.
+  the passages a rename gives it, `test/book.test.ts` the book (reading the author's answer,
+  chapters written in order with the one before in view, a chapter that fails and one a rewrite
+  overtook, renames reaching chapters, a story ending and being finished, the EPUB, and search),
+  and `test/door.test.ts` breading_ground as the one door.
 
 ### Running it locally
 
@@ -1399,7 +1496,7 @@ from it.
   they hold "from now on"; when they rewrite the past ("always so", a rename), the session starts
   again from the rewritten turns.
 - **Recall exact words on demand.** A tool searches the reference, the scene summaries, every
-  turn played and (from step 7) the written book.
+  turn played and the written book.
 - **Measure it.** Every call is recorded with the tokens counted before sending and what the
   model says it used, cache reads included.
 

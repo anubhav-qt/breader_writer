@@ -1,0 +1,241 @@
+/*
+ * The book's controls live in the page's margins: the line above the text names the chapter and
+ * turns into controls under the pointer, the line below is a dot-matrix of the whole book. Colour
+ * inside the book comes only from the book: progress, the current chapter and selection. Breader's
+ * instrument.css (features/reader/instrument.css), without voices, Immersive, comments and the rest.
+ */
+
+/* Book colour */
+.rd {
+  --book-mark: var(--book);
+  --book-soft: color-mix(in srgb, var(--book) 16%, transparent);
+}
+.rd ::selection { background: color-mix(in srgb, var(--book) 34%, transparent); }
+.rd .p-bar i { background: var(--book-mark); }
+.rd .p-item.is-now { background: var(--book-soft); }
+.rd .p-item.is-now .p-item-s { color: var(--r-fg); }
+.rd .p-item-s svg { color: var(--book-mark); }
+
+/* The margins carry their own readouts instead of the running head and page number. */
+.rd .fv-rh, .rd .fv-folio { display: none; }
+
+/* ------------------------------------------------------------------ */
+/* Page transitions (turn.ts). The screen is snapshotted as a whole and wiped between the page's
+   edges; the controls sit above it, live. */
+
+.rd .rd-chrome { view-transition-name: chrome; }
+
+::view-transition { pointer-events: none; }
+:root[data-turn]::view-transition-group(root) { animation: none; }
+:root[data-turn]::view-transition-old(root),
+:root[data-turn]::view-transition-new(root) { mix-blend-mode: normal; animation: none; }
+/* The controls' old picture stays under the new one, so they hold still if a browser can't draw
+   the new one mid-turn rather than blinking out. */
+:root[data-turn]::view-transition-group(chrome) { animation: none; }
+:root[data-turn]::view-transition-old(chrome),
+:root[data-turn]::view-transition-new(chrome) { mix-blend-mode: normal; animation: none; }
+
+/* A hard wipe in the direction of travel. */
+:root[data-turn="wipe"]::view-transition-new(root) { animation: vt-wipe-next var(--dur-snappy) var(--ease-snappy) both; }
+:root[data-turn="wipe"][data-dir="prev"]::view-transition-new(root) { animation-name: vt-wipe-prev; }
+
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; } }
+@keyframes vt-wipe-next { from { clip-path: inset(0 0 0 var(--wipe-r, 100%)); } to { clip-path: inset(0 0 0 var(--wipe-l, 0)); } }
+@keyframes vt-wipe-prev { from { clip-path: inset(0 var(--wipe-lr, 100%) 0 0); } to { clip-path: inset(0 var(--wipe-rr, 0) 0 0); } }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-turn]::view-transition-old(root) { animation: vt-out 150ms ease both; }
+  :root[data-turn]::view-transition-new(root) { animation: vt-in 150ms ease both; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared parts */
+
+.lbl {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 9px 12px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  background: var(--r-bg);
+  box-shadow: 0 0 0 1px var(--r-line), 0 14px 32px -16px var(--r-shadow);
+}
+.lbl b { font: var(--ui-w) 13px/1 var(--ui); color: var(--r-mu); }
+.lbl-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--read); font-size: 22px; line-height: 1; color: var(--r-fg); }
+.lbl em { font: var(--ui-w) 13px/1 var(--ui); font-style: normal; color: var(--r-mu); }
+
+.dg { display: inline-flex; }
+.dg-slot { display: inline-block; height: 1em; overflow: hidden; }
+.dg-strip { display: flex; flex-direction: column; }
+.dg-strip span { height: 1em; line-height: 1; }
+
+.typed { display: inline-block; animation: typed calc(var(--n) * 14ms + 80ms) steps(var(--n), end) both; }
+@keyframes typed { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+
+
+/* ------------------------------------------------------------------ */
+/* Controls in the margins */
+
+.i3-head, .i3-foot {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 9;
+  width: min(calc(var(--pw) + 48px), calc(100% - 32px));
+  height: 76px;
+  display: grid;
+  align-items: center;
+  font: var(--ui-w) 13px/1 var(--ui);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--r-mu);
+  background: var(--r-bg);
+  transition: background-color 250ms linear, opacity 260ms ease;
+}
+.i3-head { top: 0; grid-template-columns: 1fr auto 1fr; gap: 12px; }
+/* minmax(0, …): the dots follow the bar's width instead of holding it open. */
+.i3-foot { bottom: 0; grid-template-columns: 96px minmax(0, 1fr) 96px; gap: 16px; }
+/* On a phone the lines run the screen's full width, so a page running edge to edge never shows past their ends. */
+@media (max-width: 639.98px) {
+  .i3-head, .i3-foot { width: 100%; padding: 0 16px; }
+}
+.i3-side {
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--r-fg);
+  text-transform: inherit;
+  letter-spacing: inherit;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 160ms ease, transform var(--dur-snappy) var(--ease-snappy), background-color 140ms ease;
+}
+.i3-head .i3-side:first-child { justify-self: start; }
+.i3-head .i3-side:last-child { justify-self: end; }
+.i3-head.is-on .i3-side { opacity: 1; transform: none; }
+.i3-side.is-open { background: var(--r-fill); }
+/* Written as it's said: a small a after the capital, even in the uppercase bar. */
+.i3-head .i3-aa { text-transform: none; }
+.i3-head .i3-ends { justify-self: end; display: flex; align-items: center; gap: 2px; }
+.i3-icon { display: grid; place-items: center; padding: 9px; }
+.i3-dots-icon { height: 0.8em; fill: currentColor; }
+/* A loading icon fills with the book's colour, dot by dot. */
+.i3-dots-icon.is-filling rect { opacity: 0.3; transition: opacity 200ms ease; }
+.i3-dots-icon rect.is-lit { opacity: 1; fill: var(--book-mark); }
+.i3-mid {
+  min-width: 0;
+  max-width: min(560px, calc(var(--pw) - 220px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--r-mu);
+  text-transform: inherit;
+  letter-spacing: inherit;
+  transition: color 160ms ease, background-color 140ms ease;
+}
+.i3-mid .typed { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.i3-head.is-on .i3-mid { color: var(--r-fg); }
+.i3-mid.is-open { background: var(--r-fill); }
+@media (hover: hover) {
+  .i3-side:hover, .i3-mid:hover { background: var(--r-fill); }
+}
+/* Touch screens have no pointer to reveal the controls with, so they stay, quietly. */
+@media (hover: none) {
+  .i3-head .i3-side { opacity: 1; transform: none; color: var(--r-mu); }
+  .i3-head .i3-caret { opacity: 0.6; }
+}
+.i3-caret { font-size: 10px; opacity: 0; transition: opacity 160ms ease, transform var(--dur-snappy) var(--ease-snappy); }
+.i3-head.is-on .i3-caret { opacity: 1; }
+.i3-mid.is-open .i3-caret { transform: rotate(180deg); }
+.i3-read { display: inline-flex; align-items: baseline; gap: 4px; font: var(--ui-w-strong) 15px/1 var(--ui); color: var(--r-fg); }
+.i3-read small { font: var(--ui-w) 13px/1 var(--ui); color: var(--r-mu); }
+.i3-read.is-right { justify-self: end; }
+.i3-dots { position: relative; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.i3-dot {
+  --dc: var(--r-line);
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin: 0 1.5px;
+  border-radius: 1px;
+  background: var(--dc);
+  transition: background-color 240ms ease, transform var(--dur-snappy) var(--ease-snappy);
+}
+.i3-dot.is-split { margin-left: 6.5px; }
+.i3-dot.is-read { --dc: var(--book-mark); }
+.i3-dot.is-now { --dc: var(--r-fg); }
+.i3-foot.is-on .i3-dot { transform: scale(1.2); }
+.i3-foot .i3-dot.is-hover { transform: scale(1.6); }
+.i3-dot.is-hover.is-next { --dc: var(--r-mu); }
+
+/* Phones: the readouts and the back button take less room, so the chapter and the dots get it. */
+@media (max-width: 520px) {
+  .i3-foot { grid-template-columns: 72px minmax(0, 1fr) 72px; gap: 10px; }
+  .i3-back-word { display: none; }
+  .i3-mid { max-width: min(560px, calc(var(--pw) - 100px)); }
+}
+.i3-tip { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); pointer-events: none; text-transform: none; letter-spacing: 0; }
+.i3-scrim { position: absolute; inset: 0; z-index: 7; }
+.i3-drop {
+  position: absolute;
+  top: 66px;
+  z-index: 8;
+  width: min(380px, calc(100% - 24px));
+  max-height: calc(100% - 140px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--r-bg);
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--r-line), 0 28px 60px -28px var(--r-shadow);
+}
+.i3-drop-in { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+/* Close, top right of the drops and the say-as card, level with their headings. */
+.i3-x {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--r-mu);
+  background: var(--r-bg);
+  transition: color 140ms ease, background-color 140ms ease;
+}
+.i3-x:hover { color: var(--r-fg); background: var(--r-fill); }
+.i3-drop.is-toc { left: max(12px, calc(50% - 190px)); }
+.i3-drop.is-look { right: max(12px, calc(50% - var(--pw) / 2 - 24px)); width: min(320px, calc(100% - 24px)); }
+.rd .pnl-h { text-transform: uppercase; letter-spacing: 0.06em; }
+/* Contents status as squares: filled when read, half when you're in it, open when not yet. */
+.rd .p-item { justify-content: flex-start; gap: 12px; }
+.rd .p-item::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 1.5px; box-shadow: inset 0 0 0 1.5px var(--r-line); }
+.rd .p-item.is-done::before { background: var(--book-mark); box-shadow: none; }
+.rd .p-item.is-now::before { background: linear-gradient(to top, var(--book-mark) 50%, transparent 50%); box-shadow: inset 0 0 0 1.5px var(--book-mark); }
+.rd .p-item-s { margin-left: auto; }
+.rd .p-item-s svg { display: none; }
+
+
+/* ------------------------------------------------------------------ */
+/* Waking and focus (focus.ts). A mouse moved a little over an inch wakes the controls, arrows
+   included; in full screen everything but the page sleeps until then, and the pointer too. */
+
+.rd.is-awake .i3-head .i3-side { opacity: 1; transform: none; }
+.rd.is-awake .i3-head .i3-mid { color: var(--r-fg); }
+.rd.is-awake .i3-head .i3-caret { opacity: 1; }
+.rd.is-awake .fv-zone span { opacity: 0.8; transform: none; }
+
+.rd.is-focus:not(.is-awake) .i3-head,
+.rd.is-focus:not(.is-awake) .i3-foot { opacity: 0; pointer-events: none; }
+.rd.is-focus:not(.is-awake) .fv-zone span { opacity: 0; }
+.rd.is-focus.is-still, .rd.is-focus.is-still * { cursor: none !important; }
+
+
+
+.i3-left { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; min-width: 0; }
